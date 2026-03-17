@@ -15,10 +15,16 @@ interface Stem {
   sourceNode?: AudioBufferSourceNode; volume: number; pan: number;
   muted: boolean; fftData: Uint8Array; waveformPeaks: Float32Array;
 }
+import { MixPreset, PRESETS } from './PresetScreen';
+
 interface MixEditorProps {
   projectId: string; user: User; uploadedFiles: File[];
   onBack: () => void; onCreditsUpdate: (n: number) => void;
   onExport: (d: { audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array; finalLufs: number }) => void;
+  initialPreset?: MixPreset;
+  reverbOn?: boolean;
+  delayOn?: boolean;
+  stereoOn?: boolean;
 }
 
 const C = {
@@ -34,7 +40,7 @@ const C = {
   progressBar: (pct:number) => ({height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'8px',width:`${pct}%`,transition:'width 0.3s ease'}),
 };
 
-export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCreditsUpdate, onExport }: MixEditorProps) {
+export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCreditsUpdate, onExport, initialPreset, reverbOn = false, delayOn = false, stereoOn = false }: MixEditorProps) {
   const [stems, setStems] = useState<Stem[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -42,9 +48,9 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const [masterVolume, setMasterVolume] = useState(0);
   const [lufsIntegrated, setLufsIntegrated] = useState(-23.0);
   const [lufsMomentary, setLufsMomentary] = useState(-23.0);
-  const [bassGain, setBassGain] = useState(0);
-  const [midGain, setMidGain] = useState(0);
-  const [highGain, setHighGain] = useState(0);
+  const [bassGain, setBassGain] = useState(initialPreset?.bass ?? 0);
+  const [midGain, setMidGain] = useState(initialPreset?.mid ?? 0);
+  const [highGain, setHighGain] = useState(initialPreset?.high ?? 0);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStep, setLoadingStep] = useState('Inicializando...');
@@ -52,6 +58,8 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStep, setExportStep] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showPresetPanel, setShowPresetPanel] = useState(false);
+  const [activePreset, setActivePreset] = useState<MixPreset|undefined>(initialPreset);
   const [allFiles, setAllFiles] = useState<File[]>(uploadedFiles);
 
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -87,7 +95,42 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       highFilter.type = 'highshelf'; highFilter.frequency.value = 8000; highFilter.gain.value = highGain;
       mixAnalyser.fftSize = 2048; mixAnalyser.smoothingTimeConstant = 0.8;
       masterGain.connect(bassFilter); bassFilter.connect(midFilter); midFilter.connect(highFilter);
-      highFilter.connect(mixAnalyser); mixAnalyser.connect(audioContext.destination);
+
+      // REVERB real con ConvolverNode
+      const reverbNode = audioContext.createConvolver();
+      const reverbGain = audioContext.createGain();
+      const dryGain = audioContext.createGain();
+      const reverbLen = audioContext.sampleRate * 2.5;
+      const reverbBuf = audioContext.createBuffer(2, reverbLen, audioContext.sampleRate);
+      for (let c = 0; c < 2; c++) {
+        const d = reverbBuf.getChannelData(c);
+        for (let i = 0; i < reverbLen; i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/reverbLen, 3.5);
+      }
+      reverbNode.buffer = reverbBuf;
+      const reverbWetVal = (initialPreset?.reverbWet ?? 0) * (reverbOn ? 1 : 0);
+      reverbGain.gain.value = reverbWetVal;
+      dryGain.gain.value = 1 - reverbWetVal * 0.4;
+
+      // DELAY real con DelayNode
+      const delayNode = audioContext.createDelay(1.0);
+      const delayFeedback = audioContext.createGain();
+      const delayGainNode = audioContext.createGain();
+      delayNode.delayTime.value = 0.25;
+      delayFeedback.gain.value = 0.3;
+      delayGainNode.gain.value = (initialPreset?.delayWet ?? 0) * (delayOn ? 1 : 0);
+
+      // Conectar cadena con efectos
+      highFilter.connect(dryGain);
+      highFilter.connect(reverbNode);
+      reverbNode.connect(reverbGain);
+      highFilter.connect(delayNode);
+      delayNode.connect(delayFeedback);
+      delayFeedback.connect(delayNode);
+      delayNode.connect(delayGainNode);
+      dryGain.connect(mixAnalyser);
+      reverbGain.connect(mixAnalyser);
+      delayGainNode.connect(mixAnalyser);
+      mixAnalyser.connect(audioContext.destination);
       masterGain.gain.value = Math.pow(10, masterVolume / 20);
       masterGainRef.current = masterGain; mixAnalyserRef.current = mixAnalyser;
       mixFftDataRef.current = new Uint8Array(mixAnalyser.frequencyBinCount);
@@ -121,6 +164,17 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       setLoadingProgress(100); setLoadingStep('¡Listo!');
       setTimeout(() => setIsLoading(false), 500);
     } catch (e) { console.error(e); setIsLoading(false); }
+  };
+
+  const applyPresetToAudio = (preset: MixPreset) => {
+    const ctx = audioContextRef.current;
+    if (!ctx) return;
+    if (bassFilterRef.current) bassFilterRef.current.gain.setTargetAtTime(preset.bass, ctx.currentTime, 0.05);
+    if (midFilterRef.current) midFilterRef.current.gain.setTargetAtTime(preset.mid, ctx.currentTime, 0.05);
+    if (highFilterRef.current) highFilterRef.current.gain.setTargetAtTime(preset.high, ctx.currentTime, 0.05);
+    setBassGain(preset.bass); setMidGain(preset.mid); setHighGain(preset.high);
+    setActivePreset(preset);
+    setShowPresetPanel(false);
   };
 
   const generateWaveformPeaks = (buffer: AudioBuffer, samples: number): Float32Array => {
@@ -260,8 +314,17 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       setExportProgress(15); setExportStep('Aplicando reducción de ruido, compresión y EQ...'); await new Promise(r=>setTimeout(r,1200));
       const offCtx = new OfflineAudioContext(2, Math.floor(44100*duration), 44100);
       const mixBus = offCtx.createGain();
+      // Compresión real según preset
+      const compMap: Record<string,(c:DynamicsCompressorNode)=>void> = {
+        none: c => { c.threshold.value=-60; c.ratio.value=1; c.knee.value=40; c.attack.value=0.1; c.release.value=0.5; },
+        low:  c => { c.threshold.value=-24; c.ratio.value=2; c.knee.value=20; c.attack.value=0.02; c.release.value=0.3; },
+        medium: c => { c.threshold.value=-18; c.ratio.value=4; c.knee.value=12; c.attack.value=0.005; c.release.value=0.1; },
+        high: c => { c.threshold.value=-14; c.ratio.value=6; c.knee.value=8; c.attack.value=0.003; c.release.value=0.08; },
+        max:  c => { c.threshold.value=-10; c.ratio.value=10; c.knee.value=4; c.attack.value=0.001; c.release.value=0.05; },
+      };
       const compressor = offCtx.createDynamicsCompressor();
-      compressor.threshold.value=-18; compressor.knee.value=12; compressor.ratio.value=4; compressor.attack.value=0.005; compressor.release.value=0.1;
+      const compType = initialPreset?.compression ?? 'medium';
+      (compMap[compType] || compMap.medium)(compressor);
       const noiseRed = offCtx.createBiquadFilter(); noiseRed.type='highpass'; noiseRed.frequency.value=40;
       const lowShelf = offCtx.createBiquadFilter(); lowShelf.type='lowshelf'; lowShelf.frequency.value=100; lowShelf.gain.value=bassGain+1.2;
       const midPeak = offCtx.createBiquadFilter(); midPeak.type='peaking'; midPeak.frequency.value=2500; midPeak.Q.value=0.8; midPeak.gain.value=midGain-0.5;
@@ -395,7 +458,15 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'16px',gap:'10px',flexWrap:'wrap'}}>
           <div>
             <h1 style={{fontSize:'clamp(18px,4vw,26px)',fontWeight:700,letterSpacing:'-0.5px',...C.grad,margin:0}}>🎛️ Mezclador AI Pro</h1>
-            <p style={{color:'#9B7EC8',fontSize:'12px',marginTop:'4px'}}>{stems.length} stems · {fmt(duration)}</p>
+            <p style={{color:'#9B7EC8',fontSize:'12px',marginTop:'4px'}}>
+              {stems.length} stems · {fmt(duration)}
+              {activePreset && (
+                <button onClick={() => setShowPresetPanel(!showPresetPanel)}
+                  style={{marginLeft:'8px',background:'rgba(192,38,211,0.1)',border:'1px solid rgba(192,38,211,0.3)',borderRadius:'980px',padding:'3px 10px',fontSize:'11px',color:'#C026D3',fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'4px'}}>
+                  ✦ {activePreset.name} <i className="ri-arrow-down-s-line" style={{fontSize:'12px'}}></i>
+                </button>
+              )}
+            </p>
           </div>
           <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
             {stems.length<12&&<button onClick={()=>setShowUploadModal(true)} style={{...C.ghostBtn,fontSize:'12px',padding:'8px 14px'}}>+ Stems ({stems.length}/12)</button>}
@@ -559,6 +630,38 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           </div>
         )}
       </div>
+
+      {/* Panel de presets — cambiar y comparar en caliente */}
+      {showPresetPanel && (
+        <div style={{position:'fixed',inset:0,background:'rgba(15,10,26,0.85)',backdropFilter:'blur(8px)',zIndex:50,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}}
+          onClick={() => setShowPresetPanel(false)}>
+          <div style={{background:'#1A1028',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'20px 20px 0 0',padding:'20px 16px 32px',width:'100%',maxWidth:'800px',maxHeight:'85vh',overflowY:'auto'}}
+            onClick={e => e.stopPropagation()}>
+            <div style={{width:'36px',height:'4px',background:'rgba(192,38,211,0.3)',borderRadius:'2px',margin:'0 auto 18px'}}></div>
+            <div style={{fontSize:'14px',fontWeight:600,color:'#F8F0FF',marginBottom:'4px',textAlign:'center'}}>Cambiar preset de mezcla</div>
+            <div style={{fontSize:'12px',color:'#9B7EC8',textAlign:'center',marginBottom:'16px'}}>Los cambios se aplican al audio en tiempo real</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'8px'}}>
+              {PRESETS.map(p => {
+                const isSel = activePreset?.id === p.id;
+                return (
+                  <button key={p.id} onClick={() => applyPresetToAudio(p)}
+                    style={{background:isSel?'rgba(192,38,211,0.12)':'#0F0A1A',border:`1.5px solid ${isSel?p.color:'rgba(192,38,211,0.1)'}`,borderRadius:'12px',padding:'12px',cursor:'pointer',textAlign:'left',transition:'all 0.15s'}}>
+                    <div style={{fontSize:'13px',fontWeight:600,color:'#F8F0FF',marginBottom:'3px',display:'flex',alignItems:'center',gap:'5px'}}>
+                      {isSel && <span style={{color:p.color}}>✦</span>}{p.name}
+                    </div>
+                    <div style={{fontSize:'10px',color:'#9B7EC8',lineHeight:1.4}}>{p.desc}</div>
+                    <div style={{display:'flex',gap:'3px',marginTop:'6px',flexWrap:'wrap'}}>
+                      <span style={{fontSize:'10px',padding:'1px 6px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>B:{p.bass>0?'+':''}{p.bass}</span>
+                      <span style={{fontSize:'10px',padding:'1px 6px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>M:{p.mid>0?'+':''}{p.mid}</span>
+                      <span style={{fontSize:'10px',padding:'1px 6px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>H:{p.high>0?'+':''}{p.high}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <UploadModal isOpen={showUploadModal} onClose={()=>setShowUploadModal(false)}
         onUploadComplete={handleUploadMoreStems} userCredits={user.credits} onCreditsUpdate={onCreditsUpdate} />

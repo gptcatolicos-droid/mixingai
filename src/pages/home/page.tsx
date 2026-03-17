@@ -70,8 +70,15 @@ export default function HomePage() {
         )}
       </nav>
 
-      {/* HERO */}
-      <section style={{maxWidth:'1000px',margin:'0 auto',padding:'80px 24px 60px',textAlign:'center'}}>
+      {/* HERO con fondo de estudio */}
+      <section style={{position:'relative',overflow:'hidden',padding:'80px 24px 60px',textAlign:'center'}}>
+        <div style={{position:'absolute',inset:0,backgroundImage:"url('https://images.unsplash.com/photo-1598653222000-6b7b7a552625?w=1400&q=80')",backgroundSize:'cover',backgroundPosition:'center top',opacity:0.09,pointerEvents:'none'}}></div>
+        <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,#0F0A1A 0%,rgba(15,10,26,0.2) 30%,rgba(15,10,26,0.2) 70%,#0F0A1A 100%)',pointerEvents:'none'}}></div>
+        {/* Imagen de fondo tenue — home studio */}
+        <div style={{position:'absolute',inset:0,backgroundImage:'url(https://images.unsplash.com/photo-1598653222000-6b7b7a552625?w=1400&q=80)',backgroundSize:'cover',backgroundPosition:'center',opacity:0.07,pointerEvents:'none'}}></div>
+        {/* Gradiente encima de la imagen */}
+        <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,#0F0A1A 0%,transparent 30%,transparent 70%,#0F0A1A 100%)',pointerEvents:'none'}}></div>
+        <div style={{position:'relative',maxWidth:'1000px',margin:'0 auto'}}>
         {/* Badge */}
         <div style={{display:'inline-flex',alignItems:'center',gap:'8px',background:'rgba(192,38,211,0.1)',border:'1px solid rgba(192,38,211,0.25)',borderRadius:'980px',padding:'6px 16px',marginBottom:'32px'}}>
           <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'#4ade80'}}></div>
@@ -113,6 +120,9 @@ export default function HomePage() {
               <div style={{fontSize:'12px',color:'#9B7EC8',marginTop:'4px'}}>{s.label}</div>
             </div>
           ))}
+        </div>
+      </section>
+
         </div>
       </section>
 
