@@ -2,8 +2,8 @@ User-agent: *
 Allow: /
 Allow: /auth/login
 Allow: /auth/register
-Allow: /pricing
 Allow: /blog
+Allow: /blog/
 Allow: /terms
 Allow: /privacy
 Allow: /cookies
@@ -16,4 +16,13 @@ Disallow: /billing
 Disallow: /feed
 Disallow: /analytics
 
+# Sitemap
 Sitemap: https://mixingmusic.ai/sitemap.xml
+
+# Crawl-delay para bots agresivos
+User-agent: AhrefsBot
+Crawl-delay: 10
+User-agent: SemrushBot
+Crawl-delay: 10
+User-agent: MJ12bot
+Disallow: /
