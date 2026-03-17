@@ -22,38 +22,26 @@ export function drawFFTAnalyzer({
 
   // NUEVO: Estilo Apple Music con fondo gris degradado suave
   if (style === 'applemusic') {
-    // Fondo degradado gris suave estilo Apple Music
+    // Fondo oscuro para el nuevo tema fucsia/violeta
     const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
-    bgGradient.addColorStop(0, '#f3f4f6');
-    bgGradient.addColorStop(0.3, '#e5e7eb');
-    bgGradient.addColorStop(0.7, '#d1d5db');
-    bgGradient.addColorStop(1, '#e5e7eb');
+    bgGradient.addColorStop(0, '#0F0A1A');
+    bgGradient.addColorStop(1, '#1A1028');
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, width, height);
 
-    // Grid lines sutiles estilo Apple
-    ctx.strokeStyle = 'rgba(107, 114, 128, 0.15)';
+    // Grid lines sutiles
+    ctx.strokeStyle = 'rgba(192,38,211,0.08)';
     ctx.lineWidth = 0.5;
     ctx.setLineDash([]);
-    
-    // Líneas horizontales
     for (let i = 1; i < 4; i++) {
       const y = (height / 4) * i;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
     }
-
-    // Líneas verticales para frecuencias
     const freqPositions = [0.1, 0.25, 0.5, 0.75, 0.9];
     freqPositions.forEach(pos => {
       const x = width * pos;
-      ctx.strokeStyle = 'rgba(107, 114, 128, 0.1)';
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
+      ctx.strokeStyle = 'rgba(192,38,211,0.06)';
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
     });
   } else {
     // Otros estilos existentes

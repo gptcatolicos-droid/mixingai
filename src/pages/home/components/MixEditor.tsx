@@ -997,9 +997,9 @@ export default function MixEditor({
       duration,
       style: 'soundcloud',
       colors: {
-        played: '#3b82f6',
-        unplayed: '#e2e8f0',
-        playhead: '#1e40af'
+        played: '#C026D3',
+        unplayed: 'rgba(124,58,237,0.25)',
+        playhead: '#EC4899'
       }
     });
   }, [stems, currentTime, duration]);
@@ -1022,23 +1022,54 @@ export default function MixEditor({
   // Loading screen with Apple Music design
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+      <div style={{minHeight:'100vh',background:'#0F0A1A',display:'flex',flexDirection:'column'}}>
         <Header user={user} onLogout={() => {}} onCreditsUpdate={onCreditsUpdate} />
-        
-        <div className="flex items-center justify-center min-h-[calc(100vh-80px)]">
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-12 max-w-lg w-full mx-4 shadow-2xl border border-white/20">
-            <div className="text-center">
-              <div className="w-20 h-20 mx-auto mb-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center animate-pulse shadow-lg">
-                <i className="ri-equalizer-line text-white text-3xl"></i>
-              </div>
-              <h3 className="text-3xl font-bold text-gray-900 mb-4" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                Cargando Mezclador
-              </h3>
-              <p className="text-gray-600 mb-6 text-lg" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>{loadingStep}</p>
-              <Progress value={loadingProgress} className="mb-4" />
-              <div className="text-blue-600 font-bold text-xl" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                {loadingProgress}%
-              </div>
+        <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
+          <div style={{background:'#1A1028',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'24px',padding:'48px',maxWidth:'440px',width:'100%',textAlign:'center'}}>
+            <div style={{width:'72px',height:'72px',margin:'0 auto 28px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'20px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 32px rgba(192,38,211,0.5)'}}>
+              <i className="ri-equalizer-line" style={{color:'#fff',fontSize:'28px'}}></i>
+            </div>
+            <h3 style={{fontSize:'24px',fontWeight:600,color:'#F8F0FF',marginBottom:'12px',letterSpacing:'-0.5px'}}>Cargando Mezclador</h3>
+            <p style={{color:'#9B7EC8',marginBottom:'28px',fontSize:'15px'}}>{loadingStep}</p>
+            <div style={{background:'#241636',borderRadius:'8px',height:'6px',overflow:'hidden',marginBottom:'12px'}}>
+              <div style={{height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'8px',width:`${loadingProgress}%`,transition:'width 0.3s ease'}}></div>
+            </div>
+            <div style={{fontFamily:'monospace',color:'#C026D3',fontWeight:600,fontSize:'18px'}}>{loadingProgress}%</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Export modal overlay - nuevo diseño fucsia/violeta
+  if (isExporting) {
+    const steps = [
+      {label:'Reducción Ruido', threshold:25},
+      {label:'Compresión', threshold:50},
+      {label:'EQ + Limiter', threshold:75},
+      {label:'Normalización', threshold:95},
+    ];
+    return (
+      <div style={{minHeight:'100vh',background:'#0F0A1A',display:'flex',flexDirection:'column'}}>
+        <Header user={user} onLogout={() => {}} onCreditsUpdate={onCreditsUpdate} />
+        <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
+          <div style={{background:'#1A1028',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'24px',padding:'48px',maxWidth:'480px',width:'100%',textAlign:'center'}}>
+            <div style={{width:'80px',height:'80px',margin:'0 auto 28px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'24px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 40px rgba(192,38,211,0.6)'}}>
+              <i className="ri-equalizer-fill" style={{color:'#fff',fontSize:'32px'}}></i>
+            </div>
+            <h3 style={{fontSize:'26px',fontWeight:600,color:'#F8F0FF',marginBottom:'12px',letterSpacing:'-0.5px'}}>Procesando con IA</h3>
+            <p style={{color:'#9B7EC8',marginBottom:'28px',fontSize:'14px',lineHeight:1.6}}>{exportStep}</p>
+            <div style={{background:'#241636',borderRadius:'8px',height:'6px',overflow:'hidden',marginBottom:'10px'}}>
+              <div style={{height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'8px',width:`${exportProgress}%`,transition:'width 0.4s ease'}}></div>
+            </div>
+            <div style={{fontFamily:'monospace',color:'#C026D3',fontWeight:600,fontSize:'20px',marginBottom:'32px'}}>{exportProgress}%</div>
+            <div style={{display:'flex',justifyContent:'center',gap:'24px'}}>
+              {steps.map(s => (
+                <div key={s.label} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'6px'}}>
+                  <div style={{width:'10px',height:'10px',borderRadius:'50%',background:exportProgress>=s.threshold?'#C026D3':'#241636',border:exportProgress>=s.threshold?'2px solid #EC4899':'2px solid #3D2560',boxShadow:exportProgress>=s.threshold?'0 0 10px rgba(192,38,211,0.7)':'none',transition:'all 0.4s ease'}}></div>
+                  <span style={{fontSize:'10px',color:'#9B7EC8',fontWeight:500}}>{s.label}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1046,487 +1077,181 @@ export default function MixEditor({
     );
   }
 
-  // Export modal overlay - MEJORADO con logo Apple Music
-  if (isExporting) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
-        <Header user={user} onLogout={() => {}} onCreditsUpdate={onCreditsUpdate} />
-        
-        <div className="flex items-center justify-center min-h-[calc(100vh-80px)]">
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-12 max-w-lg w-full mx-4 shadow-2xl border border-white/20">
-            <div className="text-center">
-              {/* Logo Apple Music Style con animación */}
-              <div className="w-24 h-24 mx-auto mb-8 bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 rounded-3xl flex items-center justify-center shadow-lg relative overflow-hidden">
-                {/* Animación de ondas de sonido */}
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-400/30 via-pink-400/30 to-red-400/30 animate-pulse"></div>
-                <div className="relative z-10">
-                  <i className="ri-equalizer-fill text-white text-4xl animate-bounce"></i>
-                </div>
-                {/* Efecto de brillo */}
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 animate-[shine_2s_ease-in-out_infinite]"></div>
-              </div>
-              
-              <h3 className="text-3xl font-bold text-gray-900 mb-4" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                Procesando con IA
-              </h3>
-              
-              <p className="text-gray-600 mb-6 text-lg leading-relaxed max-w-md mx-auto" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                {exportStep}
-              </p>
-              
-              <Progress value={exportProgress} className="mb-4" />
-              
-              <div className="text-purple-600 font-bold text-xl mb-4" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                {exportProgress}%
-              </div>
-              
-              {/* Indicadores de procesamiento */}
-              <div className="flex justify-center space-x-6">
-                <div className="flex flex-col items-center">
-                  <div className={`w-3 h-3 rounded-full transition-all duration-500 ${exportProgress >= 25 ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
-                  <span className="text-xs text-gray-500 mt-1">Reducción Ruido</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <div className={`w-3 h-3 rounded-full transition-all duration-500 ${exportProgress >= 50 ? 'bg-blue-500 animate-pulse' : 'bg-gray-300'}`}></div>
-                  <span className="text-xs text-gray-500 mt-1">Compresión</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <div className={`w-3 h-3 rounded-full transition-all duration-500 ${exportProgress >= 75 ? 'bg-purple-500 animate-pulse' : 'bg-gray-300'}`}></div>
-                  <span className="text-xs text-gray-500 mt-1">EQ + Limiter</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <div className={`w-3 h-3 rounded-full transition-all duration-500 ${exportProgress >= 95 ? 'bg-pink-500 animate-pulse' : 'bg-gray-300'}`}></div>
-                  <span className="text-xs text-gray-500 mt-1">Normalización</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Animación CSS personalizada */}
-        <style jsx>{`
-          @keyframes shine {
-            0% { transform: translateX(-100%) skewX(-12deg); }
-            100% { transform: translateX(200%) skewX(-12deg); }
-          }
-        `}</style>
-      </div>
-    );
-  }
+  const S = {
+    page: {minHeight:'100vh',background:'#0F0A1A',fontFamily:"'DM Sans',system-ui,sans-serif"},
+    card: {background:'#1A1028',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'18px',padding:'20px'},
+    label: {fontSize:'10px',fontWeight:600,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'12px',display:'block'},
+    sectionPad: {maxWidth:'1400px',margin:'0 auto',padding:'20px 20px 40px'},
+    gradText: {background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'},
+    glowBtn: {background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'10px 22px',borderRadius:'980px',fontSize:'13px',fontWeight:600,cursor:'pointer',boxShadow:'0 0 20px rgba(192,38,211,0.4)',fontFamily:'inherit'},
+    ghostBtn: {background:'transparent',border:'1px solid rgba(192,38,211,0.25)',color:'#9B7EC8',padding:'10px 18px',borderRadius:'980px',fontSize:'13px',cursor:'pointer',fontFamily:'inherit'},
+    track: {height:'4px',background:'#241636',borderRadius:'2px',position:'relative' as const},
+    trackFill: {height:'100%',background:'linear-gradient(90deg,#EC4899,#7C3AED)',borderRadius:'2px'},
+    mono: {fontFamily:"'DM Mono',monospace"},
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+    <div style={S.page}>
       <Header user={user} onLogout={() => {}} onCreditsUpdate={onCreditsUpdate} />
+      <div style={S.sectionPad}>
 
-      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-6 lg:py-8">
-        {/* Header with Apple Music styling and Export Button */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 lg:mb-8 space-y-4 lg:space-y-0">
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px',flexWrap:'wrap',gap:'12px'}}>
           <div>
-            <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-              🎛️ Mezclador AI Pro
-            </h1>
-            <p className="text-gray-500 text-base lg:text-lg font-medium" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-              {stems.length} stems cargados • Duración: {Math.floor(duration / 60)}:{(duration % 60).toFixed(0).padStart(2, '0')}
-            </p>
+            <h1 style={{fontSize:'26px',fontWeight:600,letterSpacing:'-0.5px',...S.gradText}}>🎛️ Mezclador AI Pro</h1>
+            <p style={{color:'#9B7EC8',fontSize:'13px',marginTop:'4px'}}>{stems.length} stems · {Math.floor(duration/60)}:{String(Math.floor(duration%60)).padStart(2,'0')}</p>
           </div>
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-            {/* NUEVO: Botón para subir más stems */}
+          <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
             {stems.length < 12 && (
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="px-4 lg:px-6 py-2 lg:py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2 text-sm lg:text-base"
-                style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
-              >
-                <i className="ri-add-line"></i>
-                <span>Subir Más Stems ({stems.length}/12)</span>
+              <button onClick={() => setShowUploadModal(true)} style={{...S.ghostBtn,borderColor:'rgba(192,38,211,0.4)',color:'#C026D3'}}>
+                + Subir Stems ({stems.length}/12)
               </button>
             )}
-            
-            <button
-              onClick={handleExportMix}
-              disabled={stems.length === 0 || isExporting}
-              className={`px-6 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white font-bold rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2 lg:space-x-3 text-sm lg:text-base ${
-                stems.length === 0 || isExporting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
-              }`}
-              style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
-            >
-              <i className="ri-download-cloud-line text-lg lg:text-xl"></i>
-              <span>Exportar Mezcla con IA</span>
+            <button onClick={handleExportMix} disabled={stems.length===0||isExporting} style={{...S.glowBtn,opacity:stems.length===0?0.5:1}}>
+              ✦ Exportar con IA
             </button>
-            <button
-              onClick={onBack}
-              className="px-4 lg:px-6 py-2 lg:py-3 bg-gradient-to-r from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white font-medium rounded-2xl transition-all duration-300 border border-white/20 shadow-lg hover:shadow-xl text-sm lg:text-base"
-              style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
-            >
-              <i className="ri-arrow-left-line mr-2"></i>
-              Volver
-            </button>
+            <button onClick={onBack} style={S.ghostBtn}>← Volver</button>
           </div>
         </div>
 
-        {/* Timeline con proporciones corregidas */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-2xl lg:rounded-3xl p-4 lg:p-8 mb-6 lg:mb-8 border border-white/20 shadow-2xl">
-          <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-4 lg:mb-6" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>Timeline</h3>
-          <div className="bg-gray-100/50 rounded-xl lg:rounded-2xl p-2 lg:p-4">
-            <canvas
-              ref={timelineCanvasRef}
-              width={1000}
-              height={120}
-              className="w-full h-20 lg:h-28 rounded-xl cursor-pointer"
-              style={{ aspectRatio: '25/3' }}
-              onClick={(e) => {
-                if (timelineCanvasRef.current) {
-                  handleWaveformClick(e, timelineCanvasRef.current, duration, handleTimelineSeek);
-                }
-              }}
-            />
+        {/* Timeline */}
+        <div style={{...S.card,marginBottom:'12px'}}>
+          <span style={S.label}>Timeline</span>
+          <div style={{background:'#0F0A1A',borderRadius:'10px',padding:'8px 12px',border:'1px solid rgba(192,38,211,0.1)'}}>
+            <canvas ref={timelineCanvasRef} width={1200} height={100} style={{width:'100%',height:'60px',borderRadius:'8px',cursor:'pointer'}}
+              onClick={(e) => { if(timelineCanvasRef.current) handleWaveformClick(e,timelineCanvasRef.current,duration,handleTimelineSeek); }} />
           </div>
-          <div className="flex justify-between text-gray-500 text-xs lg:text-sm mt-2 lg:mt-4" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-            <span>{Math.floor(currentTime / 60)}:{(currentTime % 60).toFixed(0).padStart(2, '0')}</span>
-            <span>{Math.floor(duration / 60)}:{(duration % 60).toFixed(0).padStart(2, '0')}</span>
+          <div style={{display:'flex',justifyContent:'space-between',marginTop:'6px',fontSize:'11px',color:'#9B7EC8',...S.mono}}>
+            <span>{Math.floor(currentTime/60)}:{String(Math.floor(currentTime%60)).padStart(2,'0')}</span>
+            <span>{Math.floor(duration/60)}:{String(Math.floor(duration%60)).padStart(2,'0')}</span>
           </div>
         </div>
 
-        {/* Main Controls Grid - REDESIGN: Nueva distribución responsive */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6 mb-6 lg:mb-8">
-          
-          {/* Transport Controls - 3 columns en desktop */}
-          <div className="xl:col-span-3 bg-white/80 backdrop-blur-xl rounded-2xl lg:rounded-3xl p-4 lg:p-8 border border-white/20 shadow-2xl">
-            <h3 className="text-lg lg:text-2xl font-bold text-gray-900 mb-4 lg:mb-6" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>Control MIX</h3>
-            <div className="flex items-center justify-center space-x-4 lg:space-x-6 mb-6 lg:mb-8">
-              <button
-                onClick={handlePlayPause}
-                disabled={stems.length === 0}
-                className={`w-16 h-16 lg:w-20 lg:h-20 rounded-full flex items-center justify-center text-2xl lg:text-3xl transition-all duration-300 shadow-2xl ${
-                  isPlaying
-                    ? 'bg-gradient-to-br from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white shadow-red-500/30'
-                    : 'bg-gradient-to-br from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white shadow-blue-500/30'
-                } ${stems.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'}`}
-              >
-                <i className={isPlaying ? 'ri-pause-fill' : 'ri-play-fill'}></i>
+        {/* Controls Row */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 2fr 1fr',gap:'12px',marginBottom:'12px'}}>
+
+          {/* Transport */}
+          <div style={S.card}>
+            <span style={S.label}>Control Mix</span>
+            <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
+              <button onClick={handlePlayPause} disabled={stems.length===0} style={{width:'52px',height:'52px',borderRadius:'50%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 24px rgba(236,72,153,0.5)',flexShrink:0}}>
+                <i className={isPlaying?'ri-pause-fill':'ri-play-fill'} style={{color:'#fff',fontSize:'20px',marginLeft:isPlaying?0:'3px'}}></i>
               </button>
-
-              <button
-                onClick={handleStop}
-                disabled={stems.length === 0}
-                className={`w-12 h-12 lg:w-16 lg:h-16 bg-gradient-to-br from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white rounded-full flex items-center justify-center text-lg lg:text-xl transition-all duration-300 shadow-xl hover:scale-110 ${
-                  stems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                <i className="ri-stop-fill"></i>
+              <button onClick={handleStop} disabled={stems.length===0} style={{width:'36px',height:'36px',borderRadius:'50%',background:'#241636',border:'1px solid rgba(192,38,211,0.2)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <i className="ri-stop-fill" style={{color:'#9B7EC8',fontSize:'14px'}}></i>
               </button>
             </div>
-
-            {/* Master Volume */}
-            <div className="space-y-3 lg:space-y-4 mb-4 lg:mb-6">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-900 font-semibold text-base lg:text-lg" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>Mix Volume</span>
-                <span className="text-blue-600 font-bold text-base lg:text-lg" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                  {masterVolume > 0 ? '+' : ''}{masterVolume.toFixed(1)} dB
-                </span>
+            <div style={{marginBottom:'16px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:'12px',marginBottom:'8px'}}>
+                <span style={{color:'#9B7EC8'}}>Mix Volume</span>
+                <span style={{...S.mono,color:'#EC4899',fontWeight:500}}>{masterVolume>0?'+':''}{masterVolume.toFixed(1)} dB</span>
               </div>
-              <div className="bg-gray-200/50 rounded-full p-1">
-                <input
-                  type="range"
-                  min="-60"
-                  max="12"
-                  step="0.1"
-                  value={masterVolume}
-                  onChange={(e) => updateMasterVolume(parseFloat(e.target.value))}
-                  className="w-full h-2 lg:h-3 bg-transparent rounded-full appearance-none cursor-pointer apple-slider"
-                />
+              <div style={S.track}>
+                <div style={{...S.trackFill,width:`${((masterVolume+60)/72)*100}%`}}></div>
+                <input type="range" min="-60" max="12" step="0.1" value={masterVolume} onChange={e=>updateMasterVolume(parseFloat(e.target.value))} style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%'}} />
               </div>
             </div>
-
-            {/* Función para ajustar todos los stems */}
-            <div className="space-y-3 lg:space-y-4 mb-4 lg:mb-6">
-              <div className="text-center">
-                <span className="text-gray-900 font-semibold text-base lg:text-lg" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>Stems Gain Adjust</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => setAllStemsGain(-12)}
-                  className="px-2 lg:px-3 py-1.5 lg:py-2 bg-gradient-to-r from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white font-bold rounded-lg lg:rounded-xl transition-all duration-300 shadow-lg hover:scale-105 text-xs lg:text-sm"
-                >
-                  -12 dB
-                </button>
-                <button
-                  onClick={() => setAllStemsGain(-6)}
-                  className="px-2 lg:px-3 py-1.5 lg:py-2 bg-gradient-to-r from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white font-bold rounded-lg lg:rounded-xl transition-all duration-300 shadow-lg hover:scale-105 text-xs lg:text-sm"
-                >
-                  -6 dB
-                </button>
-                <button
-                  onClick={() => setAllStemsGain(0)}
-                  className="px-2 lg:px-3 py-1.5 lg:py-2 bg-gradient-to-r from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white font-bold rounded-lg lg:rounded-xl transition-all duration-300 shadow-lg hover:scale-105 text-xs lg:text-sm"
-                >
-                  0 dB
-                </button>
+            <div>
+              <div style={{fontSize:'11px',color:'#9B7EC8',marginBottom:'8px',fontWeight:500}}>Stems Gain</div>
+              <div style={{display:'flex',gap:'6px'}}>
+                {[-12,-6,0].map(v=>(
+                  <button key={v} onClick={()=>setAllStemsGain(v)} style={{flex:1,padding:'7px 0',background:'#241636',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',fontSize:'11px',color:'#9B7EC8',cursor:'pointer',fontFamily:'inherit',fontWeight:500}}>
+                    {v===0?'0 dB':`${v}`}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* FFT Analyzer EXPANDIDO - 7 columns en desktop */}
-          <div className="xl:col-span-7 bg-white/80 backdrop-blur-xl rounded-2xl lg:rounded-3xl p-4 lg:p-8 border border-white/20 shadow-2xl">
-            <h3 className="text-lg lg:text-2xl font-bold text-gray-900 mb-4 lg:mb-6" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>FFT Analyzer Pro</h3>
-            
-            {/* FFT Canvas CORREGIDO - Proporciones exactas */}
-            <div className="bg-gradient-to-br from-gray-200 via-gray-100 to-gray-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 mb-4 lg:mb-6 border border-gray-200/50 shadow-inner">
-              <canvas
-                ref={mixFFTCanvasRef}
-                width={800}
-                height={200}
-                className="w-full h-32 lg:h-48 rounded-xl"
-                style={{ aspectRatio: '4/1' }}
-              />
+          {/* FFT */}
+          <div style={S.card}>
+            <span style={S.label}>FFT Analyzer Pro</span>
+            <div style={{background:'#0F0A1A',borderRadius:'12px',padding:'12px',border:'1px solid rgba(192,38,211,0.1)',marginBottom:'16px',height:'100px',overflow:'hidden'}}>
+              <canvas ref={mixFFTCanvasRef} width={800} height={120} style={{width:'100%',height:'80px',borderRadius:'8px'}} />
             </div>
-
-            {/* Botones EQ rápido centrados con colores Apple Music */}
-            <div className="flex justify-center">
-              <div className="grid grid-cols-3 gap-4 lg:gap-8">
-                <div className="text-center">
-                  <div className="text-xs lg:text-sm text-gray-600 mb-2 lg:mb-3 font-semibold" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>BASS</div>
-                  <div className="flex space-x-1 lg:space-x-2">
-                    <button
-                      onClick={() => adjustGlobalEQ('bass', 'down')}
-                      className="w-8 h-8 lg:w-12 lg:h-12 bg-gradient-to-br from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white rounded-xl lg:rounded-2xl text-sm lg:text-lg font-bold transition-all duration-300 shadow-lg hover:scale-110 hover:shadow-xl"
-                    >
-                      <i className="ri-subtract-line"></i>
-                    </button>
-                    <button
-                      onClick={() => adjustGlobalEQ('bass', 'up')}
-                      className="w-8 h-8 lg:w-12 lg:h-12 bg-gradient-to-br from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white rounded-xl lg:rounded-2xl text-sm lg:text-lg font-bold transition-all duration-300 shadow-lg hover:scale-110 hover:shadow-xl"
-                    >
-                      <i className="ri-add-line"></i>
-                    </button>
+            <div style={{display:'flex',justifyContent:'space-around'}}>
+              {(['bass','mid','high'] as const).map((band,i)=>{
+                const val = band==='bass'?bassGain:band==='mid'?midGain:highGain;
+                return (
+                  <div key={band} style={{textAlign:'center'}}>
+                    <div style={{fontSize:'10px',fontWeight:600,letterSpacing:'0.8px',textTransform:'uppercase',color:'#9B7EC8',marginBottom:'8px'}}>{band}</div>
+                    <div style={{display:'flex',gap:'6px',justifyContent:'center'}}>
+                      <button onClick={()=>adjustGlobalEQ(band,'down')} style={{width:'32px',height:'32px',background:'#241636',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                      <button onClick={()=>adjustGlobalEQ(band,'up')} style={{width:'32px',height:'32px',background:'#241636',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                    </div>
+                    <div style={{...S.mono,fontSize:'11px',color:'#C026D3',marginTop:'6px',fontWeight:500}}>{val>0?'+':''}{val.toFixed(1)} dB</div>
                   </div>
-                  <div className="text-xs lg:text-sm text-blue-600 font-bold mt-1 lg:mt-2" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                    {bassGain > 0 ? '+' : ''}{bassGain.toFixed(1)} dB
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <div className="text-xs lg:text-sm text-gray-600 mb-2 lg:mb-3 font-semibold" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>MID</div>
-                  <div className="flex space-x-1 lg:space-x-2">
-                    <button
-                      onClick={() => adjustGlobalEQ('mid', 'down')}
-                      className="w-8 h-8 lg:w-12 lg:h-12 bg-gradient-to-br from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white rounded-xl lg:rounded-2xl text-sm lg:text-lg font-bold transition-all duration-300 shadow-lg hover:scale-110 hover:shadow-xl"
-                    >
-                      <i className="ri-subtract-line"></i>
-                    </button>
-                    <button
-                      onClick={() => adjustGlobalEQ('mid', 'up')}
-                      className="w-8 h-8 lg:w-12 lg:h-12 bg-gradient-to-br from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white rounded-xl lg:rounded-2xl text-sm lg:text-lg font-bold transition-all duration-300 shadow-lg hover:scale-110 hover:shadow-xl"
-                    >
-                      <i className="ri-add-line"></i>
-                    </button>
-                  </div>
-                  <div className="text-xs lg:text-sm text-blue-600 font-bold mt-1 lg:mt-2" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                    {midGain > 0 ? '+' : ''}{midGain.toFixed(1)} dB
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <div className="text-xs lg:text-sm text-gray-600 mb-2 lg:mb-3 font-semibold" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>HIGH</div>
-                  <div className="flex space-x-1 lg:space-x-2">
-                    <button
-                      onClick={() => adjustGlobalEQ('high', 'down')}
-                      className="w-8 h-8 lg:w-12 lg:h-12 bg-gradient-to-br from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white rounded-xl lg:rounded-2xl text-sm lg:text-lg font-bold transition-all duration-300 shadow-lg hover:scale-110 hover:shadow-xl"
-                    >
-                      <i className="ri-subtract-line"></i>
-                    </button>
-                    <button
-                      onClick={() => adjustGlobalEQ('high', 'up')}
-                      className="w-8 h-8 lg:w-12 lg:h-12 bg-gradient-to-br from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white rounded-xl lg:rounded-2xl text-sm lg:text-lg font-bold transition-all duration-300 shadow-lg hover:scale-110 hover:shadow-xl"
-                    >
-                      <i className="ri-add-line"></i>
-                    </button>
-                  </div>
-                  <div className="text-xs lg:text-sm text-blue-600 font-bold mt-1 lg:mt-2" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                    {highGain > 0 ? '+' : ''}{highGain.toFixed(1)} dB
-                  </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* LUFS Counter - 2 columns - SOLO CONTADOR NUMÉRICO responsive */}
-          <div className="xl:col-span-2 bg-white/80 backdrop-blur-xl rounded-2xl lg:rounded-3xl p-4 lg:p-8 border border-white/20 shadow-2xl">
-            <div className="flex items-center justify-between mb-4 lg:mb-6">
-              <h3 className="text-lg lg:text-2xl font-bold text-gray-900" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>LUFS</h3>
-              <div className="text-xs font-bold px-2 lg:px-3 py-1 lg:py-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                {lufsIntegrated >= -16 && lufsIntegrated <= -12 ? 'Ready' : 'Safe'}
-              </div>
+          {/* LUFS */}
+          <div style={S.card}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}}>
+              <span style={{...S.label,marginBottom:0}}>LUFS</span>
+              <span style={{fontSize:'10px',fontWeight:600,padding:'3px 10px',borderRadius:'980px',background:'rgba(34,197,94,0.1)',color:'#4ade80',border:'1px solid rgba(34,197,94,0.2)'}}>
+                {lufsIntegrated>=-16&&lufsIntegrated<=-12?'Ready':'Safe'}
+              </span>
             </div>
-            
-            {/* LUFS Counter Grande - SIN BARRRA GRÁFICA responsive */}
-            <div className="text-center space-y-4 lg:space-y-6">
-              <div className="bg-gradient-to-br from-gray-100 to-gray-50 rounded-2xl lg:rounded-3xl p-3 lg:p-6 border border-gray-200/50 shadow-inner">
-                <div className="text-xs text-gray-500 mb-1 lg:mb-2 font-medium" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>Momentary</div>
-                <div 
-                  className="text-base lg:text-lg font-bold mb-1 leading-none overflow-hidden" 
-                  style={{ 
-                    fontFamily: '"JetBrains Mono", monospace',
-                    color: '#d946ef'
-                  }}
-                >
-                  {lufsMomentary.toFixed(1)}
-                </div>
-                <div className="text-xs text-gray-500 font-medium" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>LUFS</div>
+            {[{label:'Momentary',val:lufsMomentary},{label:'Integrated',val:lufsIntegrated}].map(m=>(
+              <div key={m.label} style={{background:'#0F0A1A',borderRadius:'12px',padding:'14px',textAlign:'center',border:'1px solid rgba(192,38,211,0.1)',marginBottom:'10px'}}>
+                <div style={{...S.mono,fontSize:'24px',fontWeight:500,letterSpacing:'-1px',background:'linear-gradient(90deg,#EC4899,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{m.val.toFixed(1)}</div>
+                <div style={{fontSize:'10px',color:'#9B7EC8',marginTop:'2px',textTransform:'uppercase',letterSpacing:'0.8px'}}>{m.label}</div>
               </div>
-
-              <div className="bg-gradient-to-br from-gray-100 to-gray-50 rounded-2xl lg:rounded-3xl p-3 lg:p-6 border border-gray-200/50 shadow-inner">
-                <div className="text-xs text-gray-500 mb-1 lg:mb-2 font-medium" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>Integrated</div>
-                <div 
-                  className="text-base lg:text-lg font-bold mb-1 leading-none overflow-hidden" 
-                  style={{ 
-                    fontFamily: '"JetBrains Mono", monospace',
-                    color: '#d946ef'
-                  }}
-                >
-                  {lufsIntegrated.toFixed(1)}
-                </div>
-                <div className="text-xs text-gray-500 font-medium" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>LUFS</div>
-              </div>
-            </div>
-
-            {/* Reference Standards */}
-            <div className="mt-4 lg:mt-6 pt-3 lg:pt-4 border-t border-gray-200/50">
-              <div className="text-xs text-gray-500 mb-2 font-medium" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>Standards</div>
-              <div className="space-y-1 text-xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-gray-600" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>Spotify</span>
+            ))}
+            <div style={{borderTop:'1px solid rgba(192,38,211,0.1)',paddingTop:'10px'}}>
+              {[{name:'Spotify',val:'-14',color:'#4ade80'},{name:'YouTube',val:'-13',color:'#f87171'}].map(r=>(
+                <div key={r.name} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:'11px',marginBottom:'5px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                    <div style={{width:'6px',height:'6px',borderRadius:'50%',background:r.color}}></div>
+                    <span style={{color:'#9B7EC8'}}>{r.name}</span>
                   </div>
-                  <span className="text-gray-900 font-bold">-14</span>
+                  <span style={{...S.mono,color:'#F8F0FF',fontWeight:500}}>{r.val}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <span className="text-gray-600" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>YouTube</span>
-                  </div>
-                  <span className="text-gray-900 font-bold">-13</span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Stems Grid with Apple Music cards responsive */}
+        {/* Stems Grid */}
         {stems.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
-            {stems.map((stem) => (
-              <div key={stem.id} className="bg-white/80 backdrop-blur-xl rounded-2xl lg:rounded-3xl p-4 lg:p-6 border border-white/20 shadow-2xl hover:shadow-3xl transition-all hover:scale-[1.02]">
-                {/* Stem header */}
-                <div className="flex items-center justify-between mb-4 lg:mb-6">
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-gray-900 text-sm lg:text-lg truncate" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                      {stem.name.split('.')[0]}
-                    </h4>
-                  </div>
-                  <button
-                    onClick={() => toggleStemMute(stem.id)}
-                    className={`w-8 h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center text-sm lg:text-lg transition-all duration-300 shadow-lg ${
-                      stem.muted
-                        ? 'bg-gradient-to-br from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white shadow-red-500/30 hover:scale-110'
-                        : 'bg-gradient-to-br from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white shadow-gray-500/30 hover:scale-110'
-                    }`}
-                  >
-                    <i className={stem.muted ? 'ri-volume-mute-line' : 'ri-volume-up-line'}></i>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:'10px'}}>
+            {stems.map(stem => (
+              <div key={stem.id} style={{...S.card,transition:'border-color 0.2s',borderColor:stem.muted?'rgba(239,68,68,0.3)':'rgba(192,38,211,0.15)'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+                  <span style={{fontSize:'12px',fontWeight:600,color:'#F8F0FF',letterSpacing:'0.2px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'140px'}}>
+                    {stem.name.replace(/\.[^.]+$/,'').toUpperCase()}
+                  </span>
+                  <button onClick={()=>toggleStemMute(stem.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:stem.muted?'rgba(239,68,68,0.2)':'linear-gradient(135deg,#C026D3,#7C3AED)',border:stem.muted?'1px solid rgba(239,68,68,0.4)':'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <i className={stem.muted?'ri-volume-mute-line':'ri-volume-up-line'} style={{color:'#fff',fontSize:'12px'}}></i>
                   </button>
                 </div>
-
-                {/* Mini FFT con proporciones Apple exactas */}
-                <div className="h-12 lg:h-16 bg-gradient-to-br from-gray-200 via-gray-100 to-gray-50 rounded-xl lg:rounded-2xl mb-4 lg:mb-6 overflow-hidden border border-gray-200/50">
-                  <canvas
-                    width={400}
-                    height={60}
-                    className="w-full h-full rounded-xl"
-                    style={{ aspectRatio: '20/3' }}
-                    ref={(canvas) => {
-                      if (canvas && stem.fftData) {
-                        drawMiniFFT(canvas, stem.fftData, '#007AFF');
-                      }
-                    }}
-                  />
+                {/* Mini FFT */}
+                <div style={{background:'#0F0A1A',borderRadius:'8px',height:'32px',overflow:'hidden',border:'1px solid rgba(192,38,211,0.1)',marginBottom:'10px'}}>
+                  <canvas width={300} height={40} style={{width:'100%',height:'100%'}}
+                    ref={canvas => { if(canvas && stem.fftData) { const {drawMiniFFT} = require('@/utils/drawFFT'); drawMiniFFT(canvas,stem.fftData,'#C026D3'); }}} />
                 </div>
-
-                {/* Volume slider with Apple design */}
-                <div className="space-y-2 lg:space-y-3 mb-3 lg:mb-4">
-                  <div className="flex items-center justify-between text-xs lg:text-sm">
-                    <span className="text-gray-600" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>Volume</span>
-                    <span className="text-blue-600 font-bold" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                      {stem.volume > 0 ? '+' : ''}{stem.volume.toFixed(1)} dB
-                    </span>
+                {/* Volume */}
+                <div style={{marginBottom:'10px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px',marginBottom:'5px'}}>
+                    <span style={{color:'#9B7EC8'}}>Volume</span>
+                    <span style={{...S.mono,color:'#C026D3',fontWeight:500}}>{stem.volume>0?'+':''}{stem.volume.toFixed(1)} dB</span>
                   </div>
-                  <div className="bg-gray-200/50 rounded-full p-1">
-                    <input
-                      type="range"
-                      min="-60"
-                      max="12"
-                      step="0.1"
-                      value={stem.volume}
-                      onChange={(e) => updateStemVolume(stem.id, parseFloat(e.target.value))}
-                      className="w-full h-1.5 lg:h-2 bg-transparent rounded-full appearance-none cursor-pointer apple-mini-slider"
-                    />
-                  </div>
-                  
-                  {/* Manual Volume Input */}
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      min="-60"
-                      max="12"
-                      step="0.1"
-                      value={stem.volume.toFixed(1)}
-                      onChange={(e) => {
-                        const value = Math.max(-60, Math.min(12, parseFloat(e.target.value) || 0));
-                        updateStemVolume(stem.id, value);
-                      }}
-                      className="w-12 lg:w-16 px-1 lg:px-2 py-0.5 lg:py-1 text-xs bg-gray-100/50 border border-gray-200 rounded-lg text-center font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
-                    />
-                    <span className="text-xs text-gray-500">dB</span>
+                  <div style={S.track}>
+                    <div style={{...S.trackFill,width:`${((stem.volume+60)/72)*100}%`}}></div>
+                    <input type="range" min="-60" max="12" step="0.1" value={stem.volume} onChange={e=>updateStemVolume(stem.id,parseFloat(e.target.value))} style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%'}} />
                   </div>
                 </div>
-
-                {/* Pan slider with Apple design */}
-                <div className="space-y-2 lg:space-y-3">
-                  <div className="flex items-center justify-between text-xs lg:text-sm">
-                    <span className="text-gray-600" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>Pan</span>
-                    <span className="text-blue-600 font-bold" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-                      {stem.pan === 0 ? 'C' : stem.pan > 0 ? `R${(stem.pan * 100).toFixed(0)}` : `L${(Math.abs(stem.pan) * 100).toFixed(0)}`}
-                    </span>
+                {/* Pan */}
+                <div>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px',marginBottom:'5px'}}>
+                    <span style={{color:'#9B7EC8'}}>Pan</span>
+                    <span style={{...S.mono,color:'#C026D3',fontWeight:500}}>{stem.pan===0?'C':stem.pan>0?`R${(stem.pan*100).toFixed(0)}`:`L${(Math.abs(stem.pan)*100).toFixed(0)}`}</span>
                   </div>
-                  <div className="bg-gray-200/50 rounded-full p-1">
-                    <input
-                      type="range"
-                      min="-1"
-                      max="1"
-                      step="0.01"
-                      value={stem.pan}
-                      onChange={(e) => updateStemPan(stem.id, parseFloat(e.target.value))}
-                      className="w-full h-1.5 lg:h-2 bg-transparent rounded-full appearance-none cursor-pointer apple-mini-slider"
-                    />
-                  </div>
-                  
-                  {/* Manual Pan Input */}
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      min="-100"
-                      max="100"
-                      step="1"
-                      value={Math.round(stem.pan * 100)}
-                      onChange={(e) => {
-                        const value = Math.max(-100, Math.min(100, parseInt(e.target.value) || 0));
-                        updateStemPan(stem.id, value / 100);
-                      }}
-                      className="w-12 lg:w-16 px-1 lg:px-2 py-0.5 lg:py-1 text-xs bg-gray-100/50 border border-gray-200 rounded-lg text-center font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
-                    />
-                    <span className="text-xs text-gray-500">%</span>
+                  <div style={S.track}>
+                    <div style={{...S.trackFill,width:`${((stem.pan+1)/2)*100}%`}}></div>
+                    <input type="range" min="-1" max="1" step="0.01" value={stem.pan} onChange={e=>updateStemPan(stem.id,parseFloat(e.target.value))} style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%'}} />
                   </div>
                 </div>
               </div>
@@ -1535,89 +1260,7 @@ export default function MixEditor({
         )}
       </div>
 
-      {/* NUEVO: Modal para subir más stems */}
-      <UploadModal
-        isOpen={showUploadModal}
-        onClose={() => setShowUploadModal(false)}
-        onUploadComplete={handleUploadMoreStems}
-        userCredits={user.credits}
-        onCreditsUpdate={onCreditsUpdate}
-      />
-
-      {/* Apple Music style slider CSS */}
-      <style jsx>{`
-        .apple-slider::-webkit-slider-thumb {
-          appearance: none;
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #007AFF, #5856D6);
-          cursor: pointer;
-          border: 3px solid #ffffff;
-          box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
-          transition: all 0.2s ease;
-        }
-
-        .apple-slider::-webkit-slider-thumb:hover {
-          transform: scale(1.1);
-          box-shadow: 0 6px 20px rgba(0, 122, 255, 0.6);
-        }
-
-        .apple-slider::-webkit-slider-track {
-          background: linear-gradient(90deg, #007AFF, #5856D6);
-          height: 6px;
-          border-radius: 3px;
-        }
-
-        .apple-mini-slider::-webkit-slider-thumb {
-          appearance: none;
-          height: 16px;
-          width: 16px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #007AFF, #5856D6);
-          cursor: pointer;
-          border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
-          transition: all 0.2s ease;
-        }
-
-        .apple-mini-slider::-webkit-slider-track {
-          background: linear-gradient(90deg, #007AFF, #5856D6);
-          height: 4px;
-          border-radius: 2px;
-        }
-
-        .apple-slider::-moz-range-thumb {
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #007AFF, #5856D6);
-          cursor: pointer;
-          border: 3px solid #ffffff;
-          box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
-        }
-
-        .apple-mini-slider::-moz-range-thumb {
-          height: 16px;
-          width: 16px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #007AFF, #5856D6);
-          cursor: pointer;
-          border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
-        }
-
-        @media (max-width: 1024px) {
-          .apple-slider::-webkit-slider-thumb {
-            height: 24px;
-            width: 24px;
-          }
-          .apple-mini-slider::-webkit-slider-thumb {
-            height: 20px;
-            width: 20px;
-          }
-        }
-      `}</style>
+      <UploadModal isOpen={showUploadModal} onClose={()=>setShowUploadModal(false)} onUploadComplete={handleUploadMoreStems} userCredits={user.credits} onCreditsUpdate={onCreditsUpdate} />
     </div>
   );
 }

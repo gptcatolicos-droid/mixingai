@@ -57,7 +57,7 @@ serve(async (req) => {
           email: user.email,
           country: user.country || 'Argentina',
           phone: user.phone || '',
-          credits: 0, // Sin créditos hasta verificar
+          credits: 999999, // Créditos ilimitados de bienvenida
           provider: user.provider || 'email',
           username: user.username,
           email_verified: false,
