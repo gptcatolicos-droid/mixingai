@@ -20,9 +20,9 @@ interface Message {
 }
 
 interface AIChatProps {
-  user: User;
+  user?: User | null;
   onStartMixer: (preset: MixPreset, files: File[]) => void;
-  onCreditsUpdate: (n: number) => void;
+  onCreditsUpdate?: (n: number) => void;
 }
 
 const SYSTEM_PROMPT = `Eres el asistente de mezcla de MixingMusic.AI. Tu nombre es Mix.
@@ -40,7 +40,7 @@ Tienes 9 presets disponibles:
 - Gospel: Coro potente, voces llenas, reverb de iglesia. Bass +2, Mid +3, High +3.
 
 FLUJO OBLIGATORIO:
-1. Saluda al usuario por su nombre y pregunta cómo quiere que suene su canción.
+1. Saluda al usuario y pregunta cómo quiere que suene su canción.
 2. Cuando describa el sonido, recomienda 1-2 presets específicos con una breve explicación.
 3. Confirma el preset elegido y dile EXACTAMENTE: "¡Perfecto! Ahora sube tus stems con el botón +"
 4. Cuando confirme que subió los stems, di que están listos y que puede abrir el mezclador.
@@ -73,7 +73,7 @@ export default function AIChat({ user, onStartMixer, onCreditsUpdate }: AIChatPr
     // Mensaje de bienvenida al montar
     const welcome: Message = {
       id: '0', role: 'ai',
-      text: `¡Hola ${user.firstName}! 👋 Soy Mix, tu asistente de mezcla con IA.\n\n¿Cómo quieres que suene tu canción? Cuéntame el vibe, el género o los artistas que te inspiran.`,
+      text: `¡Hola! 👋 Soy Mix, tu asistente de mezcla con IA.\n\n¿Cómo quieres que suene tu canción? Cuéntame el vibe, el género o los artistas que te inspiran.`,
     };
     setMessages([welcome]);
   }, []);
@@ -199,7 +199,15 @@ export default function AIChat({ user, onStartMixer, onCreditsUpdate }: AIChatPr
 
   return (
     <div style={S.page}>
-      <Header user={user} onLogout={() => {}} onCreditsUpdate={onCreditsUpdate} />
+      {/* Mini nav sin login */}
+      <div style={{background:'rgba(26,16,40,0.97)',backdropFilter:'blur(12px)',borderBottom:'1px solid rgba(192,38,211,0.15)',padding:'0 16px',display:'flex',alignItems:'center',justifyContent:'space-between',height:'56px',flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+          <div style={{width:'28px',height:'28px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <i className="ri-equalizer-fill" style={{color:'#fff',fontSize:'14px'}}></i>
+          </div>
+          <span style={{fontWeight:600,fontSize:'14px',background:'linear-gradient(90deg,#EC4899,#C026D3)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>mixingmusic.ai</span>
+        </div>
+      </div>
 
       {/* Chat messages */}
       <div style={{flex:1,overflowY:'auto',padding:'16px 12px',display:'flex',flexDirection:'column',gap:'14px',maxWidth:'680px',width:'100%',margin:'0 auto'}}>
