@@ -71,13 +71,7 @@ export default defineConfig({
     sourcemap: isDev,
     outDir: 'out',
     // Minificar y ofuscar código
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: !isDev,
-        drop_debugger: !isDev,
-      },
-    },
+    minify: 'esbuild',
   },
   resolve: {
     alias: {
