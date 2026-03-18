@@ -9,7 +9,7 @@ interface User {
 
 interface ExportScreenProps {
   user: User; projectId: string;
-  exportData: { audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array; finalLufs: number; mp3Url?: string; wavUrl?: string; } | null;
+  exportData: { audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array; finalLufs: number; mp3Url?: string; wavUrl?: string; presetName?: string; } | null;
   exportProgress: number; exportStep: string;
   onBack: () => void; onCreditsUpdate: (newCredits: number) => void;
 }
@@ -181,7 +181,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
               <span style={S.label}>Preview de tu Mezcla Final</span>
               <span style={{fontSize:'11px',fontWeight:600,padding:'4px 12px',borderRadius:'980px',background:'rgba(192,38,211,0.1)',color:'#C026D3',border:'1px solid rgba(192,38,211,0.25)'}}>
-                ✦ Procesada con IA · {exportData.finalLufs.toFixed(1)} LUFS
+                ✦ {exportData.presetName ? exportData.presetName + ' · ' : ''}Procesada con IA · {exportData.finalLufs.toFixed(1)} LUFS
               </span>
             </div>
 

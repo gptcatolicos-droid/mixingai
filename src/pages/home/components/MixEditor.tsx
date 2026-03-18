@@ -330,7 +330,27 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       const midPeak = offCtx.createBiquadFilter(); midPeak.type='peaking'; midPeak.frequency.value=2500; midPeak.Q.value=0.8; midPeak.gain.value=midGain-0.5;
       const highShelf = offCtx.createBiquadFilter(); highShelf.type='highshelf'; highShelf.frequency.value=8000; highShelf.gain.value=highGain+1.8;
       const limiter = offCtx.createDynamicsCompressor(); limiter.threshold.value=-1; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=0.001; limiter.release.value=0.01;
-      mixBus.connect(noiseRed); noiseRed.connect(lowShelf); lowShelf.connect(midPeak); midPeak.connect(highShelf); highShelf.connect(compressor); compressor.connect(limiter); limiter.connect(offCtx.destination);
+      // REVERB offline con el preset activo
+      const activePresetData = activePreset || initialPreset;
+      const reverbWetVal = (activePresetData?.reverbWet ?? 0);
+      const delayWetVal = (activePresetData?.delayWet ?? 0);
+      
+      const dryGainOff = offCtx.createGain(); dryGainOff.gain.value = 1 - reverbWetVal * 0.4;
+      const reverbGainOff = offCtx.createGain(); reverbGainOff.gain.value = reverbWetVal;
+      const reverbNodeOff = offCtx.createConvolver();
+      const reverbLenOff = offCtx.sampleRate * 2.5;
+      const reverbBufOff = offCtx.createBuffer(2, reverbLenOff, offCtx.sampleRate);
+      for (let c=0;c<2;c++){const d=reverbBufOff.getChannelData(c);for(let i=0;i<reverbLenOff;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/reverbLenOff,3.5);}
+      reverbNodeOff.buffer = reverbBufOff;
+      
+      const delayNodeOff = offCtx.createDelay(1.0); delayNodeOff.delayTime.value=0.25;
+      const delayFeedOff = offCtx.createGain(); delayFeedOff.gain.value=0.3;
+      const delayGainOff = offCtx.createGain(); delayGainOff.gain.value=delayWetVal;
+      
+      mixBus.connect(noiseRed); noiseRed.connect(lowShelf); lowShelf.connect(midPeak); midPeak.connect(highShelf); highShelf.connect(compressor); compressor.connect(dryGainOff);
+      compressor.connect(reverbNodeOff); reverbNodeOff.connect(reverbGainOff);
+      compressor.connect(delayNodeOff); delayNodeOff.connect(delayFeedOff); delayFeedOff.connect(delayNodeOff); delayNodeOff.connect(delayGainOff);
+      dryGainOff.connect(limiter); reverbGainOff.connect(limiter); delayGainOff.connect(limiter); limiter.connect(offCtx.destination);
       setExportProgress(40); setExportStep('Renderizando stems...'); await new Promise(r=>setTimeout(r,800));
       for (const stem of stems) {
         if (stem.buffer && !stem.muted) {
@@ -348,7 +368,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       const wavBlob = bufferToWav(normalized,24);
       const wavUrl = URL.createObjectURL(wavBlob);
       setExportProgress(100); setExportStep('¡Listo!'); await new Promise(r=>setTimeout(r,800));
-      onExport({ audioBuffer:normalized, audioUrl:wavUrl, waveformPeaks:peaks, finalLufs:-14.0 });
+      onExport({ audioBuffer:normalized, audioUrl:wavUrl, waveformPeaks:peaks, finalLufs:-14.0, presetName:(activePreset||initialPreset)?.name });
       setIsExporting(false); setExportProgress(0); setExportStep('');
     } catch(e) { console.error(e); setIsExporting(false); }
   };
@@ -471,26 +491,36 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           </div>
           <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
             {stems.length<12&&<button onClick={()=>setShowUploadModal(true)} style={{...C.ghostBtn,fontSize:'12px',padding:'8px 14px'}}>+ Stems ({stems.length}/12)</button>}
-            <button onClick={handleExportMix} disabled={stems.length===0} style={{...C.glowBtn(stems.length===0),fontSize:'12px',padding:'8px 14px'}}>✦ Exportar</button>
+            <button onClick={handleExportMix} disabled={stems.length===0}
+              style={{background:stems.length===0?'#241636':'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',border:'none',color:'#fff',padding:'12px 28px',borderRadius:'980px',fontSize:'15px',fontWeight:700,cursor:stems.length===0?'not-allowed':'pointer',boxShadow:stems.length>0?'0 0 28px rgba(192,38,211,0.6)':'none',fontFamily:'inherit',opacity:stems.length===0?0.4:1,display:'inline-flex',alignItems:'center',gap:'8px',animation:stems.length>0?'glow 2.5s infinite':'none',letterSpacing:'-0.2px'}}>
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="2" height="10" rx="1" fill="white" opacity="0.5"/><rect x="1" y="8" width="4" height="4" rx="2" fill="white"/><rect x="9" y="3" width="2" height="14" rx="1" fill="white" opacity="0.5"/><rect x="8" y="5" width="4" height="4" rx="2" fill="white"/><rect x="16" y="5" width="2" height="10" rx="1" fill="white" opacity="0.5"/><rect x="15" y="11" width="4" height="4" rx="2" fill="white"/></svg>
+              ✦ Exportar Mezcla con IA
+            </button>
             <button onClick={onBack} style={{...C.ghostBtn,fontSize:'12px',padding:'8px 14px'}}>← Volver</button>
           </div>
         </div>
 
-        {/* PRESETS — siempre visibles, cambio en tiempo real */}
+        {/* PRESETS — siempre visibles con waveform visual */}
         <div style={{...C.card,marginBottom:'12px'}}>
           <div style={{fontSize:'12px',fontWeight:700,color:'#F8F0FF',marginBottom:'12px',display:'flex',alignItems:'center',gap:'8px'}}>
             🎨 <span>Preset activo — toca otro para comparar en tiempo real</span>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(100px,1fr))',gap:'8px'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'8px'}}>
             {PRESETS.map(p => {
               const isSel = activePreset?.id === p.id;
               return (
                 <button key={p.id} onClick={() => applyPresetToAudio(p)}
-                  style={{background:isSel?`linear-gradient(135deg,${p.color}22,${p.color}11)`:'#0F0A1A',border:`1.5px solid ${isSel?p.color:'rgba(192,38,211,0.1)'}`,borderRadius:'12px',padding:'10px 8px',cursor:'pointer',textAlign:'left',transition:'all 0.15s',boxShadow:isSel?`0 0 12px ${p.color}44`:'none',position:'relative'}}>
+                  style={{background:isSel?`linear-gradient(135deg,${p.color}22,${p.color}11)`:'#0F0A1A',border:`1.5px solid ${isSel?p.color:'rgba(192,38,211,0.1)'}`,borderRadius:'12px',padding:'10px 8px',cursor:'pointer',textAlign:'left',transition:'all 0.15s',boxShadow:isSel?`0 0 14px ${p.color}44`:'none',position:'relative'}}>
                   {isSel&&<div style={{position:'absolute',top:'6px',right:'6px',width:'16px',height:'16px',borderRadius:'50%',background:p.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',color:'#fff',fontWeight:700}}>✓</div>}
-                  <div style={{fontSize:'11px',fontWeight:700,color:'#F8F0FF',marginBottom:'2px'}}>{p.name}</div>
-                  <div style={{fontSize:'10px',color:'#9B7EC8',lineHeight:1.3}}>{p.tags[0]} · {p.tags[1]}</div>
-                  <div style={{display:'flex',gap:'3px',marginTop:'6px'}}>
+                  {/* Waveform visual */}
+                  <div style={{height:'28px',display:'flex',alignItems:'flex-end',gap:'1.5px',marginBottom:'8px',background:'#0A0614',borderRadius:'6px',padding:'4px 5px'}}>
+                    {p.wavePattern.map((h,i) => (
+                      <div key={i} style={{flex:1,borderRadius:'2px 2px 0 0',height:`${h*100}%`,background:isSel?p.color:'rgba(155,126,200,0.25)',transition:'background 0.2s'}}></div>
+                    ))}
+                  </div>
+                  <div style={{fontSize:'12px',fontWeight:700,color:'#F8F0FF',marginBottom:'3px'}}>{p.name}</div>
+                  <div style={{fontSize:'10px',color:'#9B7EC8',lineHeight:1.3,marginBottom:'6px'}}>{p.desc.split(',')[0]}</div>
+                  <div style={{display:'flex',gap:'3px',flexWrap:'wrap'}}>
                     <span style={{fontSize:'9px',padding:'1px 5px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>B:{p.bass>0?'+':''}{p.bass}</span>
                     <span style={{fontSize:'9px',padding:'1px 5px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>R:{Math.round(p.reverbWet*100)}%</span>
                   </div>
