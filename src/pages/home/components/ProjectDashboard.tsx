@@ -118,8 +118,8 @@ export default function ProjectDashboard() {
 
   // PANTALLA: Dashboard principal
   const S = {
-    page: {minHeight:'100vh',background:'#0F0A1A',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F8F0FF'},
-    card: {background:'#1A1028',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'20px'},
+    page: {minHeight:'100vh',background:'transparent',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F8F0FF'},
+    card: {background:'rgba(26,16,40,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'20px'},
   };
 
   return (
@@ -170,7 +170,7 @@ export default function ProjectDashboard() {
                 <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                   {projects.slice(0,3).map(p => (
                     <button key={p.id} onClick={() => { setSelectedProject(p.id); setCurrentScreen('mixer'); }}
-                      style={{...S.card,display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',border:'1px solid rgba(192,38,211,0.1)',background:'#1A1028',width:'100%',textAlign:'left'}}>
+                      style={{...S.card,display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',border:'1px solid rgba(192,38,211,0.1)',background:'rgba(26,16,40,0.82)',width:'100%',textAlign:'left'}}>
                       <div>
                         <div style={{fontSize:'14px',fontWeight:600,color:'#F8F0FF'}}>{p.name}</div>
                         <div style={{fontSize:'12px',color:'#9B7EC8',marginTop:'2px'}}>{p.stems} stems · {p.createdAt.toLocaleDateString()}</div>
@@ -211,7 +211,7 @@ function UploadArea({ onUploadComplete }: { onUploadComplete: (f: File[]) => voi
   const handleDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); processFiles(Array.from(e.dataTransfer.files)); };
 
   if (isUploading) return (
-    <div style={{background:'#1A1028',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'20px',padding:'40px 24px',textAlign:'center'}}>
+    <div style={{background:'rgba(26,16,40,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'20px',padding:'40px 24px',textAlign:'center'}}>
       <div style={{width:'56px',height:'56px',margin:'0 auto 16px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'16px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 24px rgba(192,38,211,0.5)'}}>
         <i className="ri-upload-cloud-line" style={{color:'#fff',fontSize:'22px'}}></i>
       </div>
@@ -228,7 +228,7 @@ function UploadArea({ onUploadComplete }: { onUploadComplete: (f: File[]) => voi
     <>
       <input type="file" multiple accept="audio/*,.wav,.mp3,.flac,.aac,.m4a" onChange={e => { if(e.target.files) processFiles(Array.from(e.target.files)); e.target.value=''; }} id="file-upload" style={{display:'none'}} />
       <div
-        style={{background:'#1A1028',border:`2px dashed ${isDragging?'#C026D3':'rgba(192,38,211,0.25)'}`,borderRadius:'20px',padding:'48px 24px',textAlign:'center',cursor:'pointer',transition:'all 0.2s',background:isDragging?'rgba(192,38,211,0.05)':'#1A1028'} as any}
+        style={{background:'rgba(26,16,40,0.82)',border:`2px dashed ${isDragging?'#C026D3':'rgba(192,38,211,0.25)'}`,borderRadius:'20px',padding:'48px 24px',textAlign:'center',cursor:'pointer',transition:'all 0.2s',background:isDragging?'rgba(192,38,211,0.05)':'#1A1028'} as any}
         onDragOver={e=>{e.preventDefault();setIsDragging(true)}} onDragLeave={e=>{e.preventDefault();setIsDragging(false)}}
         onDrop={handleDrop} onClick={() => document.getElementById('file-upload')?.click()}>
         <div style={{width:'60px',height:'60px',margin:'0 auto 16px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'16px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 24px rgba(192,38,211,0.4)'}}>

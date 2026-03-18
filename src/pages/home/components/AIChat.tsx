@@ -98,9 +98,9 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
   };
 
   const S = {
-    page:{minHeight:'100vh',background:'#0F0A1A',display:'flex',flexDirection:'column' as const,fontFamily:"'Outfit',system-ui,sans-serif",color:'#F8F0FF',position:'relative' as const,overflow:'hidden'},
-    nav:{background:'rgba(15,10,26,0.97)',backdropFilter:'blur(16px)',borderBottom:'1px solid rgba(192,38,211,0.15)',padding:'0 24px',display:'flex',alignItems:'center',justifyContent:'space-between',height:'56px',flexShrink:0,position:'relative' as const,zIndex:10},
-    bai:{background:'linear-gradient(135deg,rgba(36,22,54,0.95),rgba(26,16,40,0.98))',border:'1px solid rgba(192,38,211,0.18)',borderRadius:'3px 18px 18px 18px',padding:'14px 18px',maxWidth:'86%',fontSize:'15px',color:'#F8F0FF',lineHeight:1.7,position:'relative' as const,overflow:'hidden'},
+    page:{minHeight:'100vh',background:'transparent',display:'flex',flexDirection:'column' as const,fontFamily:"'Outfit',system-ui,sans-serif",color:'#F8F0FF',position:'relative' as const,overflow:'hidden'},
+    nav:{background:'rgba(15,10,26,0.88)',backdropFilter:'blur(16px)',borderBottom:'1px solid rgba(192,38,211,0.15)',padding:'0 24px',display:'flex',alignItems:'center',justifyContent:'space-between',height:'56px',flexShrink:0,position:'relative' as const,zIndex:10},
+    bai:{background:'linear-gradient(135deg,rgba(36,22,54,0.88),rgba(26,16,40,0.88))',border:'1px solid rgba(192,38,211,0.18)',borderRadius:'3px 18px 18px 18px',padding:'14px 18px',maxWidth:'86%',fontSize:'15px',color:'#F8F0FF',lineHeight:1.7,position:'relative' as const,overflow:'hidden'},
     busr:{background:'linear-gradient(135deg,#C026D3,#7C3AED)',borderRadius:'18px 3px 18px 18px',padding:'12px 18px',maxWidth:'74%',fontSize:'15px',color:'#fff',marginLeft:'auto',lineHeight:1.7},
     av:{width:'36px',height:'36px',borderRadius:'50%',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,boxShadow:'0 0 12px rgba(192,38,211,0.35)'},
   };
@@ -126,10 +126,10 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
   );
 
   const ProgressCard = () => (
-    <div style={{background:'rgba(36,22,54,0.9)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'12px',padding:'14px 16px',marginTop:'12px'}}>
+    <div style={{background:'rgba(36,22,54,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'12px',padding:'14px 16px',marginTop:'12px'}}>
       <div style={{fontSize:'13px',fontWeight:600,color:'#F8F0FF',marginBottom:'3px',display:'flex',alignItems:'center',gap:'6px'}}>{ICON(13)} Cargando al mezclador...</div>
       <div style={{fontSize:'11px',color:'#9B7EC8',marginBottom:'10px'}}>Procesando {uploadedFiles.length} pistas</div>
-      <div style={{background:'#0F0A1A',borderRadius:'8px',height:'6px',overflow:'hidden',marginBottom:'6px'}}>
+      <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'8px',height:'6px',overflow:'hidden',marginBottom:'6px'}}>
         <div style={{height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'8px',width:`${loadingProgress}%`,transition:'width 0.3s'}}></div>
       </div>
       <div style={{fontFamily:"'DM Mono',monospace",fontSize:'12px',color:'#C026D3',fontWeight:600}}>{Math.round(loadingProgress)}%</div>
@@ -227,7 +227,7 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
                   <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'6px'}}>
                     <div style={S.busr}>{msg.text}</div>
                     {msg.stems&&(
-                      <div style={{background:'#1A1028',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',padding:'8px 14px',fontSize:'11px'}}>
+                      <div style={{background:'rgba(26,16,40,0.82)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',padding:'8px 14px',fontSize:'11px'}}>
                         {msg.stems.slice(0,3).map(f=>(
                           <div key={f.name} style={{display:'flex',alignItems:'center',gap:'5px',marginBottom:'2px',color:'#9B7EC8',fontFamily:"'DM Mono',monospace"}}>
                             <div style={{width:'5px',height:'5px',borderRadius:'50%',background:'#4ade80'}}></div>
@@ -273,7 +273,7 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
             </button>
             <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()}
               placeholder={chatStarted?'Escribe o toca ⬆ para subir pistas...':'¿Cómo quieres que suene tu canción? Ej: gospel con coro potente...'}
-              style={{flex:1,background:'rgba(26,16,40,0.85)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'14px',padding:'14px 18px',fontSize:'15px',color:'#F8F0FF',outline:'none',fontFamily:'inherit',backdropFilter:'blur(8px)'}} />
+              style={{flex:1,background:'rgba(26,16,40,0.78)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'14px',padding:'14px 18px',fontSize:'15px',color:'#F8F0FF',outline:'none',fontFamily:'inherit',backdropFilter:'blur(8px)'}} />
             <button onClick={()=>send()} disabled={!input.trim()||isTyping}
               style={{width:'50px',height:'50px',background:input.trim()?'linear-gradient(135deg,#EC4899,#C026D3)':'#241636',border:'none',borderRadius:'14px',display:'flex',alignItems:'center',justifyContent:'center',cursor:input.trim()?'pointer':'default',color:'#fff',fontSize:'18px',flexShrink:0,opacity:input.trim()?1:0.4}}>↑</button>
           </div>

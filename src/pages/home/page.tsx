@@ -79,7 +79,7 @@ export default function HomePage() {
 
   // PANTALLA PRINCIPAL: Chat IA directo, sin login
   return (
-    <div style={{minHeight:'100vh',background:'#0F0A1A',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F8F0FF',display:'flex',flexDirection:'column'}}>
+    <div style={{minHeight:'100vh',background:'transparent',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F8F0FF',display:'flex',flexDirection:'column'}}>
       <AIChat user={null} onStartMixer={handleStartMixer} onCreditsUpdate={() => {}} />
     </div>
   );

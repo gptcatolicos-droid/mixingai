@@ -17,8 +17,8 @@ interface FileUpload {
 }
 
 const S = {
-  page: {minHeight:'100vh',background:'#0F0A1A',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F8F0FF',position:'relative' as const,overflow:'hidden'},
-  card: {background:'#1A1028',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'16px'},
+  page: {minHeight:'100vh',background:'transparent',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F8F0FF',position:'relative' as const,overflow:'hidden'},
+  card: {background:'rgba(26,16,40,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'16px'},
   label: {fontSize:'10px',fontWeight:600,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px',display:'block'},
   glowBtn: (disabled=false) => ({background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'12px 28px',borderRadius:'980px',fontSize:'14px',fontWeight:600,cursor:disabled?'not-allowed':'pointer',boxShadow:'0 0 20px rgba(192,38,211,0.4)',fontFamily:'inherit',opacity:disabled?0.4:1,display:'inline-flex',alignItems:'center',gap:'8px',width:'100%',justifyContent:'center'}),
   ghostBtn: {background:'transparent',border:'1px solid rgba(192,38,211,0.25)',color:'#9B7EC8',padding:'10px 20px',borderRadius:'980px',fontSize:'13px',cursor:'pointer',fontFamily:'inherit'},
@@ -123,7 +123,7 @@ export default function NewProjectScreen({ user, onBack, onUploadComplete, hasUn
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:'8px',maxHeight:'280px',overflowY:'auto'}}>
               {files.map(upload => (
-                <div key={upload.id} style={{background:'#0F0A1A',borderRadius:'10px',padding:'10px 12px',display:'flex',alignItems:'center',gap:'10px',border:'1px solid rgba(192,38,211,0.08)'}}>
+                <div key={upload.id} style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'10px 12px',display:'flex',alignItems:'center',gap:'10px',border:'1px solid rgba(192,38,211,0.08)'}}>
                   <div style={{width:'32px',height:'32px',background:'rgba(192,38,211,0.1)',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                     <i className="ri-music-2-line" style={{color:'#C026D3',fontSize:'14px'}}></i>
                   </div>

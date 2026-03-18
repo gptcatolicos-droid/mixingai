@@ -61,8 +61,8 @@ interface PresetScreenProps {
 }
 
 const S = {
-  page: {minHeight:'100vh',background:'#0F0A1A',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F8F0FF'},
-  card: {background:'#1A1028',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'16px'},
+  page: {minHeight:'100vh',background:'transparent',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F8F0FF'},
+  card: {background:'rgba(26,16,40,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'16px'},
   label: {fontSize:'10px',fontWeight:600,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px',display:'block'},
   glowBtn: {background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'14px 32px',borderRadius:'980px',fontSize:'15px',fontWeight:600,cursor:'pointer',boxShadow:'0 0 24px rgba(192,38,211,0.5)',fontFamily:'inherit'},
   ghostBtn: {background:'transparent',border:'1px solid rgba(192,38,211,0.25)',color:'#9B7EC8',padding:'12px 24px',borderRadius:'980px',fontSize:'14px',cursor:'pointer',fontFamily:'inherit'},
@@ -128,7 +128,7 @@ export default function PresetScreen({ user, stemCount, onBack, onConfirm }: Pre
             const isSel = selected === p.id;
             return (
               <div key={p.id} onClick={() => setSelected(p.id)}
-                style={{background:'#1A1028',border:`1.5px solid ${isSel ? p.color : 'rgba(192,38,211,0.1)'}`,borderRadius:'14px',padding:'14px',cursor:'pointer',transition:'border-color 0.2s',boxShadow:isSel?`0 0 16px ${p.color}33`:'none',position:'relative'}}>
+                style={{background:'rgba(26,16,40,0.82)',border:`1.5px solid ${isSel ? p.color : 'rgba(192,38,211,0.1)'}`,borderRadius:'14px',padding:'14px',cursor:'pointer',transition:'border-color 0.2s',boxShadow:isSel?`0 0 16px ${p.color}33`:'none',position:'relative'}}>
                 {isSel && (
                   <div style={{position:'absolute',top:'8px',right:'8px',width:'18px',height:'18px',borderRadius:'50%',background:p.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',color:'#fff',fontWeight:700}}>✓</div>
                 )}
@@ -156,7 +156,7 @@ export default function PresetScreen({ user, stemCount, onBack, onConfirm }: Pre
               {label:'Mid',val:preset.mid,max:6},
               {label:'High',val:preset.high,max:6},
             ].map(eq => (
-              <div key={eq.label} style={{background:'#0F0A1A',borderRadius:'10px',padding:'12px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
+              <div key={eq.label} style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'12px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
                 <div style={{fontSize:'10px',color:'#9B7EC8',textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:'6px'}}>{eq.label}</div>
                 <div style={{fontSize:'20px',fontWeight:600,fontFamily:"'DM Mono',monospace",color: eq.val>0?preset.color:eq.val<0?'#f87171':'#9B7EC8'}}>
                   {eq.val>0?'+':''}{eq.val} dB
@@ -166,7 +166,7 @@ export default function PresetScreen({ user, stemCount, onBack, onConfirm }: Pre
                 </div>
               </div>
             ))}
-            <div style={{background:'#0F0A1A',borderRadius:'10px',padding:'12px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
+            <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'12px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
               <div style={{fontSize:'10px',color:'#9B7EC8',textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:'6px'}}>Compresión</div>
               <div style={{fontSize:'14px',fontWeight:600,color:preset.color,textTransform:'capitalize'}}>{preset.compression}</div>
               <div style={{fontSize:'10px',color:'rgba(155,126,200,0.5)',marginTop:'4px'}}>

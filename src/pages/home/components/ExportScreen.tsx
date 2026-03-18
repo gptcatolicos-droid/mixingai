@@ -15,8 +15,8 @@ interface ExportScreenProps {
 }
 
 const S = {
-  page: {minHeight:'100vh',background:'#0F0A1A',fontFamily:"'DM Sans',system-ui,sans-serif"},
-  card: {background:'#1A1028',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'18px',padding:'24px'},
+  page: {minHeight:'100vh',background:'transparent',fontFamily:"'DM Sans',system-ui,sans-serif"},
+  card: {background:'rgba(26,16,40,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'18px',padding:'24px'},
   label: {fontSize:'10px',fontWeight:600,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'12px',display:'block'},
   mono: {fontFamily:"'DM Mono',monospace"},
   glowBtn: {background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',borderRadius:'980px',fontSize:'13px',fontWeight:600,cursor:'pointer',boxShadow:'0 0 20px rgba(192,38,211,0.4)',fontFamily:'inherit'},
@@ -186,7 +186,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
             </div>
 
             {/* Waveform — muestra los peaks REALES de la mezcla exportada */}
-            <div style={{background:'#0F0A1A',borderRadius:'12px',padding:'12px',border:'1px solid rgba(192,38,211,0.1)',marginBottom:'20px'}}>
+            <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'12px',padding:'12px',border:'1px solid rgba(192,38,211,0.1)',marginBottom:'20px'}}>
               <canvas ref={waveformCanvasRef} width={1200} height={100}
                 style={{width:'100%',height:'70px',borderRadius:'8px',cursor:'pointer',display:'block'}}
                 onClick={e => { if(waveformCanvasRef.current) handleWaveformClick(e,waveformCanvasRef.current,dur,handleWaveformSeek); }} />
@@ -214,7 +214,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
                 {label:'Sample Rate',val:'44.1 kHz',sub:'Alta fidelidad'},
                 {label:'Bit Depth',val:'24 bits',sub:'Estudio profesional'},
               ].map(s=>(
-                <div key={s.label} style={{background:'#0F0A1A',borderRadius:'12px',padding:'14px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
+                <div key={s.label} style={{background:'rgba(8,4,16,0.88)',borderRadius:'12px',padding:'14px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
                   <div style={{...S.mono,fontSize:'18px',fontWeight:500,background:'linear-gradient(90deg,#EC4899,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{s.val}</div>
                   <div style={{fontSize:'10px',color:'#9B7EC8',marginTop:'3px',textTransform:'uppercase',letterSpacing:'0.6px'}}>{s.label}</div>
                   <div style={{fontSize:'10px',color:'rgba(155,126,200,0.6)',marginTop:'2px'}}>{s.sub}</div>
@@ -279,7 +279,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
               <i className="ri-checkbox-circle-fill" style={{color:'#fff',fontSize:'26px'}}></i>
             </div>
             <h3 style={{fontSize:'20px',fontWeight:600,color:'#F8F0FF',marginBottom:'16px'}}>¡Descarga Completada!</h3>
-            <div style={{background:'#0F0A1A',borderRadius:'12px',padding:'14px',marginBottom:'20px',border:'1px solid rgba(74,222,128,0.15)'}}>
+            <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'12px',padding:'14px',marginBottom:'20px',border:'1px solid rgba(74,222,128,0.15)'}}>
               <div style={{fontSize:'13px',color:'#4ade80',fontWeight:600,marginBottom:'4px'}}>✓ Formato: {deductedCreditsInfo.format}</div>
               <div style={{fontSize:'12px',color:'#9B7EC8'}}>Tu mezcla está lista para subir a Spotify, YouTube y más plataformas.</div>
             </div>

@@ -28,14 +28,14 @@ interface MixEditorProps {
 }
 
 const C = {
-  page: {minHeight:'100vh',background:'#0F0A1A'},
-  card: {background:'#1A1028',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'16px'},
+  page: {minHeight:'100vh',background:'transparent'},
+  card: {background:'rgba(26,16,40,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'16px'},
   label: {fontSize:'10px',fontWeight:600,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px',display:'block'},
   mono: {fontFamily:"'DM Mono',monospace"},
   grad: {background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'},
   glowBtn: (disabled=false) => ({background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'10px 18px',borderRadius:'980px',fontSize:'13px',fontWeight:600,cursor:disabled?'not-allowed':'pointer',boxShadow:'0 0 16px rgba(192,38,211,0.4)',fontFamily:'inherit',opacity:disabled?0.4:1,display:'inline-flex',alignItems:'center',gap:'6px'}),
   ghostBtn: {background:'transparent',border:'1px solid rgba(192,38,211,0.25)',color:'#9B7EC8',padding:'10px 16px',borderRadius:'980px',fontSize:'13px',cursor:'pointer',fontFamily:'inherit',display:'inline-flex',alignItems:'center',gap:'6px'},
-  track: {height:'4px',background:'#241636',borderRadius:'2px',position:'relative' as const,marginTop:'4px'},
+  track: {height:'4px',background:'rgba(36,22,54,0.75)',borderRadius:'2px',position:'relative' as const,marginTop:'4px'},
   trackFill: (pct:number) => ({height:'100%',background:'linear-gradient(90deg,#EC4899,#7C3AED)',borderRadius:'2px',width:`${pct}%`,pointerEvents:'none' as const}),
   progressBar: (pct:number) => ({height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'8px',width:`${pct}%`,transition:'width 0.3s ease'}),
 };
@@ -431,7 +431,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           </div>
           <h3 style={{fontSize:'20px',fontWeight:600,color:'#F8F0FF',marginBottom:'10px'}}>Cargando Mezclador</h3>
           <p style={{color:'#9B7EC8',marginBottom:'20px',fontSize:'14px'}}>{loadingStep}</p>
-          <div style={{background:'#241636',borderRadius:'8px',height:'6px',overflow:'hidden',marginBottom:'8px'}}>
+          <div style={{background:'rgba(36,22,54,0.75)',borderRadius:'8px',height:'6px',overflow:'hidden',marginBottom:'8px'}}>
             <div style={C.progressBar(loadingProgress)}></div>
           </div>
           <div style={{...C.mono,color:'#C026D3',fontWeight:600}}>{loadingProgress}%</div>
@@ -451,7 +451,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
             </div>
             <h3 style={{fontSize:'22px',fontWeight:600,color:'#F8F0FF',marginBottom:'10px'}}>Procesando con IA</h3>
             <p style={{color:'#9B7EC8',marginBottom:'20px',fontSize:'13px',lineHeight:1.6}}>{exportStep}</p>
-            <div style={{background:'#241636',borderRadius:'8px',height:'6px',overflow:'hidden',marginBottom:'8px'}}>
+            <div style={{background:'rgba(36,22,54,0.75)',borderRadius:'8px',height:'6px',overflow:'hidden',marginBottom:'8px'}}>
               <div style={C.progressBar(exportProgress)}></div>
             </div>
             <div style={{...C.mono,color:'#C026D3',fontWeight:600,fontSize:'18px',marginBottom:'24px'}}>{exportProgress}%</div>
@@ -533,7 +533,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         {/* Timeline */}
         <div style={{...C.card,marginBottom:'12px'}}>
           <span style={C.label}>Timeline</span>
-          <div style={{background:'#0F0A1A',borderRadius:'10px',padding:'8px',border:'1px solid rgba(192,38,211,0.1)'}}>
+          <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'8px',border:'1px solid rgba(192,38,211,0.1)'}}>
             <canvas ref={timelineCanvasRef} width={1200} height={80}
               style={{width:'100%',height:'50px',borderRadius:'6px',cursor:'pointer',display:'block'}}
               onClick={e=>{ if(timelineCanvasRef.current) handleWaveformClick(e,timelineCanvasRef.current,duration,handleTimelineSeek); }} />
@@ -555,7 +555,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                 <i className={isPlaying?'ri-pause-fill':'ri-play-fill'} style={{color:'#fff',fontSize:'20px',marginLeft:isPlaying?0:'2px'}}></i>
               </button>
               <button onClick={handleStop} disabled={stems.length===0}
-                style={{width:'36px',height:'36px',borderRadius:'50%',background:'#241636',border:'1px solid rgba(192,38,211,0.2)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                style={{width:'36px',height:'36px',borderRadius:'50%',background:'rgba(36,22,54,0.75)',border:'1px solid rgba(192,38,211,0.2)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <i className="ri-stop-fill" style={{color:'#9B7EC8',fontSize:'14px'}}></i>
               </button>
             </div>
@@ -576,7 +576,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
               <div style={{display:'flex',gap:'6px'}}>
                 {[-12,-6,0].map(v=>(
                   <button key={v} onClick={()=>setAllStemsGain(v)}
-                    style={{flex:1,padding:'7px 0',background:'#241636',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',fontSize:'11px',color:'#9B7EC8',cursor:'pointer',fontFamily:'inherit'}}>
+                    style={{flex:1,padding:'7px 0',background:'rgba(36,22,54,0.75)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',fontSize:'11px',color:'#9B7EC8',cursor:'pointer',fontFamily:'inherit'}}>
                     {v===0?'0 dB':`${v}`}
                   </button>
                 ))}
@@ -587,7 +587,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           {/* FFT */}
           <div style={C.card}>
             <span style={C.label}>FFT Analyzer</span>
-            <div style={{background:'#0F0A1A',borderRadius:'10px',padding:'8px',border:'1px solid rgba(192,38,211,0.1)',marginBottom:'14px',height:'90px',overflow:'hidden'}}>
+            <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'8px',border:'1px solid rgba(192,38,211,0.1)',marginBottom:'14px',height:'90px',overflow:'hidden'}}>
               <canvas ref={mixFFTCanvasRef} width={800} height={100} style={{width:'100%',height:'100%',display:'block'}} />
             </div>
             <div style={{display:'flex',justifyContent:'space-around'}}>
@@ -597,8 +597,8 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                   <div key={band} style={{textAlign:'center'}}>
                     <div style={{fontSize:'10px',fontWeight:600,letterSpacing:'0.8px',textTransform:'uppercase',color:'#9B7EC8',marginBottom:'8px'}}>{band}</div>
                     <div style={{display:'flex',gap:'6px',justifyContent:'center'}}>
-                      <button onClick={()=>adjustGlobalEQ(band,'down')} style={{width:'32px',height:'32px',background:'#241636',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
-                      <button onClick={()=>adjustGlobalEQ(band,'up')} style={{width:'32px',height:'32px',background:'#241636',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                      <button onClick={()=>adjustGlobalEQ(band,'down')} style={{width:'32px',height:'32px',background:'rgba(36,22,54,0.75)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                      <button onClick={()=>adjustGlobalEQ(band,'up')} style={{width:'32px',height:'32px',background:'rgba(36,22,54,0.75)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
                     </div>
                     <div style={{...C.mono,fontSize:'11px',color:'#C026D3',marginTop:'5px',fontWeight:500}}>{val>0?'+':''}{val.toFixed(1)} dB</div>
                   </div>
@@ -615,7 +615,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'12px'}}>
               {[{l:'Momentary',v:lufsMomentary},{l:'Integrated',v:lufsIntegrated}].map(m=>(
-                <div key={m.l} style={{background:'#0F0A1A',borderRadius:'10px',padding:'12px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
+                <div key={m.l} style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'12px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
                   <div style={{...C.mono,fontSize:'20px',fontWeight:500,...C.grad}}>{m.v.toFixed(1)}</div>
                   <div style={{fontSize:'10px',color:'#9B7EC8',marginTop:'2px',textTransform:'uppercase',letterSpacing:'0.6px'}}>{m.l}</div>
                 </div>
@@ -650,7 +650,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                   </button>
                 </div>
                 {/* Mini FFT */}
-                <div style={{background:'#0F0A1A',borderRadius:'6px',height:'28px',overflow:'hidden',border:'1px solid rgba(192,38,211,0.08)',marginBottom:'8px'}}>
+                <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'6px',height:'28px',overflow:'hidden',border:'1px solid rgba(192,38,211,0.08)',marginBottom:'8px'}}>
                   <canvas width={200} height={30} style={{width:'100%',height:'100%',display:'block'}}
                     ref={c=>{ if(c&&stem.fftData) drawMiniFFT(c,stem.fftData,'#C026D3'); }} />
                 </div>

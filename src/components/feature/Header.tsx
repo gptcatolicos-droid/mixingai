@@ -14,7 +14,7 @@ interface HeaderProps {
 }
 
 const S = {
-  header: {background:'rgba(26,16,40,0.97)',backdropFilter:'blur(12px)',borderBottom:'1px solid rgba(192,38,211,0.15)',position:'sticky' as const,top:0,zIndex:100},
+  header: {background:'rgba(26,16,40,0.85)',backdropFilter:'blur(12px)',borderBottom:'1px solid rgba(192,38,211,0.15)',position:'sticky' as const,top:0,zIndex:100},
   inner: {maxWidth:'1400px',margin:'0 auto',padding:'0 24px',display:'flex',alignItems:'center',justifyContent:'space-between',height:'60px'},
   logo: {display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',textDecoration:'none'},
   logoIcon: {width:'32px',height:'32px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'9px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0},
@@ -103,7 +103,7 @@ export default function Header({ user, onLogout, onCreditsUpdate }: HeaderProps)
           <div style={{background:'#1A1028',borderTop:'1px solid rgba(192,38,211,0.1)',padding:'16px 24px',display:'flex',flexDirection:'column',gap:'8px'}}>
             {user ? (
               <>
-                <div style={{background:'#241636',borderRadius:'12px',padding:'14px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'10px'}}>
+                <div style={{background:'rgba(36,22,54,0.75)',borderRadius:'12px',padding:'14px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'10px'}}>
                   <div style={S.avatar}>{user.firstName.charAt(0).toUpperCase()}</div>
                   <div>
                     <div style={{fontSize:'14px',fontWeight:600,color:'#F8F0FF'}}>{user.firstName} {user.lastName}</div>
