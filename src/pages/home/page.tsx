@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import AIChat from './components/AIChat';
 import ProjectDashboard from './components/ProjectDashboard';
 import { MixPreset } from './components/PresetScreen';
@@ -13,34 +13,29 @@ interface ExportData {
 type Screen = 'chat' | 'mixer' | 'export';
 
 export default function HomePage() {
-  // TODOS los hooks primero, sin condiciones
+  // TODOS los hooks al inicio — sin condiciones antes
   const [user] = useState(() => {
     try { const s = localStorage.getItem('audioMixerUser'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
   const [screen, setScreen] = useState<Screen>('chat');
   const [selectedPreset, setSelectedPreset] = useState<MixPreset | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const exportDataRef = useRef<ExportData | null>(null);
-  const [exportDataState, setExportDataState] = useState<ExportData | null>(null);
+  const [exportData, setExportData] = useState<ExportData | null>(null);
   const [projectId] = useState(() => Date.now().toString());
 
+  // Handlers — antes de cualquier return condicional
   const handleStartMixer = (preset: MixPreset, files: File[]) => {
-    setSelectedPreset(preset);
-    setUploadedFiles(files);
-    setScreen('mixer');
+    setSelectedPreset(preset); setUploadedFiles(files); setScreen('mixer');
   };
 
   const handleExport = (data: ExportData) => {
-    // Guardar en ref primero — disponible inmediatamente sin esperar re-render
-    exportDataRef.current = data;
-    setExportDataState(data);
+    setExportData(data);
     setScreen('export');
   };
 
-  // Si usuario logueado → dashboard completo
+  // Si usuario logueado → dashboard
   if (user) return <ProjectDashboard />;
 
-  // PANTALLA: Mezclador
   if (screen === 'mixer' && selectedPreset) {
     return (
       <MixEditor
@@ -58,24 +53,19 @@ export default function HomePage() {
     );
   }
 
-  // PANTALLA: Export — usar ref para garantizar que el dato está disponible
   if (screen === 'export') {
-    const data = exportDataRef.current || exportDataState;
     return (
       <ExportScreen
         user={{ id:'guest', firstName:'Usuario', lastName:'', email:'', country:'', credits:999999, createdAt:'' }}
         projectId={projectId}
-        exportData={data}
-        exportProgress={data ? 100 : 0}
-        exportStep={data ? '¡Listo!' : 'Preparando...'}
+        exportData={exportData}
+        exportProgress={0}
+        exportStep=""
         onBack={() => setScreen('mixer')}
         onCreditsUpdate={() => {}}
       />
     );
   }
 
-  // PANTALLA: Chat principal
-  return (
-    <AIChat user={null} onStartMixer={handleStartMixer} onCreditsUpdate={() => {}} />
-  );
+  return <AIChat user={null} onStartMixer={handleStartMixer} onCreditsUpdate={() => {}} />;
 }
