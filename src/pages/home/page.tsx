@@ -1,37 +1,28 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useRef } from 'react';
 import AIChat from './components/AIChat';
 import ProjectDashboard from './components/ProjectDashboard';
 import { MixPreset } from './components/PresetScreen';
 import MixEditor from './components/MixEditor';
 import ExportScreen from './components/ExportScreen';
-import { blogArticles } from '../../mocks/blogArticles';
-
-const getLatestArticles = () =>
-  blogArticles.sort((a, b) => new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime()).slice(0, 6);
-
-const detectLang = (): 'en' | 'es' => navigator.language?.startsWith('es') ? 'es' : 'en';
 
 interface ExportData {
   audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array;
-  finalLufs: number; mp3Url?: string; wavUrl?: string;
+  finalLufs: number; mp3Url?: string; wavUrl?: string; presetName?: string;
 }
 
 type Screen = 'chat' | 'mixer' | 'export';
 
 export default function HomePage() {
+  // TODOS los hooks primero, sin condiciones
   const [user] = useState(() => {
     try { const s = localStorage.getItem('audioMixerUser'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
   const [screen, setScreen] = useState<Screen>('chat');
   const [selectedPreset, setSelectedPreset] = useState<MixPreset | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [exportData, setExportData] = useState<ExportData | null>(null);
+  const exportDataRef = useRef<ExportData | null>(null);
+  const [exportDataState, setExportDataState] = useState<ExportData | null>(null);
   const [projectId] = useState(() => Date.now().toString());
-  const [lang] = useState(detectLang);
-
-  // Si usuario está logueado, mostrar el dashboard completo
-  if (user) return <ProjectDashboard />;
 
   const handleStartMixer = (preset: MixPreset, files: File[]) => {
     setSelectedPreset(preset);
@@ -40,11 +31,16 @@ export default function HomePage() {
   };
 
   const handleExport = (data: ExportData) => {
-    setExportData(data);
+    // Guardar en ref primero — disponible inmediatamente sin esperar re-render
+    exportDataRef.current = data;
+    setExportDataState(data);
     setScreen('export');
   };
 
-  // PANTALLA: Mezclador (sin login)
+  // Si usuario logueado → dashboard completo
+  if (user) return <ProjectDashboard />;
+
+  // PANTALLA: Mezclador
   if (screen === 'mixer' && selectedPreset) {
     return (
       <MixEditor
@@ -62,25 +58,24 @@ export default function HomePage() {
     );
   }
 
-  // PANTALLA: Exportar (sin login)
+  // PANTALLA: Export — usar ref para garantizar que el dato está disponible
   if (screen === 'export') {
+    const data = exportDataRef.current || exportDataState;
     return (
       <ExportScreen
         user={{ id:'guest', firstName:'Usuario', lastName:'', email:'', country:'', credits:999999, createdAt:'' }}
         projectId={projectId}
-        exportData={exportData}
-        exportProgress={0}
-        exportStep=""
+        exportData={data}
+        exportProgress={data ? 100 : 0}
+        exportStep={data ? '¡Listo!' : 'Preparando...'}
         onBack={() => setScreen('mixer')}
         onCreditsUpdate={() => {}}
       />
     );
   }
 
-  // PANTALLA PRINCIPAL: Chat IA directo, sin login
+  // PANTALLA: Chat principal
   return (
-    <div style={{minHeight:'100vh',background:'transparent',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F8F0FF',display:'flex',flexDirection:'column'}}>
-      <AIChat user={null} onStartMixer={handleStartMixer} onCreditsUpdate={() => {}} />
-    </div>
+    <AIChat user={null} onStartMixer={handleStartMixer} onCreditsUpdate={() => {}} />
   );
 }

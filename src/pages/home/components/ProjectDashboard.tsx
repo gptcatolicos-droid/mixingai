@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/feature/Header';
 import MixEditor from './MixEditor';
 import ExportScreen from './ExportScreen';
@@ -34,6 +34,7 @@ export default function ProjectDashboard() {
   const [delayOn, setDelayOn] = useState(false);
   const [stereoOn, setStereoOn] = useState(false);
   const [exportData, setExportData] = useState<ExportData|null>(null);
+  const exportDataRef = useRef<ExportData|null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -85,7 +86,11 @@ export default function ProjectDashboard() {
     setCurrentScreen('mixer');
   };
 
-  const handleExport = (data: ExportData) => { setExportData(data); setCurrentScreen('export'); };
+  const handleExport = (data: ExportData) => {
+    exportDataRef.current = data;
+    setExportData(data);
+    setCurrentScreen('export');
+  };
 
   const handleBackToDashboard = () => {
     setCurrentScreen('dashboard'); setSelectedProject(null); setUploadedFiles([]); setExportData(null);
@@ -112,9 +117,12 @@ export default function ProjectDashboard() {
     />;
 
   // PANTALLA: Export
-  if (currentScreen === 'export' && user && selectedProject)
-    return <ExportScreen user={user} projectId={selectedProject} exportData={exportData}
-      exportProgress={0} exportStep="" onBack={() => setCurrentScreen('mixer')} onCreditsUpdate={handleCreditsUpdate} />;
+  if (currentScreen === 'export' && user && selectedProject) {
+    const expData = exportDataRef.current || exportData;
+    return <ExportScreen user={user} projectId={selectedProject} exportData={expData}
+      exportProgress={expData ? 100 : 0} exportStep={expData ? '¡Listo!' : 'Preparando...'}
+      onBack={() => setCurrentScreen('mixer')} onCreditsUpdate={handleCreditsUpdate} />;
+  }
 
   // PANTALLA: Dashboard principal
   const S = {

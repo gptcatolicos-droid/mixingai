@@ -323,13 +323,29 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
               <div style={{width:'72px',height:'72px',margin:'0 auto 24px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'20px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 32px rgba(192,38,211,0.5)'}}>
                 <i className="ri-equalizer-fill" style={{color:'#fff',fontSize:'28px'}}></i>
               </div>
-              <h3 style={{fontSize:'22px',fontWeight:600,color:'#F8F0FF',marginBottom:'10px'}}>Procesando con IA</h3>
-              <p style={{color:'#9B7EC8',marginBottom:'24px',fontSize:'14px'}}>{exportStep}</p>
-              <div style={S.progressTrack}><div style={S.progressBar(exportProgress)}></div></div>
-              <div style={{...S.mono,color:'#C026D3',fontWeight:600,fontSize:'18px',marginTop:'10px'}}>{exportProgress}%</div>
+              <h3 style={{fontSize:'22px',fontWeight:600,color:'#F8F0FF',marginBottom:'10px'}}>
+                {exportProgress > 0 ? 'Procesando con IA' : 'Preparando mezcla...'}
+              </h3>
+              <p style={{color:'#9B7EC8',marginBottom:'24px',fontSize:'14px'}}>
+                {exportStep || 'Aplicando efectos y normalizando...'}
+              </p>
+              {exportProgress > 0 && (
+                <>
+                  <div style={S.progressTrack}><div style={S.progressBar(exportProgress)}></div></div>
+                  <div style={{...S.mono,color:'#C026D3',fontWeight:600,fontSize:'18px',marginTop:'10px'}}>{exportProgress}%</div>
+                </>
+              )}
+              {exportProgress === 0 && (
+                <div style={{display:'flex',justifyContent:'center',gap:'5px',marginTop:'8px'}}>
+                  {[0,150,300].map(d=>(
+                    <div key={d} style={{width:'8px',height:'8px',borderRadius:'50%',background:'#C026D3',animation:'bounce 1s infinite',animationDelay:`${d}ms`}}></div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
+        <style>{`@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}`}</style>
       </div>
 
       {/* Modal descargando */}
