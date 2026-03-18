@@ -37,7 +37,14 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
   const [exportAudioContext, setExportAudioContext] = useState<AudioContext | null>(null);
   const [exportSourceNode, setExportSourceNode] = useState<AudioBufferSourceNode | null>(null);
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
+  const vuCanvasRef = useRef<HTMLCanvasElement>(null);
   const exportTimeUpdateRef = useRef<number>();
+  const exportAnalyserRef = useRef<AnalyserNode | null>(null);
+  const vuAnimRef = useRef<number>();
+  const [exportMomentaryLufs, setExportMomentaryLufs] = useState(-60.0);
+  const [exportIntegratedLufs, setExportIntegratedLufs] = useState(-60.0);
+  const exportLufsHistoryRef = useRef<number[]>([]);
+  const lufsFrameRef = useRef(0);
 
   useEffect(() => {
     if (exportData && !exportAudioContext) {
@@ -65,16 +72,75 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
     if (exportAudioContext.state === 'suspended') await exportAudioContext.resume();
     if (isExportPlaying) {
       exportSourceNode?.stop(); exportSourceNode?.disconnect();
+      exportAnalyserRef.current = null;
+      if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
       setIsExportPlaying(false); setExportPausedTime(exportCurrentTime);
       if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
     } else {
       const sourceNode = exportAudioContext.createBufferSource();
       sourceNode.buffer = exportData.audioBuffer;
-      sourceNode.connect(exportAudioContext.destination);
+      // Conectar a analyser para VU meter en tiempo real
+      const analyser = exportAudioContext.createAnalyser();
+      analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
+      sourceNode.connect(analyser);
+      analyser.connect(exportAudioContext.destination);
+      exportAnalyserRef.current = analyser;
       const startTime = exportAudioContext.currentTime;
       const offset = exportPausedTime;
       sourceNode.start(startTime, offset);
       setExportSourceNode(sourceNode); setIsExportPlaying(true);
+      // Iniciar loop de VU meter
+      const vuLoop = () => {
+        if (!exportAnalyserRef.current) return;
+        const td = new Float32Array(analyser.fftSize);
+        analyser.getFloatTimeDomainData(td);
+        let rmsSum = 0;
+        for (let i = 0; i < td.length; i++) rmsSum += td[i]*td[i];
+        const rms = Math.sqrt(rmsSum/td.length);
+        const momentary = rms > 0 ? Math.max(-60, 20*Math.log10(rms)-0.691) : -60;
+        // Dibujar VU meter en canvas
+        const vc = vuCanvasRef.current;
+        if (vc) {
+          const ctx2 = vc.getContext('2d');
+          if (ctx2) {
+            const w = vc.width, h = vc.height;
+            ctx2.clearRect(0,0,w,h);
+            // Fondo
+            ctx2.fillStyle = 'rgba(8,4,16,0.6)';
+            ctx2.fillRect(0,0,w,h);
+            // Barras L y R
+            const level = Math.max(0, (momentary + 60) / 60);
+            const barW = w/2 - 4;
+            const barH = h * level;
+            const gradient = ctx2.createLinearGradient(0, h, 0, 0);
+            gradient.addColorStop(0, '#4ade80');
+            gradient.addColorStop(0.6, '#FBBF24');
+            gradient.addColorStop(0.85, '#EC4899');
+            gradient.addColorStop(1, '#ef4444');
+            ctx2.fillStyle = gradient;
+            ctx2.fillRect(2, h - barH, barW, barH);
+            ctx2.fillRect(barW + 6, h - barH * 0.97, barW, barH * 0.97);
+            // Línea de -14 LUFS
+            const targetY = h - (46/60) * h;
+            ctx2.strokeStyle = 'rgba(74,222,128,0.6)';
+            ctx2.lineWidth = 1;
+            ctx2.setLineDash([3,3]);
+            ctx2.beginPath(); ctx2.moveTo(0, targetY); ctx2.lineTo(w, targetY); ctx2.stroke();
+            ctx2.setLineDash([]);
+          }
+        }
+        // Actualizar LUFS cada 6 frames
+        lufsFrameRef.current++;
+        if (lufsFrameRef.current % 6 === 0) {
+          setExportMomentaryLufs(momentary);
+          exportLufsHistoryRef.current.push(momentary);
+          if (exportLufsHistoryRef.current.length > 300) exportLufsHistoryRef.current.shift();
+          const integrated = exportLufsHistoryRef.current.reduce((a,b)=>a+b,0)/exportLufsHistoryRef.current.length;
+          setExportIntegratedLufs(Math.max(-60, Math.min(0, integrated)));
+        }
+        vuAnimRef.current = requestAnimationFrame(vuLoop);
+      };
+      vuAnimRef.current = requestAnimationFrame(vuLoop);
       sourceNode.onended = () => { setIsExportPlaying(false); setExportPausedTime(0); setExportCurrentTime(0); };
       exportTimeUpdateRef.current = window.setInterval(() => {
         const elapsed = exportAudioContext.currentTime - startTime + offset;
@@ -207,27 +273,44 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
               {fmt(exportCurrentTime)} / {fmt(dur)}
             </div>
 
-            {/* MIX BUS MASTER en la pantalla de exportación */}
-            <div style={{background:'linear-gradient(135deg,rgba(36,22,54,0.88),rgba(26,16,40,0.88))',border:'1px solid rgba(192,38,211,0.25)',borderRadius:'14px',padding:'14px',marginBottom:'16px',position:'relative',overflow:'hidden'}}>
+            {/* MIX BUS MASTER con VU meter en tiempo real */}
+            <div style={{background:'linear-gradient(135deg,rgba(36,22,54,0.88),rgba(26,16,40,0.88))',border:'1px solid rgba(192,38,211,0.25)',borderRadius:'14px',padding:'16px',marginBottom:'16px',position:'relative',overflow:'hidden'}}>
               <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)'}}></div>
-              <div style={{fontSize:'10px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px',display:'flex',alignItems:'center',gap:'6px'}}>
-                <i className="ri-equalizer-fill" style={{color:'#C026D3',fontSize:'12px'}}></i>
-                Mix Bus Master
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'14px'}}>
+                <i className="ri-equalizer-fill" style={{color:'#C026D3',fontSize:'13px'}}></i>
+                <span style={{fontSize:'10px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8'}}>Mix Bus Master</span>
                 {exportData.presetName && <span style={{background:'linear-gradient(135deg,#EC4899,#C026D3)',borderRadius:'980px',padding:'2px 10px',fontSize:'9px',color:'#fff',fontWeight:700}}>✦ {exportData.presetName}</span>}
+                <span style={{marginLeft:'auto',fontSize:'9px',color:isExportPlaying?'#4ade80':'#9B7EC8',fontFamily:"'DM Mono',monospace",fontWeight:600}}>{isExportPlaying?'▶ PLAYING':'■ STOPPED — dale Play para ver los LUFS'}</span>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(100px,1fr))',gap:'8px'}}>
-                {[
-                  {label:'LUFS Final',val:exportData.finalLufs.toFixed(1),sub:'Streaming ready',color:'#EC4899'},
-                  {label:'Sample Rate',val:'44.1 kHz',sub:'Alta fidelidad',color:'#C026D3'},
-                  {label:'Bit Depth',val:'24 bits',sub:'Estudio prof.',color:'#7C3AED'},
-                  {label:'Spotify',val:'-14 LUFS',sub:Math.abs(exportData.finalLufs+14)<0.5?'✓ Óptimo':'⚠ Check',color:Math.abs(exportData.finalLufs+14)<0.5?'#4ade80':'#FBBF24'},
-                ].map(s=>(
-                  <div key={s.label} style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'10px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
-                    <div style={{...S.mono,fontSize:'17px',fontWeight:600,color:s.color,marginBottom:'2px'}}>{s.val}</div>
-                    <div style={{fontSize:'9px',textTransform:'uppercase' as const,letterSpacing:'0.5px',color:'#9B7EC8',marginBottom:'1px'}}>{s.label}</div>
-                    <div style={{fontSize:'9px',color:'rgba(155,126,200,0.6)'}}>{s.sub}</div>
+              <div style={{display:'grid',gridTemplateColumns:'52px 1fr',gap:'14px',alignItems:'start'}}>
+                <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',gap:'4px'}}>
+                  <canvas ref={vuCanvasRef} width={60} height={100} style={{width:'44px',height:'80px',borderRadius:'6px',border:'1px solid rgba(192,38,211,0.2)'}} />
+                  <span style={{fontSize:'9px',color:'#9B7EC8',fontFamily:"'DM Mono',monospace"}}>VU</span>
+                </div>
+                <div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'8px'}}>
+                    <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'10px',textAlign:'center' as const,border:'1px solid rgba(192,38,211,0.08)'}}>
+                      <div style={{...S.mono,fontSize:'20px',fontWeight:600,color:exportMomentaryLufs>-14?'#f87171':exportMomentaryLufs<-30?'#9B7EC8':'#4ade80',transition:'color 0.3s'}}>{exportMomentaryLufs.toFixed(1)}</div>
+                      <div style={{fontSize:'9px',textTransform:'uppercase' as const,letterSpacing:'0.5px',color:'#9B7EC8',marginTop:'2px'}}>LUFS Momentary</div>
+                    </div>
+                    <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'10px',textAlign:'center' as const,border:'1px solid rgba(192,38,211,0.08)'}}>
+                      <div style={{...S.mono,fontSize:'20px',fontWeight:600,color:'#C026D3'}}>{exportIntegratedLufs.toFixed(1)}</div>
+                      <div style={{fontSize:'9px',textTransform:'uppercase' as const,letterSpacing:'0.5px',color:'#9B7EC8',marginTop:'2px'}}>LUFS Integrated</div>
+                    </div>
                   </div>
-                ))}
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px'}}>
+                    {[
+                      {label:'Sample Rate',val:'44.1 kHz',color:'#C026D3'},
+                      {label:'Bit Depth',val:'24 bits',color:'#7C3AED'},
+                      {label:'Spotify',val:exportData.finalLufs.toFixed(1),sub:Math.abs(exportData.finalLufs+14)<0.5?'✓ Óptimo':'⚠ Check',color:Math.abs(exportData.finalLufs+14)<0.5?'#4ade80':'#FBBF24'},
+                    ].map(s=>(
+                      <div key={s.label} style={{background:'rgba(15,10,26,0.6)',borderRadius:'8px',padding:'8px',textAlign:'center' as const,border:'1px solid rgba(192,38,211,0.06)'}}>
+                        <div style={{...S.mono,fontSize:'13px',fontWeight:600,color:s.color}}>{s.val}</div>
+                        <div style={{fontSize:'9px',color:'#9B7EC8'}}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 

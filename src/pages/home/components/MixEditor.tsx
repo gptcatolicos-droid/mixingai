@@ -543,6 +543,29 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           </div>
         </div>
 
+        {/* TIMELINE + TRANSPORT — arriba de todo */}
+        <div style={{...C.card,marginBottom:'12px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+            <span style={C.label}>Timeline</span>
+            <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+              <span style={{...C.mono,fontSize:'12px',color:'#9B7EC8'}}>{fmt(currentTime)} / {fmt(duration)}</span>
+              <button onClick={handlePlayPause} disabled={stems.length===0}
+                style={{width:'42px',height:'42px',borderRadius:'50%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 16px rgba(236,72,153,0.5)',flexShrink:0}}>
+                <i className={isPlaying?'ri-pause-fill':'ri-play-fill'} style={{color:'#fff',fontSize:'18px',marginLeft:isPlaying?0:'2px'}}></i>
+              </button>
+              <button onClick={handleStop} disabled={stems.length===0}
+                style={{width:'34px',height:'34px',borderRadius:'50%',background:'rgba(36,22,54,0.75)',border:'1px solid rgba(192,38,211,0.2)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <i className="ri-stop-fill" style={{color:'#9B7EC8',fontSize:'13px'}}></i>
+              </button>
+            </div>
+          </div>
+          <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'8px',border:'1px solid rgba(192,38,211,0.1)'}}>
+            <canvas ref={timelineCanvasRef} width={1200} height={80}
+              style={{width:'100%',height:'50px',borderRadius:'6px',cursor:'pointer',display:'block'}}
+              onClick={e=>{ if(timelineCanvasRef.current) handleWaveformClick(e,timelineCanvasRef.current,duration,handleTimelineSeek); }} />
+          </div>
+        </div>
+
         {/* PRESETS */}
         <div style={{...C.card,marginBottom:'12px'}}>
           <span style={C.label}>Preset — toca para aplicar y escuchar en tiempo real</span>
@@ -655,19 +678,6 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                 <span style={{color:momentaryLufs<=-12.5&&momentaryLufs>=-13.5?'#4ade80':'#f87171'}}>-13</span>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Timeline */}
-        <div style={{...C.card,marginBottom:'12px'}}>
-          <span style={C.label}>Timeline</span>
-          <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'8px',border:'1px solid rgba(192,38,211,0.1)'}}>
-            <canvas ref={timelineCanvasRef} width={1200} height={80}
-              style={{width:'100%',height:'50px',borderRadius:'6px',cursor:'pointer',display:'block'}}
-              onClick={e=>{ if(timelineCanvasRef.current) handleWaveformClick(e,timelineCanvasRef.current,duration,handleTimelineSeek); }} />
-          </div>
-          <div style={{display:'flex',justifyContent:'space-between',marginTop:'6px',fontSize:'11px',color:'#9B7EC8',...C.mono}}>
-            <span>{fmt(currentTime)}</span><span>{fmt(duration)}</span>
           </div>
         </div>
 
