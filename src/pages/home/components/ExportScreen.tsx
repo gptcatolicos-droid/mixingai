@@ -14,6 +14,8 @@ interface ExportScreenProps {
   onBack: () => void; onCreditsUpdate: (newCredits: number) => void;
 }
 
+const fmt = (s: number) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+
 const S = {
   page: {minHeight:'100vh',background:'transparent',fontFamily:"'DM Sans',system-ui,sans-serif"},
   card: {background:'rgba(26,16,40,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'18px',padding:'24px'},

@@ -420,9 +420,11 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       const wavBlob = bufferToWav(normalized,24);
       const wavUrl = URL.createObjectURL(wavBlob);
       setExportProgress(100); setExportStep('¡Listo!'); await new Promise(r=>setTimeout(r,800));
-      onExport({ audioBuffer:normalized, audioUrl:wavUrl, waveformPeaks:peaks, finalLufs:-14.0, presetName:(activePreset||initialPreset)?.name });
+      // Limpiar estado ANTES de llamar onExport para evitar setState en componente desmontado
       setIsExporting(false); setExportProgress(0); setExportStep('');
-    } catch(e) { console.error(e); setIsExporting(false); }
+      await new Promise(r=>setTimeout(r,50)); // microtask para que React procese el cleanup
+      onExport({ audioBuffer:normalized, audioUrl:wavUrl, waveformPeaks:peaks, finalLufs:-14.0, presetName:(activePreset||initialPreset)?.name });
+    } catch(e) { console.error('Export error:', e); setIsExporting(false); }
   };
 
   const normalizeTo14LUFS = (buffer: AudioBuffer): AudioBuffer => {
