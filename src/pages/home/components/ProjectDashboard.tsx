@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+
+// Variable de módulo — sync, garantizada entre renders
+let pendingExportData: any = null;
 import Header from '@/components/feature/Header';
 import MixEditor from './MixEditor';
 import ExportScreen from './ExportScreen';
@@ -87,6 +90,7 @@ export default function ProjectDashboard() {
   };
 
   const handleExport = (data: ExportData) => {
+    pendingExportData = data; // sync
     exportDataRef.current = data;
     setExportData(data);
     setCurrentScreen('export');
@@ -116,10 +120,12 @@ export default function ProjectDashboard() {
       initialPreset={selectedPreset} reverbOn={reverbOn} delayOn={delayOn} stereoOn={stereoOn}
     />;
 
-  // PANTALLA: Export
-  if (currentScreen === 'export' && user && selectedProject) {
-    const expData = exportDataRef.current || exportData;
-    return <ExportScreen user={user} projectId={selectedProject} exportData={expData}
+  // PANTALLA: Export — sin condición de user/project para evitar pantalla negra
+  if (currentScreen === 'export') {
+    const expData = pendingExportData || exportDataRef.current || exportData;
+    const expUser = user || { id:'guest', firstName:'Usuario', lastName:'', email:'', country:'', credits:999999, createdAt:'' };
+    const expProject = selectedProject || 'export';
+    return <ExportScreen user={expUser} projectId={expProject} exportData={expData}
       exportProgress={expData ? 100 : 0} exportStep={expData ? '¡Listo!' : 'Preparando...'}
       onBack={() => setCurrentScreen('mixer')} onCreditsUpdate={handleCreditsUpdate} />;
   }

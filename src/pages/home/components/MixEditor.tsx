@@ -20,7 +20,7 @@ import { MixPreset, PRESETS } from './PresetScreen';
 interface MixEditorProps {
   projectId: string; user: User; uploadedFiles: File[];
   onBack: () => void; onCreditsUpdate: (n: number) => void;
-  onExport: (d: { audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array; finalLufs: number }) => void;
+  onExport: (d: { audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array; finalLufs: number; presetName?: string }) => void;
   initialPreset?: MixPreset;
   reverbOn?: boolean;
   delayOn?: boolean;

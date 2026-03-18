@@ -12,8 +12,10 @@ interface ExportData {
 
 type Screen = 'chat' | 'mixer' | 'export';
 
+// Variable de módulo — fuera del componente, no se pierde entre renders
+let pendingExportData: ExportData | null = null;
+
 export default function HomePage() {
-  // TODOS los hooks al inicio — sin condiciones antes
   const [user] = useState(() => {
     try { const s = localStorage.getItem('audioMixerUser'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
@@ -23,17 +25,16 @@ export default function HomePage() {
   const [exportData, setExportData] = useState<ExportData | null>(null);
   const [projectId] = useState(() => Date.now().toString());
 
-  // Handlers — antes de cualquier return condicional
   const handleStartMixer = (preset: MixPreset, files: File[]) => {
     setSelectedPreset(preset); setUploadedFiles(files); setScreen('mixer');
   };
 
   const handleExport = (data: ExportData) => {
+    pendingExportData = data; // sync — disponible inmediatamente
     setExportData(data);
     setScreen('export');
   };
 
-  // Si usuario logueado → dashboard
   if (user) return <ProjectDashboard />;
 
   if (screen === 'mixer' && selectedPreset) {
@@ -54,13 +55,15 @@ export default function HomePage() {
   }
 
   if (screen === 'export') {
+    // Usar pendingExportData (sync) como fallback garantizado
+    const data = exportData || pendingExportData;
     return (
       <ExportScreen
         user={{ id:'guest', firstName:'Usuario', lastName:'', email:'', country:'', credits:999999, createdAt:'' }}
         projectId={projectId}
-        exportData={exportData}
-        exportProgress={0}
-        exportStep=""
+        exportData={data}
+        exportProgress={data ? 100 : 0}
+        exportStep={data ? '¡Listo!' : 'Preparando...'}
         onBack={() => setScreen('mixer')}
         onCreditsUpdate={() => {}}
       />
