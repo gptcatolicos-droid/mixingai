@@ -207,19 +207,28 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
               {fmt(exportCurrentTime)} / {fmt(dur)}
             </div>
 
-            {/* Stats de mejora — muestra el contraste antes/después */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px',marginBottom:'28px'}}>
-              {[
-                {label:'LUFS Final',val:exportData.finalLufs.toFixed(1),sub:'Streaming ready'},
-                {label:'Sample Rate',val:'44.1 kHz',sub:'Alta fidelidad'},
-                {label:'Bit Depth',val:'24 bits',sub:'Estudio profesional'},
-              ].map(s=>(
-                <div key={s.label} style={{background:'rgba(8,4,16,0.88)',borderRadius:'12px',padding:'14px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
-                  <div style={{...S.mono,fontSize:'18px',fontWeight:500,background:'linear-gradient(90deg,#EC4899,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{s.val}</div>
-                  <div style={{fontSize:'10px',color:'#9B7EC8',marginTop:'3px',textTransform:'uppercase',letterSpacing:'0.6px'}}>{s.label}</div>
-                  <div style={{fontSize:'10px',color:'rgba(155,126,200,0.6)',marginTop:'2px'}}>{s.sub}</div>
-                </div>
-              ))}
+            {/* MIX BUS MASTER en la pantalla de exportación */}
+            <div style={{background:'linear-gradient(135deg,rgba(36,22,54,0.88),rgba(26,16,40,0.88))',border:'1px solid rgba(192,38,211,0.25)',borderRadius:'14px',padding:'14px',marginBottom:'16px',position:'relative',overflow:'hidden'}}>
+              <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)'}}></div>
+              <div style={{fontSize:'10px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px',display:'flex',alignItems:'center',gap:'6px'}}>
+                <i className="ri-equalizer-fill" style={{color:'#C026D3',fontSize:'12px'}}></i>
+                Mix Bus Master
+                {exportData.presetName && <span style={{background:'linear-gradient(135deg,#EC4899,#C026D3)',borderRadius:'980px',padding:'2px 10px',fontSize:'9px',color:'#fff',fontWeight:700}}>✦ {exportData.presetName}</span>}
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(100px,1fr))',gap:'8px'}}>
+                {[
+                  {label:'LUFS Final',val:exportData.finalLufs.toFixed(1),sub:'Streaming ready',color:'#EC4899'},
+                  {label:'Sample Rate',val:'44.1 kHz',sub:'Alta fidelidad',color:'#C026D3'},
+                  {label:'Bit Depth',val:'24 bits',sub:'Estudio prof.',color:'#7C3AED'},
+                  {label:'Spotify',val:'-14 LUFS',sub:Math.abs(exportData.finalLufs+14)<0.5?'✓ Óptimo':'⚠ Check',color:Math.abs(exportData.finalLufs+14)<0.5?'#4ade80':'#FBBF24'},
+                ].map(s=>(
+                  <div key={s.label} style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'10px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
+                    <div style={{...S.mono,fontSize:'17px',fontWeight:600,color:s.color,marginBottom:'2px'}}>{s.val}</div>
+                    <div style={{fontSize:'9px',textTransform:'uppercase' as const,letterSpacing:'0.5px',color:'#9B7EC8',marginBottom:'1px'}}>{s.label}</div>
+                    <div style={{fontSize:'9px',color:'rgba(155,126,200,0.6)'}}>{s.sub}</div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Botones de descarga */}

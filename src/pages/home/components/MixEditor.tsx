@@ -59,6 +59,10 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const [exportStep, setExportStep] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showPresetPanel, setShowPresetPanel] = useState(false);
+  const [reverbActive, setReverbActive] = useState(reverbOn);
+  const [delayActive, setDelayActive] = useState(delayOn);
+  const [momentaryLufs, setMomentaryLufs] = useState(-60.0);
+  const [integratedLufs, setIntegratedLufs] = useState(-60.0);
   const [activePreset, setActivePreset] = useState<MixPreset|undefined>(initialPreset);
   const [allFiles, setAllFiles] = useState<File[]>(uploadedFiles);
 
@@ -69,6 +73,11 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const bassFilterRef = useRef<BiquadFilterNode | null>(null);
   const midFilterRef = useRef<BiquadFilterNode | null>(null);
   const highFilterRef = useRef<BiquadFilterNode | null>(null);
+  const reverbGainRef = useRef<GainNode | null>(null);
+  const dryGainRef = useRef<GainNode | null>(null);
+  const delayGainRef = useRef<GainNode | null>(null);
+  const reverbOnRef = useRef(reverbOn);
+  const delayOnRef = useRef(delayOn);
   const timeUpdateIntervalRef = useRef<number>();
   const animationFrameRef = useRef<number>();
   const pausedTimeRef = useRef(0);
@@ -135,6 +144,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       masterGainRef.current = masterGain; mixAnalyserRef.current = mixAnalyser;
       mixFftDataRef.current = new Uint8Array(mixAnalyser.frequencyBinCount);
       bassFilterRef.current = bassFilter; midFilterRef.current = midFilter; highFilterRef.current = highFilter;
+      reverbGainRef.current = reverbGain; dryGainRef.current = dryGain; delayGainRef.current = delayGainNode;
       setLoadingStep('Decodificando archivos...'); setLoadingProgress(30);
       const decoded = await Promise.all(allFiles.map(async (file, i) => {
         try {
@@ -169,12 +179,43 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const applyPresetToAudio = (preset: MixPreset) => {
     const ctx = audioContextRef.current;
     if (!ctx) return;
-    if (bassFilterRef.current) bassFilterRef.current.gain.setTargetAtTime(preset.bass, ctx.currentTime, 0.05);
-    if (midFilterRef.current) midFilterRef.current.gain.setTargetAtTime(preset.mid, ctx.currentTime, 0.05);
-    if (highFilterRef.current) highFilterRef.current.gain.setTargetAtTime(preset.high, ctx.currentTime, 0.05);
+    const t = ctx.currentTime;
+    const smooth = 0.08;
+    // EQ en tiempo real
+    if (bassFilterRef.current) bassFilterRef.current.gain.setTargetAtTime(preset.bass, t, smooth);
+    if (midFilterRef.current) midFilterRef.current.gain.setTargetAtTime(preset.mid, t, smooth);
+    if (highFilterRef.current) highFilterRef.current.gain.setTargetAtTime(preset.high, t, smooth);
+    // Reverb en tiempo real
+    const rvWet = preset.reverbWet * (reverbOnRef.current ? 1 : 0);
+    if (reverbGainRef.current) reverbGainRef.current.gain.setTargetAtTime(rvWet, t, smooth);
+    if (dryGainRef.current) dryGainRef.current.gain.setTargetAtTime(1 - rvWet * 0.4, t, smooth);
+    // Delay en tiempo real
+    const dlWet = preset.delayWet * (delayOnRef.current ? 1 : 0);
+    if (delayGainRef.current) delayGainRef.current.gain.setTargetAtTime(dlWet, t, smooth);
     setBassGain(preset.bass); setMidGain(preset.mid); setHighGain(preset.high);
     setActivePreset(preset);
     setShowPresetPanel(false);
+  };
+
+  const toggleReverb = () => {
+    const newVal = !reverbOnRef.current;
+    reverbOnRef.current = newVal;
+    const ctx = audioContextRef.current;
+    if (!ctx || !activePreset) return;
+    const rvWet = activePreset.reverbWet * (newVal ? 1 : 0);
+    if (reverbGainRef.current) reverbGainRef.current.gain.setTargetAtTime(rvWet, ctx.currentTime, 0.05);
+    if (dryGainRef.current) dryGainRef.current.gain.setTargetAtTime(1 - rvWet * 0.4, ctx.currentTime, 0.05);
+    setReverbActive(newVal);
+  };
+
+  const toggleDelay = () => {
+    const newVal = !delayOnRef.current;
+    delayOnRef.current = newVal;
+    const ctx = audioContextRef.current;
+    if (!ctx || !activePreset) return;
+    const dlWet = activePreset.delayWet * (newVal ? 1 : 0);
+    if (delayGainRef.current) delayGainRef.current.gain.setTargetAtTime(dlWet, ctx.currentTime, 0.05);
+    setDelayActive(newVal);
   };
 
   const generateWaveformPeaks = (buffer: AudioBuffer, samples: number): Float32Array => {
@@ -201,9 +242,11 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         for (let i = 0; i < wd.length; i++) rmsSum += wd[i]*wd[i];
         const rms = Math.sqrt(rmsSum/wd.length);
         const momentary = rms > 0 ? Math.max(-60, 20*Math.log10(rms)-0.691) : -60;
+        setMomentaryLufs(momentary);
         lufsHistoryRef.current.push(momentary);
         if (lufsHistoryRef.current.length > 300) lufsHistoryRef.current.shift();
         const integrated = lufsHistoryRef.current.reduce((a,b)=>a+b,0)/lufsHistoryRef.current.length;
+        setIntegratedLufs(Math.max(-60, Math.min(0, integrated)));
         setLufsMomentary(momentary); setLufsIntegrated(integrated);
         if (mixFFTCanvasRef.current) drawFFTAnalyzer({ canvas:mixFFTCanvasRef.current, fftData:fd, style:'applemusic' });
       }
@@ -500,26 +543,23 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           </div>
         </div>
 
-        {/* PRESETS — siempre visibles con waveform visual */}
+        {/* PRESETS */}
         <div style={{...C.card,marginBottom:'12px'}}>
-          <div style={{fontSize:'12px',fontWeight:700,color:'#F8F0FF',marginBottom:'12px',display:'flex',alignItems:'center',gap:'8px'}}>
-            🎨 <span>Preset activo — toca otro para comparar en tiempo real</span>
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'8px'}}>
+          <span style={C.label}>Preset — toca para aplicar y escuchar en tiempo real</span>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(100px,1fr))',gap:'7px'}}>
             {PRESETS.map(p => {
               const isSel = activePreset?.id === p.id;
               return (
                 <button key={p.id} onClick={() => applyPresetToAudio(p)}
-                  style={{background:isSel?`linear-gradient(135deg,${p.color}22,${p.color}11)`:'#0F0A1A',border:`1.5px solid ${isSel?p.color:'rgba(192,38,211,0.1)'}`,borderRadius:'12px',padding:'10px 8px',cursor:'pointer',textAlign:'left',transition:'all 0.15s',boxShadow:isSel?`0 0 14px ${p.color}44`:'none',position:'relative'}}>
-                  {isSel&&<div style={{position:'absolute',top:'6px',right:'6px',width:'16px',height:'16px',borderRadius:'50%',background:p.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',color:'#fff',fontWeight:700}}>✓</div>}
-                  {/* Waveform visual */}
-                  <div style={{height:'28px',display:'flex',alignItems:'flex-end',gap:'1.5px',marginBottom:'8px',background:'#0A0614',borderRadius:'6px',padding:'4px 5px'}}>
+                  style={{background:isSel?`linear-gradient(135deg,${p.color}22,${p.color}11)`:'rgba(8,4,16,0.5)',border:`1.5px solid ${isSel?p.color:'rgba(192,38,211,0.1)'}`,borderRadius:'11px',padding:'9px 8px',cursor:'pointer',textAlign:'left',transition:'all 0.15s',boxShadow:isSel?`0 0 12px ${p.color}44`:'none',position:'relative'}}>
+                  {isSel&&<div style={{position:'absolute',top:'5px',right:'5px',width:'14px',height:'14px',borderRadius:'50%',background:p.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'8px',color:'#fff',fontWeight:700}}>✓</div>}
+                  <div style={{height:'22px',display:'flex',alignItems:'flex-end',gap:'1px',marginBottom:'7px',background:'rgba(8,4,16,0.6)',borderRadius:'5px',padding:'3px 4px'}}>
                     {p.wavePattern.map((h,i) => (
-                      <div key={i} style={{flex:1,borderRadius:'2px 2px 0 0',height:`${h*100}%`,background:isSel?p.color:'rgba(155,126,200,0.25)',transition:'background 0.2s'}}></div>
+                      <div key={i} style={{flex:1,borderRadius:'2px 2px 0 0',height:`${h*100}%`,background:isSel?p.color:'rgba(155,126,200,0.2)',transition:'background 0.2s'}}></div>
                     ))}
                   </div>
-                  <div style={{fontSize:'12px',fontWeight:700,color:'#F8F0FF',marginBottom:'3px'}}>{p.name}</div>
-                  <div style={{fontSize:'10px',color:'#9B7EC8',lineHeight:1.3,marginBottom:'6px'}}>{p.desc.split(',')[0]}</div>
+                  <div style={{fontSize:'11px',fontWeight:700,color:'#F8F0FF',marginBottom:'2px'}}>{p.name}</div>
+                  <div style={{fontSize:'9px',color:'rgba(155,126,200,0.6)',marginBottom:'5px'}}>{p.tags[0]}</div>
                   <div style={{display:'flex',gap:'3px',flexWrap:'wrap'}}>
                     <span style={{fontSize:'9px',padding:'1px 5px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>B:{p.bass>0?'+':''}{p.bass}</span>
                     <span style={{fontSize:'9px',padding:'1px 5px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>R:{Math.round(p.reverbWet*100)}%</span>
@@ -527,6 +567,94 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* MIX BUS MASTER */}
+        <div style={{background:'linear-gradient(135deg,rgba(36,22,54,0.88),rgba(26,16,40,0.88))',border:'1px solid rgba(192,38,211,0.3)',borderRadius:'16px',padding:'16px',marginBottom:'12px',position:'relative',overflow:'hidden'}}>
+          <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)'}}></div>
+          <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'14px'}}>
+            <i className="ri-equalizer-fill" style={{color:'#C026D3',fontSize:'14px'}}></i>
+            <span style={{fontSize:'11px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#F8F0FF'}}>Mix Bus Master</span>
+            {activePreset && <span style={{background:`linear-gradient(135deg,${activePreset.color},${activePreset.color}88)`,borderRadius:'980px',padding:'3px 10px',fontSize:'10px',color:'#fff',fontWeight:700}}>✦ {activePreset.name}</span>}
+            <span style={{marginLeft:'auto',fontSize:'10px',color:isPlaying?'#4ade80':'#9B7EC8',fontFamily:"'DM Mono',monospace",fontWeight:600}}>{isPlaying?'▶ PLAYING':'■ STOPPED'}</span>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'10px'}}>
+
+            {/* EQ */}
+            <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'12px'}}>
+              <div style={{fontSize:'9px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px'}}>EQ</div>
+              {[{label:'Bass',val:bassGain,color:'#EC4899'},{label:'Mid',val:midGain,color:'#C026D3'},{label:'High',val:highGain,color:'#7C3AED'}].map(eq=>(
+                <div key={eq.label} style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'6px'}}>
+                  <span style={{fontSize:'10px',color:'#9B7EC8',width:'28px'}}>{eq.label}</span>
+                  <div style={{flex:1,height:'4px',background:'rgba(192,38,211,0.15)',borderRadius:'2px'}}>
+                    <div style={{height:'100%',borderRadius:'2px',background:eq.color,width:`${((eq.val+12)/24)*100}%`}}></div>
+                  </div>
+                  <span style={{fontSize:'10px',color:eq.color,fontFamily:"'DM Mono',monospace",minWidth:'36px',textAlign:'right'}}>{eq.val>0?'+':''}{eq.val}dB</span>
+                </div>
+              ))}
+            </div>
+
+            {/* FX con toggles reales */}
+            <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'12px'}}>
+              <div style={{fontSize:'9px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px'}}>Efectos</div>
+              {[
+                {label:'Reverb',active:reverbActive,toggle:toggleReverb,val:activePreset?`${Math.round(activePreset.reverbWet*100)}%`:'0%',sub:'Espacio'},
+                {label:'Delay',active:delayActive,toggle:toggleDelay,val:activePreset?`${Math.round(activePreset.delayWet*100)}%`:'0%',sub:'1/4 beat'},
+                {label:'Widener',active:stereoOn,toggle:()=>{},val:activePreset?`${Math.round(activePreset.stereoWidth*100)}%`:'50%',sub:'Estéreo'},
+              ].map(fx=>(
+                <div key={fx.label} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
+                  <div>
+                    <div style={{fontSize:'11px',color:'#F8F0FF',fontWeight:600}}>{fx.label}</div>
+                    <div style={{fontSize:'10px',color:'#9B7EC8'}}>{fx.val} · {fx.sub}</div>
+                  </div>
+                  <div onClick={fx.toggle} style={{width:'32px',height:'18px',borderRadius:'9px',background:fx.active?'#C026D3':'rgba(155,126,200,0.2)',position:'relative',cursor:'pointer',transition:'background 0.2s'}}>
+                    <div style={{width:'13px',height:'13px',borderRadius:'50%',background:'#fff',position:'absolute',top:'2.5px',left:fx.active?'16px':'3px',transition:'left 0.2s'}}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Compresión */}
+            <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'12px'}}>
+              <div style={{fontSize:'9px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px'}}>Compresión</div>
+              <div style={{fontSize:'14px',fontWeight:700,color:'#F8F0FF',marginBottom:'4px',textTransform:'capitalize' as const}}>{activePreset?.compression||'media'}</div>
+              <div style={{fontSize:'10px',color:'#9B7EC8',marginBottom:'8px'}}>
+                {activePreset?.compression==='none'?'Sin compresión':activePreset?.compression==='low'?'Thr: -24dB · 2:1':activePreset?.compression==='medium'?'Thr: -18dB · 4:1':activePreset?.compression==='high'?'Thr: -14dB · 6:1':'Thr: -10dB · 10:1'}
+              </div>
+              <div style={{fontSize:'10px',color:'#9B7EC8',marginBottom:'3px'}}>GR Meter</div>
+              <div style={{height:'6px',background:'rgba(192,38,211,0.15)',borderRadius:'4px',overflow:'hidden'}}>
+                <div style={{height:'100%',background:'linear-gradient(90deg,#4ade80,#FBBF24,#EC4899)',borderRadius:'4px',width:activePreset?.compression==='none'?'5%':activePreset?.compression==='low'?'20%':activePreset?.compression==='medium'?'40%':activePreset?.compression==='high'?'60%':'80%'}}></div>
+              </div>
+            </div>
+
+            {/* LUFS REALES */}
+            <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'12px'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+                <span style={{fontSize:'9px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8'}}>LUFS</span>
+                <span style={{fontSize:'9px',fontWeight:700,padding:'2px 8px',borderRadius:'980px',background:'rgba(74,222,128,0.1)',color:'#4ade80',border:'1px solid rgba(74,222,128,0.2)'}}>
+                  {momentaryLufs>-14?'⚠ Loud':momentaryLufs<-30?'↓ Soft':'✓ Safe'}
+                </span>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px',marginBottom:'8px'}}>
+                <div style={{background:'rgba(8,4,16,0.6)',borderRadius:'8px',padding:'8px',textAlign:'center',border:'1px solid rgba(192,38,211,0.1)'}}>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:'16px',fontWeight:500,background:'linear-gradient(90deg,#EC4899,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{momentaryLufs.toFixed(1)}</div>
+                  <div style={{fontSize:'9px',color:'#9B7EC8',textTransform:'uppercase' as const,letterSpacing:'0.5px'}}>Mom</div>
+                </div>
+                <div style={{background:'rgba(8,4,16,0.6)',borderRadius:'8px',padding:'8px',textAlign:'center',border:'1px solid rgba(192,38,211,0.1)'}}>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:'16px',fontWeight:500,background:'linear-gradient(90deg,#EC4899,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{integratedLufs.toFixed(1)}</div>
+                  <div style={{fontSize:'9px',color:'#9B7EC8',textTransform:'uppercase' as const,letterSpacing:'0.5px'}}>Int</div>
+                </div>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px',marginBottom:'2px'}}>
+                <span style={{color:'#9B7EC8'}}>Spotify</span>
+                <span style={{color:momentaryLufs<=-13.5&&momentaryLufs>=-14.5?'#4ade80':'#f87171'}}>-14</span>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px'}}>
+                <span style={{color:'#9B7EC8'}}>YouTube</span>
+                <span style={{color:momentaryLufs<=-12.5&&momentaryLufs>=-13.5?'#4ade80':'#f87171'}}>-13</span>
+              </div>
+            </div>
           </div>
         </div>
 
