@@ -106,11 +106,22 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
   };
 
   const MixerBtn = () => (
-    <button onClick={()=>onStartMixer(selectedPreset||PRESETS[0],uploadedFiles)}
-      style={{width:'100%',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',border:'none',color:'#fff',padding:'15px 20px',borderRadius:'14px',fontSize:'15px',fontWeight:700,cursor:'pointer',marginTop:'12px',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px',boxShadow:'0 0 28px rgba(192,38,211,0.5)',fontFamily:'inherit',animation:'glow 2.5s infinite'}}>
-      {ICON(16)} ✦ Abrir Mezclador — {(selectedPreset||PRESETS[0]).name}
-      <span style={{background:'rgba(255,255,255,0.15)',borderRadius:'980px',padding:'3px 12px',fontSize:'12px'}}>Listo →</span>
-    </button>
+    <div style={{marginTop:'14px'}}>
+      <div style={{fontSize:'11px',fontWeight:700,color:'#FBBF24',textAlign:'center' as const,marginBottom:'8px',letterSpacing:'0.5px',textTransform:'uppercase' as const}}>
+        ↓ Siguiente paso
+      </div>
+      <button onClick={()=>onStartMixer(selectedPreset||PRESETS[0],uploadedFiles)}
+        style={{width:'100%',background:'linear-gradient(135deg,#F59E0B,#EF6C00)',border:'none',color:'#fff',padding:'18px 24px',borderRadius:'16px',fontSize:'16px',fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 0 32px rgba(245,158,11,0.6)',fontFamily:'inherit',animation:'glowOrange 2s infinite',letterSpacing:'-0.3px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+          {ICON(18)}
+          <div style={{textAlign:'left' as const}}>
+            <div>✦ Abrir Mezclador</div>
+            <div style={{fontSize:'12px',fontWeight:500,opacity:0.85}}>{(selectedPreset||PRESETS[0]).name} · {uploadedFiles.length} pistas listas</div>
+          </div>
+        </div>
+        <div style={{width:'40px',height:'40px',background:'rgba(255,255,255,0.2)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',flexShrink:0}}>→</div>
+      </button>
+    </div>
   );
 
   const UploadCard = () => (
@@ -287,6 +298,7 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
         @keyframes expand{0%{opacity:0.6;transform:translate(-50%,-50%) scale(0.8)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.3)}}
         @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
         @keyframes glow{0%,100%{box-shadow:0 0 28px rgba(192,38,211,0.5)}50%{box-shadow:0 0 48px rgba(236,72,153,0.7)}}
+        @keyframes glowOrange{0%,100%{box-shadow:0 0 32px rgba(245,158,11,0.6)}50%{box-shadow:0 0 48px rgba(239,108,0,0.8)}}
       `}</style>
     </div>
   );

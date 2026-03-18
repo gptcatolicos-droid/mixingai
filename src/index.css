@@ -34,11 +34,11 @@ html {
 }
 
 body {
-  background: rgba(15,10,26,0.92) !important;
+  background: rgba(15,10,26,0.96) !important;
 }
 
 body.page-home {
-  background: rgba(15,10,26,0.82) !important;
+  background: rgba(15,10,26,0.88) !important;
 }
 
 #root {

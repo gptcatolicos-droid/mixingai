@@ -61,6 +61,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const [showPresetPanel, setShowPresetPanel] = useState(false);
   const [reverbActive, setReverbActive] = useState(reverbOn);
   const [delayActive, setDelayActive] = useState(delayOn);
+  const [widenerActive, setWidenerActive] = useState(stereoOn);
   const [momentaryLufs, setMomentaryLufs] = useState(-60.0);
   const [integratedLufs, setIntegratedLufs] = useState(-60.0);
   const [activePreset, setActivePreset] = useState<MixPreset|undefined>(initialPreset);
@@ -372,7 +373,15 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       const lowShelf = offCtx.createBiquadFilter(); lowShelf.type='lowshelf'; lowShelf.frequency.value=100; lowShelf.gain.value=bassGain+1.2;
       const midPeak = offCtx.createBiquadFilter(); midPeak.type='peaking'; midPeak.frequency.value=2500; midPeak.Q.value=0.8; midPeak.gain.value=midGain-0.5;
       const highShelf = offCtx.createBiquadFilter(); highShelf.type='highshelf'; highShelf.frequency.value=8000; highShelf.gain.value=highGain+1.8;
-      const limiter = offCtx.createDynamicsCompressor(); limiter.threshold.value=-1; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=0.001; limiter.release.value=0.01;
+      // Limiter anti-clipping: threshold -1dBFS, ratio infinito, sin knee
+      const limiter = offCtx.createDynamicsCompressor();
+      limiter.threshold.value = -1.0;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.0003;
+      limiter.release.value = 0.05;
+      // -2dB de headroom para anti-clipping + masterVolume del usuario
+      mixBus.gain.value = Math.pow(10, (masterVolume - 2) / 20);
       // REVERB offline con el preset activo
       const activePresetData = activePreset || initialPreset;
       const reverbWetVal = (activePresetData?.reverbWet ?? 0);
@@ -604,16 +613,29 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'10px'}}>
 
-            {/* EQ */}
+            {/* EQ — sliders interactivos */}
             <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'12px'}}>
-              <div style={{fontSize:'9px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px'}}>EQ</div>
-              {[{label:'Bass',val:bassGain,color:'#EC4899'},{label:'Mid',val:midGain,color:'#C026D3'},{label:'High',val:highGain,color:'#7C3AED'}].map(eq=>(
-                <div key={eq.label} style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'6px'}}>
-                  <span style={{fontSize:'10px',color:'#9B7EC8',width:'28px'}}>{eq.label}</span>
-                  <div style={{flex:1,height:'4px',background:'rgba(192,38,211,0.15)',borderRadius:'2px'}}>
-                    <div style={{height:'100%',borderRadius:'2px',background:eq.color,width:`${((eq.val+12)/24)*100}%`}}></div>
+              <div style={{fontSize:'9px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px'}}>EQ — arrastra para ajustar</div>
+              {([{label:'Bass',val:bassGain,color:'#EC4899',band:'bass'},{label:'Mid',val:midGain,color:'#C026D3',band:'mid'},{label:'High',val:highGain,color:'#7C3AED',band:'high'}] as const).map(eq=>(
+                <div key={eq.label} style={{marginBottom:'10px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
+                    <span style={{fontSize:'10px',color:'#9B7EC8'}}>{eq.label}</span>
+                    <span style={{fontSize:'10px',color:eq.color,fontFamily:"'DM Mono',monospace",fontWeight:600}}>{eq.val>0?'+':''}{eq.val} dB</span>
                   </div>
-                  <span style={{fontSize:'10px',color:eq.color,fontFamily:"'DM Mono',monospace",minWidth:'36px',textAlign:'right'}}>{eq.val>0?'+':''}{eq.val}dB</span>
+                  <div style={{position:'relative',height:'18px',display:'flex',alignItems:'center'}}>
+                    <div style={{position:'absolute',left:0,right:0,height:'4px',background:'rgba(192,38,211,0.15)',borderRadius:'2px'}}>
+                      <div style={{height:'100%',borderRadius:'2px',background:eq.color,width:`${((eq.val+12)/24)*100}%`}}></div>
+                    </div>
+                    <input type="range" min="-12" max="12" step="1" value={eq.val}
+                      onChange={e=>{
+                        const v=parseInt(e.target.value);
+                        const ctx=audioContextRef.current;
+                        if(eq.band==='bass'){setBassGain(v);if(bassFilterRef.current&&ctx)bassFilterRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
+                        else if(eq.band==='mid'){setMidGain(v);if(midFilterRef.current&&ctx)midFilterRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
+                        else{setHighGain(v);if(highFilterRef.current&&ctx)highFilterRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
+                      }}
+                      style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%'}} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -624,7 +646,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
               {[
                 {label:'Reverb',active:reverbActive,toggle:toggleReverb,val:activePreset?`${Math.round(activePreset.reverbWet*100)}%`:'0%',sub:'Espacio'},
                 {label:'Delay',active:delayActive,toggle:toggleDelay,val:activePreset?`${Math.round(activePreset.delayWet*100)}%`:'0%',sub:'1/4 beat'},
-                {label:'Widener',active:stereoOn,toggle:()=>{},val:activePreset?`${Math.round(activePreset.stereoWidth*100)}%`:'50%',sub:'Estéreo'},
+                {label:'Widener',active:widenerActive,toggle:()=>setWidenerActive(!widenerActive),val:activePreset?`${Math.round(activePreset.stereoWidth*100)}%`:'50%',sub:'Estéreo'},
               ].map(fx=>(
                 <div key={fx.label} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
                   <div>
