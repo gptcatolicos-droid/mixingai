@@ -411,7 +411,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           src.connect(g); g.connect(p); p.connect(mixBus); src.start(0);
         }
       }
-      mixBus.gain.value = Math.pow(10,masterVolume/20);
+      // gain ya aplicado arriba con -2dB de headroom
       setExportProgress(75); setExportStep('Normalizando a -14 LUFS...'); await new Promise(r=>setTimeout(r,800));
       const rendered = await offCtx.startRendering();
       const normalized = normalizeTo14LUFS(rendered);
@@ -426,13 +426,36 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   };
 
   const normalizeTo14LUFS = (buffer: AudioBuffer): AudioBuffer => {
-    const target=-14, ch=buffer.getChannelData(0); let rmsSum=0;
-    for (let i=0;i<ch.length;i++) rmsSum+=ch[i]*ch[i];
-    const rms=Math.sqrt(rmsSum/ch.length), curr=rms>0?20*Math.log10(rms)-0.691:-60;
-    const gain=Math.pow(10,(target-curr)/20);
-    for (let c=0;c<buffer.numberOfChannels;c++) {
-      const d=buffer.getChannelData(c);
-      for (let i=0;i<d.length;i++) { d[i]*=gain; if(Math.abs(d[i])>0.95) d[i]=d[i]>0?0.95:-0.95; }
+    const target = -14;
+    // Calcular RMS para LUFS aproximado
+    const ch0 = buffer.getChannelData(0);
+    let rmsSum = 0;
+    for (let i = 0; i < ch0.length; i++) rmsSum += ch0[i] * ch0[i];
+    const rms = Math.sqrt(rmsSum / ch0.length);
+    const currLufs = rms > 0 ? 20 * Math.log10(rms) - 0.691 : -60;
+    const gain = Math.pow(10, (target - currLufs) / 20);
+
+    // Calcular peak real DESPUÉS de aplicar el gain
+    let peakAfterGain = 0;
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const d = buffer.getChannelData(c);
+      for (let i = 0; i < d.length; i++) {
+        const abs = Math.abs(d[i] * gain);
+        if (abs > peakAfterGain) peakAfterGain = abs;
+      }
+    }
+    // Si el peak va a superar -1dBFS (0.891), reducir el gain para respetarlo
+    const ceiling = 0.891;
+    const safeGain = peakAfterGain > ceiling ? gain * (ceiling / peakAfterGain) : gain;
+
+    // Aplicar gain seguro + hard clipper de seguridad
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const d = buffer.getChannelData(c);
+      for (let i = 0; i < d.length; i++) {
+        d[i] *= safeGain;
+        if (d[i] > ceiling) d[i] = ceiling;
+        else if (d[i] < -ceiling) d[i] = -ceiling;
+      }
     }
     return buffer;
   };

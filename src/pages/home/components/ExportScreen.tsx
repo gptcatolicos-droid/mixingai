@@ -67,6 +67,113 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
     });
   }, [exportData, exportCurrentTime]);
 
+  // Función centralizada para iniciar playback con limiter + VU meter
+  const startPlayback = useCallback((offset: number) => {
+    if (!exportAudioContext || !exportData) return;
+    // Limpiar loops anteriores
+    if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+    if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
+    exportAnalyserRef.current = null;
+    // Resetear historial LUFS para integrated correcto
+    exportLufsHistoryRef.current = [];
+    lufsFrameRef.current = 0;
+    setExportMomentaryLufs(-60); setExportIntegratedLufs(-60);
+
+    const sourceNode = exportAudioContext.createBufferSource();
+    sourceNode.buffer = exportData.audioBuffer;
+
+    // Analyser para VU meter
+    const analyser = exportAudioContext.createAnalyser();
+    analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.6;
+
+    // Limiter anti-clipping en el playback también
+    const limiter = exportAudioContext.createDynamicsCompressor();
+    limiter.threshold.value = -1.0; limiter.knee.value = 0;
+    limiter.ratio.value = 20; limiter.attack.value = 0.0003; limiter.release.value = 0.05;
+
+    // Cadena: source → analyser → limiter → destination
+    sourceNode.connect(analyser);
+    analyser.connect(limiter);
+    limiter.connect(exportAudioContext.destination);
+    exportAnalyserRef.current = analyser;
+
+    const startTime = exportAudioContext.currentTime;
+    sourceNode.start(startTime, offset);
+    setExportSourceNode(sourceNode); setIsExportPlaying(true);
+
+    // VU meter loop
+    const vuLoop = () => {
+      if (!exportAnalyserRef.current) return;
+      const td = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(td);
+      let rmsSum = 0;
+      for (let i = 0; i < td.length; i++) rmsSum += td[i]*td[i];
+      const rms = Math.sqrt(rmsSum/td.length);
+      // LUFS momentary correcto: escalar al rango -10 a -30 para mezclas normalizadas
+      const momentary = rms > 0.0001 ? Math.max(-50, Math.min(-5, 20*Math.log10(rms)-0.691)) : -60;
+      // Canvas VU
+      const vc = vuCanvasRef.current;
+      if (vc) {
+        const ctx2 = vc.getContext('2d');
+        if (ctx2) {
+          const w = vc.width, h = vc.height;
+          ctx2.clearRect(0,0,w,h);
+          ctx2.fillStyle = 'rgba(8,4,16,0.8)'; ctx2.fillRect(0,0,w,h);
+          // Nivel visual: -50 = 0%, -5 = 100%
+          const level = Math.max(0, Math.min(1, (momentary + 50) / 45));
+          const barW = Math.floor(w/2) - 3;
+          const barH = Math.floor(h * level);
+          const gr = ctx2.createLinearGradient(0, h, 0, 0);
+          gr.addColorStop(0, '#4ade80');
+          gr.addColorStop(0.55, '#4ade80');
+          gr.addColorStop(0.75, '#FBBF24');
+          gr.addColorStop(0.88, '#EC4899');
+          gr.addColorStop(1, '#ef4444');
+          ctx2.fillStyle = gr;
+          if (barH > 0) {
+            ctx2.fillRect(2, h - barH, barW, barH);
+            ctx2.fillRect(barW + 4, h - Math.floor(barH * 0.95), barW, Math.floor(barH * 0.95));
+          }
+          // Línea -14 LUFS target = (50-14)/45 = 80% del rango
+          const targetY = h - Math.floor(h * (36/45));
+          ctx2.strokeStyle = 'rgba(74,222,128,0.7)'; ctx2.lineWidth = 1;
+          ctx2.setLineDash([3,3]);
+          ctx2.beginPath(); ctx2.moveTo(0, targetY); ctx2.lineTo(w, targetY); ctx2.stroke();
+          ctx2.setLineDash([]);
+        }
+      }
+      // LUFS state cada 4 frames
+      lufsFrameRef.current++;
+      if (lufsFrameRef.current % 4 === 0 && rms > 0.0001) {
+        setExportMomentaryLufs(momentary);
+        exportLufsHistoryRef.current.push(momentary);
+        if (exportLufsHistoryRef.current.length > 600) exportLufsHistoryRef.current.shift();
+        const validSamples = exportLufsHistoryRef.current.filter(v => v > -50);
+        if (validSamples.length > 0) {
+          const integrated = validSamples.reduce((a,b)=>a+b,0)/validSamples.length;
+          setExportIntegratedLufs(Math.max(-50, Math.min(-5, integrated)));
+        }
+      }
+      vuAnimRef.current = requestAnimationFrame(vuLoop);
+    };
+    vuAnimRef.current = requestAnimationFrame(vuLoop);
+
+    sourceNode.onended = () => {
+      exportAnalyserRef.current = null;
+      if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+      setIsExportPlaying(false); setExportPausedTime(0); setExportCurrentTime(0);
+      if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
+    };
+    exportTimeUpdateRef.current = window.setInterval(() => {
+      const elapsed = exportAudioContext.currentTime - startTime + offset;
+      setExportCurrentTime(Math.min(elapsed, exportData.audioBuffer.duration));
+      if (elapsed >= exportData.audioBuffer.duration) {
+        setIsExportPlaying(false); setExportPausedTime(0); setExportCurrentTime(0);
+        if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
+      }
+    }, 100);
+  }, [exportAudioContext, exportData]);
+
   const handleExportPlayPause = useCallback(async () => {
     if (!exportAudioContext || !exportData) return;
     if (exportAudioContext.state === 'suspended') await exportAudioContext.resume();
@@ -77,81 +184,9 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
       setIsExportPlaying(false); setExportPausedTime(exportCurrentTime);
       if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
     } else {
-      const sourceNode = exportAudioContext.createBufferSource();
-      sourceNode.buffer = exportData.audioBuffer;
-      // Conectar a analyser para VU meter en tiempo real
-      const analyser = exportAudioContext.createAnalyser();
-      analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
-      sourceNode.connect(analyser);
-      analyser.connect(exportAudioContext.destination);
-      exportAnalyserRef.current = analyser;
-      const startTime = exportAudioContext.currentTime;
-      const offset = exportPausedTime;
-      sourceNode.start(startTime, offset);
-      setExportSourceNode(sourceNode); setIsExportPlaying(true);
-      // Iniciar loop de VU meter
-      const vuLoop = () => {
-        if (!exportAnalyserRef.current) return;
-        const td = new Float32Array(analyser.fftSize);
-        analyser.getFloatTimeDomainData(td);
-        let rmsSum = 0;
-        for (let i = 0; i < td.length; i++) rmsSum += td[i]*td[i];
-        const rms = Math.sqrt(rmsSum/td.length);
-        const momentary = rms > 0 ? Math.max(-60, 20*Math.log10(rms)-0.691) : -60;
-        // Dibujar VU meter en canvas
-        const vc = vuCanvasRef.current;
-        if (vc) {
-          const ctx2 = vc.getContext('2d');
-          if (ctx2) {
-            const w = vc.width, h = vc.height;
-            ctx2.clearRect(0,0,w,h);
-            // Fondo
-            ctx2.fillStyle = 'rgba(8,4,16,0.6)';
-            ctx2.fillRect(0,0,w,h);
-            // Barras L y R
-            const level = Math.max(0, (momentary + 60) / 60);
-            const barW = w/2 - 4;
-            const barH = h * level;
-            const gradient = ctx2.createLinearGradient(0, h, 0, 0);
-            gradient.addColorStop(0, '#4ade80');
-            gradient.addColorStop(0.6, '#FBBF24');
-            gradient.addColorStop(0.85, '#EC4899');
-            gradient.addColorStop(1, '#ef4444');
-            ctx2.fillStyle = gradient;
-            ctx2.fillRect(2, h - barH, barW, barH);
-            ctx2.fillRect(barW + 6, h - barH * 0.97, barW, barH * 0.97);
-            // Línea de -14 LUFS
-            const targetY = h - (46/60) * h;
-            ctx2.strokeStyle = 'rgba(74,222,128,0.6)';
-            ctx2.lineWidth = 1;
-            ctx2.setLineDash([3,3]);
-            ctx2.beginPath(); ctx2.moveTo(0, targetY); ctx2.lineTo(w, targetY); ctx2.stroke();
-            ctx2.setLineDash([]);
-          }
-        }
-        // Actualizar LUFS cada 6 frames
-        lufsFrameRef.current++;
-        if (lufsFrameRef.current % 6 === 0) {
-          setExportMomentaryLufs(momentary);
-          exportLufsHistoryRef.current.push(momentary);
-          if (exportLufsHistoryRef.current.length > 300) exportLufsHistoryRef.current.shift();
-          const integrated = exportLufsHistoryRef.current.reduce((a,b)=>a+b,0)/exportLufsHistoryRef.current.length;
-          setExportIntegratedLufs(Math.max(-60, Math.min(0, integrated)));
-        }
-        vuAnimRef.current = requestAnimationFrame(vuLoop);
-      };
-      vuAnimRef.current = requestAnimationFrame(vuLoop);
-      sourceNode.onended = () => { setIsExportPlaying(false); setExportPausedTime(0); setExportCurrentTime(0); };
-      exportTimeUpdateRef.current = window.setInterval(() => {
-        const elapsed = exportAudioContext.currentTime - startTime + offset;
-        setExportCurrentTime(Math.min(elapsed, exportData.audioBuffer.duration));
-        if (elapsed >= exportData.audioBuffer.duration) {
-          setIsExportPlaying(false); setExportPausedTime(0); setExportCurrentTime(0);
-          if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
-        }
-      }, 100);
+      startPlayback(exportPausedTime);
     }
-  }, [exportAudioContext, exportData, isExportPlaying, exportCurrentTime, exportPausedTime, exportSourceNode]);
+  }, [exportAudioContext, exportData, isExportPlaying, exportCurrentTime, exportPausedTime, exportSourceNode, startPlayback]);
 
   const handleExportStop = useCallback(() => {
     exportSourceNode?.stop(); exportSourceNode?.disconnect();
@@ -161,66 +196,16 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
 
   const handleWaveformSeek = useCallback((newTime: number) => {
     if (!exportData || !exportAudioContext) return;
-    if (isExportPlaying && exportSourceNode) { exportSourceNode.stop(); exportSourceNode.disconnect(); }
-    setExportCurrentTime(newTime); setExportPausedTime(newTime);
-    if (isExportPlaying) {
-      const sourceNode = exportAudioContext.createBufferSource();
-      sourceNode.buffer = exportData.audioBuffer;
-      sourceNode.connect(exportAudioContext.destination);
-      const startTime = exportAudioContext.currentTime;
-      sourceNode.start(startTime, newTime);
-      setExportSourceNode(sourceNode);
-      sourceNode.onended = () => { setIsExportPlaying(false); setExportPausedTime(0); setExportCurrentTime(0); };
-      if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
-      exportTimeUpdateRef.current = window.setInterval(() => {
-        const elapsed = exportAudioContext.currentTime - startTime + newTime;
-        setExportCurrentTime(Math.min(elapsed, exportData.audioBuffer.duration));
-        if (elapsed >= exportData.audioBuffer.duration) {
-          setIsExportPlaying(false); setExportPausedTime(0); setExportCurrentTime(0);
-          if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
-        }
-      }, 100);
-    }
-  }, [exportData, exportAudioContext, isExportPlaying, exportSourceNode]);
-
-  const handleDirectDownload = async (format: 'mp3' | 'wav') => {
-    if (!exportData || isDownloading) return;
-    setIsDownloading(true); setDownloadFormat(format); setDownloadProgress(0);
-    try {
-      const progressInterval = setInterval(() => {
-        setDownloadProgress(prev => { if (prev >= 90) { clearInterval(progressInterval); return prev; } return prev + Math.random() * 15 + 5; });
-      }, 300);
-      if (!(window as any).JSZip) await loadJSZip();
-      const audioBlob = await createAudioBlob(exportData.audioBuffer, format);
-      const zip = new (window as any).JSZip();
-      zip.file(`Mix_AI_${Date.now()}.${format}`, audioBlob);
-      setTimeout(async () => {
-        clearInterval(progressInterval); setDownloadProgress(100);
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const url = URL.createObjectURL(zipBlob);
-        const link = document.createElement('a');
-        link.href = url; link.download = `MixingMusic_AI_${format}_${Date.now()}.zip`;
-        document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
-        setDeductedCreditsInfo({ format: format.toUpperCase(), creditsDeducted: 0, remainingCredits: user.credits });
-        setIsDownloading(false); setDownloadFormat(null); setDownloadProgress(0);
-        setShowSuccessModal(true);
-      }, 1500 + Math.random() * 1000);
-    } catch (error) {
-      console.error('Error:', error);
-      setIsDownloading(false); setDownloadFormat(null); setDownloadProgress(0);
-      alert('Error exportando. Intenta de nuevo.');
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
-      exportAudioContext?.close();
-    };
-  }, [exportAudioContext]);
-
-  const dur = exportData?.audioBuffer.duration || 0;
-  const fmt = (t: number) => `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+    if (exportSourceNode) { try { exportSourceNode.stop(); exportSourceNode.disconnect(); } catch(e) {} }
+    exportAnalyserRef.current = null;
+    if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+    if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
+    setIsExportPlaying(false);
+    setExportCurrentTime(newTime);
+    setExportPausedTime(newTime);
+    // Reiniciar playback desde la nueva posición con VU meter fresco
+    setTimeout(() => startPlayback(newTime), 50);
+  }, [exportAudioContext, exportData, exportSourceNode, startPlayback])
 
   return (
     <div style={S.page}>
