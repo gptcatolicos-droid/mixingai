@@ -119,7 +119,6 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
 
   const handleDirectDownload = async (format: 'mp3' | 'wav') => {
     if (!exportData || isDownloading) return;
-    if (user.credits < 500) { alert('Necesitas al menos 500 créditos para descargar'); return; }
     setIsDownloading(true); setDownloadFormat(format); setDownloadProgress(0);
     try {
       const progressInterval = setInterval(() => {
@@ -136,9 +135,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
         const link = document.createElement('a');
         link.href = url; link.download = `MixingMusic_AI_${format}_${Date.now()}.zip`;
         document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
-        const newCredits = user.credits - 500;
-        onCreditsUpdate(newCredits);
-        setDeductedCreditsInfo({ format: format.toUpperCase(), creditsDeducted: 500, remainingCredits: newCredits });
+        setDeductedCreditsInfo({ format: format.toUpperCase(), creditsDeducted: 0, remainingCredits: user.credits });
         setIsDownloading(false); setDownloadFormat(null); setDownloadProgress(0);
         setShowSuccessModal(true);
       }, 1500 + Math.random() * 1000);
@@ -230,17 +227,17 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
               <button onClick={()=>handleDirectDownload('mp3')} disabled={isDownloading}
                 style={{...S.glowBtn,padding:'14px 28px',fontSize:'14px',opacity:isDownloading?0.5:1,display:'flex',alignItems:'center',gap:'8px'}}>
                 <i className="ri-download-line"></i>
-                Descargar .MP3 — 500 créditos
+                Descargar .MP3
               </button>
               <button onClick={()=>handleDirectDownload('wav')} disabled={isDownloading}
                 style={{background:'linear-gradient(135deg,#7C3AED,#4F46E5)',border:'none',color:'#fff',padding:'14px 28px',borderRadius:'980px',fontSize:'14px',fontWeight:600,cursor:'pointer',boxShadow:'0 0 20px rgba(124,58,237,0.4)',fontFamily:'inherit',display:'flex',alignItems:'center',gap:'8px',opacity:isDownloading?0.5:1}}>
                 <i className="ri-download-2-line"></i>
-                Descargar .WAV — 500 créditos
+                Descargar .WAV
               </button>
             </div>
 
             <div style={{textAlign:'center',fontSize:'12px',color:'rgba(155,126,200,0.6)'}}>
-              Tu saldo: {(user?.credits||0).toLocaleString()} créditos
+              Descarga gratuita · WAV 24bit / MP3
             </div>
           </div>
         ) : (
@@ -269,7 +266,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
             <p style={{color:'#9B7EC8',marginBottom:'24px',fontSize:'13px'}}>Comprimiendo tu mezcla optimizada con IA...</p>
             <div style={S.progressTrack}><div style={S.progressBar(downloadProgress)}></div></div>
             <div style={{...S.mono,color:'#C026D3',fontWeight:600,fontSize:'18px',marginTop:'10px'}}>{Math.round(downloadProgress)}%</div>
-            <div style={{fontSize:'12px',color:'rgba(155,126,200,0.5)',marginTop:'12px'}}>Se descontarán 500 créditos al completar</div>
+            <div style={{fontSize:'12px',color:'rgba(155,126,200,0.5)',marginTop:'12px'}}>Preparando tu archivo...</div>
           </div>
         </div>
       )}
@@ -282,10 +279,9 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
               <i className="ri-checkbox-circle-fill" style={{color:'#fff',fontSize:'26px'}}></i>
             </div>
             <h3 style={{fontSize:'20px',fontWeight:600,color:'#F8F0FF',marginBottom:'16px'}}>¡Descarga Completada!</h3>
-            <div style={{background:'#0F0A1A',borderRadius:'12px',padding:'14px',marginBottom:'20px',border:'1px solid rgba(192,38,211,0.1)'}}>
-              <div style={{fontSize:'13px',color:'#F8F0FF',fontWeight:500,marginBottom:'4px'}}>Formato: {deductedCreditsInfo.format}</div>
-              <div style={{fontSize:'13px',color:'#f87171',marginBottom:'4px'}}>−500 créditos descontados</div>
-              <div style={{...S.mono,fontSize:'13px',color:'#9B7EC8'}}>Saldo: {deductedCreditsInfo.remainingCredits.toLocaleString()}</div>
+            <div style={{background:'#0F0A1A',borderRadius:'12px',padding:'14px',marginBottom:'20px',border:'1px solid rgba(74,222,128,0.15)'}}>
+              <div style={{fontSize:'13px',color:'#4ade80',fontWeight:600,marginBottom:'4px'}}>✓ Formato: {deductedCreditsInfo.format}</div>
+              <div style={{fontSize:'12px',color:'#9B7EC8'}}>Tu mezcla está lista para subir a Spotify, YouTube y más plataformas.</div>
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
               {deductedCreditsInfo.remainingCredits >= 500 ? (

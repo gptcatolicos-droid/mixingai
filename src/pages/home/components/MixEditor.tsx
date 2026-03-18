@@ -462,8 +462,9 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
               {stems.length} stems · {fmt(duration)}
               {activePreset && (
                 <button onClick={() => setShowPresetPanel(!showPresetPanel)}
-                  style={{marginLeft:'8px',background:'rgba(192,38,211,0.1)',border:'1px solid rgba(192,38,211,0.3)',borderRadius:'980px',padding:'3px 10px',fontSize:'11px',color:'#C026D3',fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'4px'}}>
-                  ✦ {activePreset.name} <i className="ri-arrow-down-s-line" style={{fontSize:'12px'}}></i>
+                  style={{marginLeft:'8px',background:'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(124,58,237,0.15))',border:`1.5px solid ${activePreset.color}`,borderRadius:'980px',padding:'5px 14px',fontSize:'12px',color:'#F8F0FF',fontWeight:700,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'6px',boxShadow:`0 0 10px ${activePreset.color}44`}}>
+                  ✦ {activePreset.name}
+                  <span style={{fontSize:'10px',color:'rgba(248,240,255,0.6)'}}>cambiar ▾</span>
                 </button>
               )}
             </p>
@@ -472,6 +473,30 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
             {stems.length<12&&<button onClick={()=>setShowUploadModal(true)} style={{...C.ghostBtn,fontSize:'12px',padding:'8px 14px'}}>+ Stems ({stems.length}/12)</button>}
             <button onClick={handleExportMix} disabled={stems.length===0} style={{...C.glowBtn(stems.length===0),fontSize:'12px',padding:'8px 14px'}}>✦ Exportar</button>
             <button onClick={onBack} style={{...C.ghostBtn,fontSize:'12px',padding:'8px 14px'}}>← Volver</button>
+          </div>
+        </div>
+
+        {/* PRESETS — siempre visibles, cambio en tiempo real */}
+        <div style={{...C.card,marginBottom:'12px'}}>
+          <div style={{fontSize:'12px',fontWeight:700,color:'#F8F0FF',marginBottom:'12px',display:'flex',alignItems:'center',gap:'8px'}}>
+            🎨 <span>Preset activo — toca otro para comparar en tiempo real</span>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(100px,1fr))',gap:'8px'}}>
+            {PRESETS.map(p => {
+              const isSel = activePreset?.id === p.id;
+              return (
+                <button key={p.id} onClick={() => applyPresetToAudio(p)}
+                  style={{background:isSel?`linear-gradient(135deg,${p.color}22,${p.color}11)`:'#0F0A1A',border:`1.5px solid ${isSel?p.color:'rgba(192,38,211,0.1)'}`,borderRadius:'12px',padding:'10px 8px',cursor:'pointer',textAlign:'left',transition:'all 0.15s',boxShadow:isSel?`0 0 12px ${p.color}44`:'none',position:'relative'}}>
+                  {isSel&&<div style={{position:'absolute',top:'6px',right:'6px',width:'16px',height:'16px',borderRadius:'50%',background:p.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',color:'#fff',fontWeight:700}}>✓</div>}
+                  <div style={{fontSize:'11px',fontWeight:700,color:'#F8F0FF',marginBottom:'2px'}}>{p.name}</div>
+                  <div style={{fontSize:'10px',color:'#9B7EC8',lineHeight:1.3}}>{p.tags[0]} · {p.tags[1]}</div>
+                  <div style={{display:'flex',gap:'3px',marginTop:'6px'}}>
+                    <span style={{fontSize:'9px',padding:'1px 5px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>B:{p.bass>0?'+':''}{p.bass}</span>
+                    <span style={{fontSize:'9px',padding:'1px 5px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>R:{Math.round(p.reverbWet*100)}%</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -631,37 +656,6 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         )}
       </div>
 
-      {/* Panel de presets — cambiar y comparar en caliente */}
-      {showPresetPanel && (
-        <div style={{position:'fixed',inset:0,background:'rgba(15,10,26,0.85)',backdropFilter:'blur(8px)',zIndex:50,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}}
-          onClick={() => setShowPresetPanel(false)}>
-          <div style={{background:'#1A1028',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'20px 20px 0 0',padding:'20px 16px 32px',width:'100%',maxWidth:'800px',maxHeight:'85vh',overflowY:'auto'}}
-            onClick={e => e.stopPropagation()}>
-            <div style={{width:'36px',height:'4px',background:'rgba(192,38,211,0.3)',borderRadius:'2px',margin:'0 auto 18px'}}></div>
-            <div style={{fontSize:'14px',fontWeight:600,color:'#F8F0FF',marginBottom:'4px',textAlign:'center'}}>Cambiar preset de mezcla</div>
-            <div style={{fontSize:'12px',color:'#9B7EC8',textAlign:'center',marginBottom:'16px'}}>Los cambios se aplican al audio en tiempo real</div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'8px'}}>
-              {PRESETS.map(p => {
-                const isSel = activePreset?.id === p.id;
-                return (
-                  <button key={p.id} onClick={() => applyPresetToAudio(p)}
-                    style={{background:isSel?'rgba(192,38,211,0.12)':'#0F0A1A',border:`1.5px solid ${isSel?p.color:'rgba(192,38,211,0.1)'}`,borderRadius:'12px',padding:'12px',cursor:'pointer',textAlign:'left',transition:'all 0.15s'}}>
-                    <div style={{fontSize:'13px',fontWeight:600,color:'#F8F0FF',marginBottom:'3px',display:'flex',alignItems:'center',gap:'5px'}}>
-                      {isSel && <span style={{color:p.color}}>✦</span>}{p.name}
-                    </div>
-                    <div style={{fontSize:'10px',color:'#9B7EC8',lineHeight:1.4}}>{p.desc}</div>
-                    <div style={{display:'flex',gap:'3px',marginTop:'6px',flexWrap:'wrap'}}>
-                      <span style={{fontSize:'10px',padding:'1px 6px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>B:{p.bass>0?'+':''}{p.bass}</span>
-                      <span style={{fontSize:'10px',padding:'1px 6px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>M:{p.mid>0?'+':''}{p.mid}</span>
-                      <span style={{fontSize:'10px',padding:'1px 6px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>H:{p.high>0?'+':''}{p.high}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
       <UploadModal isOpen={showUploadModal} onClose={()=>setShowUploadModal(false)}
         onUploadComplete={handleUploadMoreStems} userCredits={user.credits} onCreditsUpdate={onCreditsUpdate} />
