@@ -49,10 +49,8 @@ export default function Header({ user, onLogout, onCreditsUpdate }: HeaderProps)
           {/* Logo */}
           <div style={{display:'flex',alignItems:'center',gap:'24px'}}>
             <div style={S.logo} onClick={() => navigate('/')}>
-              <div style={S.logoIcon}>
-                <i className="ri-equalizer-fill" style={{color:'#fff',fontSize:'15px'}}></i>
-              </div>
-              <span style={S.logoText}>mixingmusic.ai</span>
+              <img src="/logo.png" alt="MixingMusic.AI" style={{height:'28px',width:'auto',filter:'brightness(0) invert(1)',opacity:0.92}} className="logo-desktop" />
+              <img src="/logo.png" alt="MixingMusic.AI" style={{height:'22px',width:'auto',filter:'brightness(0) invert(1)',opacity:0.92}} className="logo-mobile" />
             </div>
 
             {/* Nav desktop */}

@@ -121,7 +121,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         <div style={{ width: '100%', maxWidth: '780px', background: 'rgba(15,10,26,0.8)', border: '1px solid rgba(192,38,211,0.2)', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
           <div style={{ background: 'rgba(26,16,40,0.9)', padding: '10px 16px', borderBottom: '1px solid rgba(192,38,211,0.1)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             {['#EF4444','#FBBF24','#4ade80'].map(c => <div key={c} style={{ width: '10px', height: '10px', borderRadius: '50%', background: c }}></div>)}
-            <span style={{ marginLeft: '8px', fontSize: '12px', color: '#9B7EC8' }}>AI Pro Mixer — mixingmusic.ai</span>
+            <img src="/logo.png" alt="MixingMusic.AI" style={{ height: '16px', width: 'auto', marginLeft: '8px', filter: 'brightness(0.7) sepia(1) hue-rotate(250deg) saturate(2)', opacity: 0.7 }} />
           </div>
           <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(9,1fr)', gap: '6px' }}>
             {PRESETS.map(p => (
@@ -295,7 +295,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
       <div style={{ background: 'rgba(8,4,16,0.9)', borderTop: '1px solid rgba(192,38,211,0.1)', padding: '40px 20px' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>
           <div>
-            <div style={{ fontSize: '18px', fontWeight: 800, ...S.grad }}>mixingmusic.ai</div>
+            <img src="/logo.png" alt="MixingMusic.AI" style={{ height: '32px', width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.9 }} />
             <div style={{ fontSize: '12px', color: 'rgba(248,240,255,0.4)', marginTop: '4px' }}>{t('footer_sub',lang)}</div>
           </div>
           <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>

@@ -238,6 +238,9 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
           <div>
+            <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'4px'}}>
+              <img src="/logo.png" alt="MixingMusic.AI" style={{height:'24px',width:'auto',filter:'brightness(0) invert(1)',opacity:0.85}} />
+            </div>
             <h1 style={{fontSize:'26px',fontWeight:600,letterSpacing:'-0.5px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>
               Tu Mezcla Final
             </h1>
