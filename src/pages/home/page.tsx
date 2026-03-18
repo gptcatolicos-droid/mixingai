@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import AIChat from './components/AIChat';
+import HomeHero from './components/HomeHero';
 import ProjectDashboard from './components/ProjectDashboard';
 import { MixPreset } from './components/PresetScreen';
 import MixEditor from './components/MixEditor';
@@ -70,5 +71,5 @@ export default function HomePage() {
     );
   }
 
-  return <AIChat user={null} onStartMixer={handleStartMixer} onCreditsUpdate={() => {}} />;
+  return <HomeHero onStartMixer={handleStartMixer} />;
 }
