@@ -86,9 +86,10 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
 
       {/* NAVBAR */}
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(8,4,16,0.75)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(192,38,211,0.12)', padding: '0 24px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {/* Logo oficial */}
-        <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => window.scrollTo({top:0,behavior:'smooth'})}>
-          <img src="/logo-transparent.png" alt="MixingMusic.AI" style={{ height: '36px', width: 'auto', filter: 'brightness(0) invert(1)' }} />
+        {/* Logo navbar: ícono + nombre */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => window.scrollTo({top:0,behavior:'smooth'})}>
+          <img src="/logo-icon.png" alt="" style={{ height: '32px', width: '32px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+          <span style={{ fontSize: '16px', fontWeight: 800, background: 'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.3px', lineHeight: 1 }}>mixingmusic.ai</span>
         </div>
         {/* Nav links + lang switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -123,10 +124,10 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
           <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }}></span>
           {t('hero_badge', lang)}
         </div>
-        {/* Logo oficial grande en el hero */}
-        <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'center' }}>
-          <img src="/logo-transparent.png" alt="MixingMusic.AI"
-            style={{ height: 'clamp(48px, 8vw, 80px)', width: 'auto', filter: 'brightness(0) invert(1)', maxWidth: '400px' }} />
+        {/* Logo hero: ícono + nombre en línea, mismo tamaño que un botón */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '28px' }}>
+          <img src="/logo-icon.png" alt="" style={{ height: '44px', width: '44px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+          <span style={{ fontSize: 'clamp(22px,3.5vw,32px)', fontWeight: 900, background: 'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px', lineHeight: 1 }}>mixingmusic.ai</span>
         </div>
 
         <h1 style={{ fontSize: 'clamp(38px,7vw,80px)', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-2px', marginBottom: '20px', maxWidth: '900px' }}>
@@ -323,8 +324,11 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
       {/* FOOTER */}
       <div style={{ background: 'rgba(8,4,16,0.9)', borderTop: '1px solid rgba(192,38,211,0.1)', padding: '40px 20px' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <img src="/logo-transparent.png" alt="MixingMusic.AI" style={{ height: '40px', width: 'auto', filter: 'brightness(0) invert(1)', maxWidth: '220px' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src="/logo-icon.png" alt="" style={{ height: '36px', width: '36px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+              <span style={{ fontSize: '18px', fontWeight: 800, background: 'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.3px' }}>mixingmusic.ai</span>
+            </div>
             <div style={{ fontSize: '12px', color: 'rgba(248,240,255,0.4)' }}>{t('footer_sub',lang)}</div>
           </div>
           <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
