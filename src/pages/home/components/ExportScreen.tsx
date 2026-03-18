@@ -207,7 +207,27 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
     setExportPausedTime(newTime);
     // Reiniciar playback desde la nueva posición con VU meter fresco
     setTimeout(() => startPlayback(newTime), 50);
-  }, [exportAudioContext, exportData, exportSourceNode, startPlayback])
+  }, [exportAudioContext, exportData, exportSourceNode, startPlayback]);
+
+  const handleDirectDownload = async (format: 'mp3' | 'wav') => {
+    if (!exportData) return;
+    setIsDownloading(true); setDownloadFormat(format); setDownloadProgress(0);
+    try {
+      const progressInterval = setInterval(() => {
+        setDownloadProgress(prev => { if (prev >= 90) { clearInterval(progressInterval); return prev; } return prev + Math.random()*15+5; });
+      }, 200);
+      const blob = await createAudioBlob(exportData.audioBuffer, format);
+      clearInterval(progressInterval); setDownloadProgress(100);
+      await new Promise(r => setTimeout(r, 400));
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `mezcla-mixingmusic.${format}`; a.click();
+      URL.revokeObjectURL(url);
+    } catch(e) { console.error(e); }
+    setIsDownloading(false); setDownloadProgress(0); setDownloadFormat(null);
+  };
+
+  const dur = exportData?.audioBuffer?.duration ?? 0;
 
   return (
     <div style={S.page}>
@@ -228,7 +248,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
           <button onClick={onBack} style={{...S.ghostBtn,padding:'10px 18px'}}>← Volver al Mezclador</button>
         </div>
 
-        {exportData ? (() => { const dur = exportData.audioBuffer.duration; return (
+        {exportData ? (
           <div style={S.card}>
             {/* Badge IA */}
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
@@ -319,7 +339,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
               Descarga gratuita · WAV 24bit / MP3
             </div>
           </div>
-        ); })() : (
+        ) : (
           <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'400px'}}>
             <div style={{...S.card,maxWidth:'420px',width:'100%',textAlign:'center'}}>
               <div style={{width:'72px',height:'72px',margin:'0 auto 24px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'20px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 32px rgba(192,38,211,0.5)'}}>
