@@ -18,9 +18,53 @@ body {
   margin: 0;
   background: #0F0A1A;
   color: #F8F0FF;
+  position: relative;
   min-height: 100vh;
   overflow-x: hidden;
 }
+
+/* ================================================
+   FONDO DE ESTUDIO — aplica a todas las pantallas
+   Home: 0.11 opacity (más visible)
+   Resto: 0.05 opacity (muy tenue)
+   ================================================ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url('/studio-bg.png');
+  background-size: cover;
+  background-position: center top;
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(15,10,26,0.72) 0%,
+    rgba(15,10,26,0.45) 35%,
+    rgba(15,10,26,0.45) 65%,
+    rgba(15,10,26,0.85) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* Home — fondo más visible */
+body.page-home::before {
+  opacity: 0.11;
+}
+
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; height: 4px; }

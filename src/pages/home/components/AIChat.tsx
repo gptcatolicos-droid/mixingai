@@ -44,6 +44,12 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [chatStarted, setChatStarted] = useState(false);
+
+  // Clase en body para fondo más visible en home
+  useEffect(() => {
+    document.body.classList.add('page-home');
+    return () => document.body.classList.remove('page-home');
+  }, []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -132,10 +138,7 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
 
   return (
     <div style={S.page}>
-      {/* Fondo de estudio */}
-      <div style={{position:'fixed',inset:0,backgroundImage:"url('https://images.unsplash.com/photo-1598653222000-6b7b7a552625?w=1600&q=80')",backgroundSize:'cover',backgroundPosition:'center',opacity:0.07,pointerEvents:'none',zIndex:0}}></div>
-      <div style={{position:'fixed',inset:0,background:'linear-gradient(180deg,rgba(15,10,26,0.85) 0%,rgba(15,10,26,0.5) 40%,rgba(15,10,26,0.85) 100%)',pointerEvents:'none',zIndex:0}}></div>
-      {/* Ondas */}
+      {/* Ondas de audio sobre el fondo */}
       {[300,550,800].map((s,i)=>(
         <div key={i} style={{position:'fixed',width:`${s}px`,height:`${s}px`,top:'40%',left:'50%',borderRadius:'50%',border:'1px solid rgba(192,38,211,0.05)',animation:'expand 8s infinite',animationDelay:`${i*2.5}s`,transform:'translate(-50%,-50%)',pointerEvents:'none',zIndex:0}}></div>
       ))}
