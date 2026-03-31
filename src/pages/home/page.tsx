@@ -5,15 +5,19 @@ import ProjectDashboard from './components/ProjectDashboard';
 import { MixPreset } from './components/PresetScreen';
 import MixEditor from './components/MixEditor';
 import ExportScreen from './components/ExportScreen';
+import MasterScreen from './components/MasterScreen';
 
 interface ExportData {
   audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array;
   finalLufs: number; mp3Url?: string; wavUrl?: string; presetName?: string;
 }
 
-type Screen = 'chat' | 'mixer' | 'export';
+interface MasterData {
+  audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array;
+}
 
-// Variable de módulo — fuera del componente, no se pierde entre renders
+type Screen = 'chat' | 'mixer' | 'export' | 'master';
+
 let pendingExportData: ExportData | null = null;
 
 export default function HomePage() {
@@ -24,6 +28,7 @@ export default function HomePage() {
   const [selectedPreset, setSelectedPreset] = useState<MixPreset | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [exportData, setExportData] = useState<ExportData | null>(null);
+  const [masterData, setMasterData] = useState<MasterData | null>(null);
   const [projectId] = useState(() => Date.now().toString());
 
   const handleStartMixer = (preset: MixPreset, files: File[]) => {
@@ -31,9 +36,14 @@ export default function HomePage() {
   };
 
   const handleExport = (data: ExportData) => {
-    pendingExportData = data; // sync — disponible inmediatamente
+    pendingExportData = data;
     setExportData(data);
     setScreen('export');
+  };
+
+  const handleGoToMaster = (data: MasterData) => {
+    setMasterData(data);
+    setScreen('master');
   };
 
   if (user) return <ProjectDashboard />;
@@ -56,7 +66,6 @@ export default function HomePage() {
   }
 
   if (screen === 'export') {
-    // Usar pendingExportData (sync) como fallback garantizado
     const data = exportData || pendingExportData;
     return (
       <ExportScreen
@@ -67,6 +76,17 @@ export default function HomePage() {
         exportStep={data ? '¡Listo!' : 'Preparando...'}
         onBack={() => setScreen('mixer')}
         onCreditsUpdate={() => {}}
+        onGoToMaster={handleGoToMaster}
+      />
+    );
+  }
+
+  if (screen === 'master' && masterData) {
+    return (
+      <MasterScreen
+        masterData={masterData}
+        mixData={exportData || pendingExportData}
+        onBack={() => setScreen('export')}
       />
     );
   }

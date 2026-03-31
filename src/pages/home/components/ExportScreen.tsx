@@ -12,6 +12,7 @@ interface ExportScreenProps {
   exportData: { audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array; finalLufs: number; mp3Url?: string; wavUrl?: string; presetName?: string; } | null;
   exportProgress: number; exportStep: string;
   onBack: () => void; onCreditsUpdate: (newCredits: number) => void;
+  onGoToMaster?: (data: { audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array }) => void;
 }
 
 const fmt = (s: number) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
@@ -27,7 +28,7 @@ const S = {
   progressTrack: {background:'#241636',borderRadius:'8px',height:'6px',overflow:'hidden' as const},
 };
 
-export default function ExportScreen({ user, projectId, exportData, exportProgress, exportStep, onBack, onCreditsUpdate }: ExportScreenProps) {
+export default function ExportScreen({ user, projectId, exportData, exportProgress, exportStep, onBack, onCreditsUpdate, onGoToMaster }: ExportScreenProps) {
   const [isExportPlaying, setIsExportPlaying] = useState(false);
   const [exportCurrentTime, setExportCurrentTime] = useState(0);
   const [exportPausedTime, setExportPausedTime] = useState(0);
@@ -291,7 +292,17 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
       setMasterProgress(100); setMasterStep('¡Master listo!');
       await new Promise(r => setTimeout(r, 500));
       setIsMastering(false);
-      setActiveTab('master');
+      // Detener audio de la mezcla antes de ir al master
+      if (exportSourceNode) { try { exportSourceNode.stop(); exportSourceNode.disconnect(); } catch(e){} }
+      if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+      if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
+      setIsExportPlaying(false);
+      // Navegar a pantalla de master separada
+      if (onGoToMaster) {
+        onGoToMaster({ audioBuffer: normalized, audioUrl: url, waveformPeaks: peaks });
+      } else {
+        setActiveTab('master');
+      }
     } catch(e) {
       console.error('Mastering error:', e);
       setIsMastering(false);

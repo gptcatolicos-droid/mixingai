@@ -127,24 +127,52 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
       </div>
 
       {/* CÓMO FUNCIONA */}
-      <div id="como-funciona" style={{ ...S.section }}>
-        <div style={{ textAlign: 'center', marginBottom: '56px' }}>
-          <h2 style={S.sectionTitle}>3 pasos para tu <span style={S.grad}>mezcla perfecta</span></h2>
-          <p style={S.sectionSub}>Sin instalar nada. Sin tarjeta de crédito. Funciona en el navegador.</p>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '24px' }}>
-          {[
-            { num: '01', icon: '💬', title: 'Cuéntale a la IA', desc: 'Describe tu canción: género, estilo, referencias. La IA selecciona el preset perfecto con EQ, compresión y reverb calibrados.' },
-            { num: '02', icon: '🎵', title: 'Sube tus stems', desc: 'Arrastra tus pistas WAV, MP3 o FLAC. Hasta 12 stems simultáneos. La IA las detecta, organiza y balancea automáticamente.' },
-            { num: '03', icon: '🚀', title: 'Descarga en calidad pro', desc: 'Exporta WAV 24-bit o MP3 normalizado a -14 LUFS. Listo para Spotify, YouTube y cualquier plataforma de streaming.' },
-          ].map((step, i) => (
-            <div key={i} style={{ ...S.card, position: 'relative', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', top: '-10px', right: '-10px', fontSize: '80px', fontWeight: 900, color: 'rgba(192,38,211,0.04)', lineHeight: 1 }}>{step.num}</div>
-              <div style={{ fontSize: '36px', marginBottom: '16px' }}>{step.icon}</div>
-              <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#F8F0FF', marginBottom: '10px' }}>{step.title}</h3>
-              <p style={{ fontSize: '14px', color: 'rgba(248,240,255,0.6)', lineHeight: 1.7 }}>{step.desc}</p>
+      {/* FLUJO 3 PASOS */}
+      <div id="como-funciona" style={{ padding: '80px 20px', background: 'rgba(15,10,26,0.7)' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: '980px', padding: '7px 18px', fontSize: '12px', fontWeight: 700, color: '#4ade80', marginBottom: '24px', letterSpacing: '0.5px' }}>
+              ✅ Listo para Spotify · Apple Music · YouTube Music
             </div>
-          ))}
+            <h2 style={{ fontSize: 'clamp(30px,5vw,54px)', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-1.5px', marginBottom: '16px' }}>
+              Sube tus stems,{' '}
+              <span style={S.grad}>mezcla y masteriza.</span>
+              <br style={{ display: 'block' }} />
+              <span style={{ color: '#F8F0FF' }}>¡Así de fácil!</span>
+            </h2>
+            <p style={{ fontSize: '17px', color: 'rgba(248,240,255,0.5)', maxWidth: '480px', margin: '0 auto', lineHeight: 1.6 }}>
+              Sin instalar nada · Sin tarjeta · 100% en el navegador
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '20px', position: 'relative' }}>
+            {[
+              { num:'1', icon:'🎵', color:'#EC4899', title:'Sube tus stems', sub:'WAV · MP3 · FLAC · hasta 12 pistas', desc:'La IA detecta cada instrumento — voz, batería, bajo, guitarra, piano — y los organiza automáticamente para mezclar.', badge:'Auto-detección IA' },
+              { num:'2', icon:'🎛️', color:'#C026D3', title:'Mezcla con IA', sub:'EQ · Compresor · Reverb · -20 LUFS', desc:'9 presets de género calibrados profesionalmente. Ajusta faders, mute por pista y edición manual de dB en tiempo real.', badge:'9 presets de género' },
+              { num:'3', icon:'✦',  color:'#F59E0B', title:'Masteriza con IA', sub:'Limiter · EQ · Compresión · -12 LUFS', desc:'Mastering profesional en segundos. WAV 24-bit listo para Spotify, Apple Music y YouTube Music sin tocar nada más.', badge:'Distribución inmediata' },
+            ].map((step, i) => (
+              <div key={i} style={{ background: 'rgba(26,16,40,0.9)', border: `1px solid ${step.color}22`, borderRadius: '20px', padding: '28px', borderTop: `3px solid ${step.color}`, position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: '-20px', right: '-10px', fontSize: '100px', fontWeight: 900, color: `${step.color}06`, lineHeight: 1, userSelect: 'none' }}>{step.num}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: `linear-gradient(135deg,${step.color}30,${step.color}15)`, border: `1px solid ${step.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>{step.icon}</div>
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#F8F0FF', marginBottom: '2px' }}>{step.title}</h3>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: step.color, fontFamily: 'monospace', letterSpacing: '0.3px' }}>{step.sub}</div>
+                  </div>
+                </div>
+                <p style={{ fontSize: '13px', color: 'rgba(248,240,255,0.62)', lineHeight: 1.75, marginBottom: '16px' }}>{step.desc}</p>
+                <span style={{ background: `${step.color}15`, border: `1px solid ${step.color}30`, borderRadius: '980px', padding: '4px 12px', fontSize: '11px', fontWeight: 700, color: step.color }}>{step.badge}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: '48px' }}>
+            <button onClick={() => setShowChat(true)}
+              style={{ background: 'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)', border: 'none', color: '#fff', padding: '18px 48px', borderRadius: '980px', fontSize: '17px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 0 36px rgba(192,38,211,0.5)' }}>
+              🎛️ Empezar gratis ahora
+            </button>
+            <div style={{ marginTop: '12px', fontSize: '12px', color: 'rgba(248,240,255,0.3)' }}>Sin registrarse · Sin tarjeta · 100% gratis</div>
+          </div>
         </div>
       </div>
 
@@ -250,6 +278,51 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
               )}
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* SECCIÓN 3 PASOS LLAMATIVA */}
+      <div style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.12),rgba(192,38,211,0.08),rgba(236,72,153,0.06))', borderTop: '1px solid rgba(192,38,211,0.15)', borderBottom: '1px solid rgba(192,38,211,0.15)', padding: '80px 20px' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: '980px', padding: '6px 16px', fontSize: '12px', color: '#4ade80', fontWeight: 700, marginBottom: '24px', letterSpacing: '0.5px' }}>
+            ✅ Listo para Spotify · Apple Music · YouTube Music
+          </div>
+          <h2 style={{ fontSize: 'clamp(28px,5vw,52px)', fontWeight: 900, letterSpacing: '-1.5px', lineHeight: 1.05, marginBottom: '16px', color: '#F8F0FF' }}>
+            Sube · Mezcla · <span style={{ background: 'linear-gradient(135deg,#F59E0B,#EF6C00)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Masteriza</span>
+          </h2>
+          <p style={{ fontSize: 'clamp(15px,2vw,19px)', color: 'rgba(248,240,255,0.6)', marginBottom: '52px', maxWidth: '520px', margin: '0 auto 52px', lineHeight: 1.6 }}>
+            Así de fácil. Sin DAW, sin plugins, sin experiencia técnica.<br/>
+            <strong style={{ color: '#F8F0FF' }}>Listo para Spotify, Apple Music y YouTube Music.</strong>
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: '16px', marginBottom: '44px' }}>
+            {([
+              { num: '01', icon: '🎵', label: 'Sube tus stems', desc: 'WAV · MP3 · FLAC · hasta 12 pistas. La IA detecta cada instrumento automáticamente.', color: '#7C3AED' },
+              { num: '02', icon: '🎛️', label: 'Mezcla con IA', desc: '9 presets de género. EQ, reverb, compresión y -20 LUFS optimizados en segundos.', color: '#C026D3' },
+              { num: '03', icon: '✦', label: 'Masteriza con IA', desc: 'Limiter · EQ · Compresión. -12 LUFS listo para todas las plataformas de streaming.', color: '#F59E0B' },
+            ] as {num:string;icon:string;label:string;desc:string;color:string}[]).map((step, i) => (
+              <div key={i} style={{ background: 'rgba(26,16,40,0.8)', border: `1px solid ${step.color}33`, borderRadius: '20px', padding: '28px 24px', position: 'relative', overflow: 'hidden', textAlign: 'left' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: step.color }} />
+                <div style={{ position: 'absolute', top: '-8px', right: '-4px', fontSize: '72px', fontWeight: 900, color: `${step.color}08`, lineHeight: 1, userSelect: 'none' as const }}>{step.num}</div>
+                <div style={{ fontSize: '32px', marginBottom: '14px' }}>{step.icon}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#F8F0FF', marginBottom: '10px', letterSpacing: '-0.3px' }}>{step.label}</div>
+                <div style={{ fontSize: '13px', color: 'rgba(248,240,255,0.6)', lineHeight: 1.7 }}>{step.desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            {([
+              { name: 'Spotify', lufs: '-14 LUFS', color: '#1DB954' },
+              { name: 'Apple Music', lufs: '-16 LUFS', color: '#fc3c44' },
+              { name: 'YouTube Music', lufs: '-13 LUFS', color: '#FF0000' },
+              { name: 'TikTok', lufs: '-14 LUFS', color: '#69C9D0' },
+            ] as {name:string;lufs:string;color:string}[]).map((p, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(26,16,40,0.6)', border: '1px solid rgba(192,38,211,0.12)', borderRadius: '980px', padding: '8px 16px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: p.color, flexShrink: 0 }} />
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#F8F0FF' }}>{p.name}</span>
+                <span style={{ fontSize: '11px', color: '#9B7EC8', fontFamily: 'monospace' }}>{p.lufs}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
