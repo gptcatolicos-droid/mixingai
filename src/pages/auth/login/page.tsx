@@ -264,7 +264,7 @@ export default function LoginPage() {
               <h4 className="font-bold mb-3 sm:mb-4 text-sm sm:text-base">Enlaces</h4>
               <ul className="space-y-2 text-slate-400 text-sm sm:text-base">
                 <li><Link to="/" className="hover:text-white transition-colors">Inicio</Link></li>
-                <li><Link to="/pricing" className="hover:text-white transition-colors">Precios</Link></li>
+                <li><Link to="/" className="hover:text-white transition-colors">Precios</Link></li>
                 <li><Link to="/terms" className="hover:text-white transition-colors">Términos</Link></li>
                 <li><Link to="/privacy" className="hover:text-white transition-colors">Privacidad</Link></li>
                 <li><a href="https://www.sellerplus.co/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Vender en Amazon - Agencia Amazon</a></li>

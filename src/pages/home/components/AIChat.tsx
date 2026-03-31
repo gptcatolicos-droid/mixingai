@@ -3,7 +3,7 @@ import { MixPreset, PRESETS } from './PresetScreen';
 
 interface User { id: string; firstName: string; lastName: string; email: string; country: string; credits: number; provider?: string; createdAt: string; username?: string; avatar?: string; }
 interface Message { id: string; role: 'ai'|'user'; text: string; presets?: MixPreset[]; stems?: File[]; showUploadCard?: boolean; showProgress?: boolean; showMixerBtn?: boolean; }
-interface AIChatProps { user?: User|null; onStartMixer: (preset: MixPreset, files: File[]) => void; onCreditsUpdate?: (n: number) => void; lang?: 'es'|'en'; }
+interface AIChatProps { user?: User|null; onStartMixer: (preset: MixPreset, files: File[]) => void; onCreditsUpdate?: (n: number) => void; }
 
 const ICON = (size=18) => (
   <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
@@ -36,7 +36,7 @@ const getResponse = (msg: string, preset: MixPreset|null) => {
   return { text:`¡Cuéntame más! ¿Qué género es tu canción?\n\nPor ejemplo: *"reggaeton estilo Bad Bunny"*, *"gospel de iglesia"*, *"balada romántica"*... 🎛️` };
 };
 
-export default function AIChat({ user, onStartMixer, lang = 'es' }: AIChatProps) {
+export default function AIChat({ user, onStartMixer }: AIChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);

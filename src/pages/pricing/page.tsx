@@ -113,7 +113,6 @@ const PricingPage: React.FC = () => {
         script.onload = () => {
           if (window.paypal) {
             setPaypalLoaded(true);
-            console.log('✅ PayPal SDK loaded successfully');
           } else {
             setPaypalError('PayPal SDK no se cargó correctamente');
           }
@@ -157,7 +156,6 @@ const PricingPage: React.FC = () => {
           },
 
           createOrder: async (data: any, actions: any) => {
-            console.log(`🔄 Creating PayPal order for ${planId}...`);
             setIsProcessing(true);
             setSelectedPlan(planId);
 
@@ -182,7 +180,6 @@ const PricingPage: React.FC = () => {
               }
 
               const orderData = await response.json();
-              console.log('✅ Order created:', orderData.orderID);
               
               return orderData.orderID;
 
@@ -195,7 +192,6 @@ const PricingPage: React.FC = () => {
           },
 
           onApprove: async (data: any, actions: any) => {
-            console.log('🔄 Capturing PayPal payment...');
 
             try {
               const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/capture-paypal-order`, {
@@ -213,7 +209,6 @@ const PricingPage: React.FC = () => {
               const result = await response.json();
 
               if (result.status === 'success') {
-                console.log('✅ Payment captured successfully');
                 
                 // Actualizar créditos del usuario
                 const newCredits = user.credits + result.creditsAdded;
@@ -259,7 +254,6 @@ const PricingPage: React.FC = () => {
           },
 
           onCancel: (data: any) => {
-            console.log('⚠️  PayPal payment cancelled:', data);
             setIsProcessing(false);
             setSelectedPlan(null);
           }
@@ -270,7 +264,6 @@ const PricingPage: React.FC = () => {
         if (container && !paypalButtonsRendered.current.has(planId)) {
           await buttons.render(`#${containerId}`);
           paypalButtonsRendered.current.add(planId);
-          console.log(`✅ PayPal buttons rendered for ${planId}`);
         }
 
       } catch (error) {

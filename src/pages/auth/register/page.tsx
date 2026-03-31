@@ -426,7 +426,7 @@ const RegisterPage: React.FC = () => {
               <ul className="space-y-2 sm:space-y-3">
                 <li><Link to="/" className="text-slate-300 hover:text-cyan-400 transition-colors flex items-center text-sm sm:text-base"><i className="ri-arrow-right-s-line mr-2"></i>Inicio</Link></li>
                 <li><Link to="/auth/register" className="text-slate-300 hover:text-cyan-400 transition-colors flex items-center text-sm sm:text-base"><i className="ri-arrow-right-s-line mr-2"></i>Crear Cuenta</Link></li>
-                <li><Link to="/pricing" className="text-slate-300 hover:text-cyan-400 transition-colors flex items-center text-sm sm:text-base"><i className="ri-arrow-right-s-line mr-2"></i>Precios</Link></li>
+                <li><Link to="/" className="text-slate-300 hover:text-cyan-400 transition-colors flex items-center text-sm sm:text-base"><i className="ri-arrow-right-s-line mr-2"></i>Precios</Link></li>
                 <li><Link to="/feed" className="text-slate-300 hover:text-cyan-400 transition-colors flex items-center text-sm sm:text-base"><i className="ri-arrow-right-s-line mr-2"></i>Feed Musical</Link></li>
                 <li><a href="#" className="text-slate-300 hover:text-cyan-400 transition-colors flex items-center text-sm sm:text-base"><i className="ri-arrow-right-s-line mr-2"></i>Soporte</a></li>
                 <li><a href="https://readdy.ai/?origin=logo" className="text-slate-300 hover:text-cyan-400 transition-colors flex items-center text-sm sm:text-base"><i className="ri-arrow-right-s-line mr-2"></i>Made with Readdy</a></li>

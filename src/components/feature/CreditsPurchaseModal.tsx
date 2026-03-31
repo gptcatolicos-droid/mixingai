@@ -85,7 +85,6 @@ export default function CreditsPurchaseScreen({
         script.onload = () => {
           if (window.paypal) {
             setPaypalLoaded(true);
-            console.log('✅ PayPal SDK loaded successfully');
           } else {
             setPaypalError('PayPal SDK no se cargó correctamente');
           }
@@ -130,8 +129,6 @@ export default function CreditsPurchaseScreen({
         const user = JSON.parse(localStorage.getItem('audioMixerUser') || '{}');
         const userId = user.id || 'guest_' + Date.now();
 
-        console.log('🔄 Rendering PayPal buttons...');
-
         const buttons = window.paypal.Buttons({
           style: {
             shape: 'rect',
@@ -142,7 +139,6 @@ export default function CreditsPurchaseScreen({
           },
 
           createOrder: async (data: any, actions: any) => {
-            console.log('🔄 Creating PayPal order...');
             setIsProcessing(true);
 
             try {
@@ -166,7 +162,6 @@ export default function CreditsPurchaseScreen({
               }
 
               const orderData = await response.json();
-              console.log('✅ Order created:', orderData.orderID);
               
               return orderData.orderID;
 
@@ -178,7 +173,6 @@ export default function CreditsPurchaseScreen({
           },
 
           onApprove: async (data: any, actions: any) => {
-            console.log('🔄 Capturing PayPal payment...');
 
             try {
               const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/capture-paypal-order`, {
@@ -196,7 +190,6 @@ export default function CreditsPurchaseScreen({
               const result = await response.json();
 
               if (result.status === 'success') {
-                console.log('✅ Payment captured successfully');
                 
                 // Update credits in parent component
                 onPurchaseSuccess(result.creditsAdded);
@@ -226,7 +219,6 @@ export default function CreditsPurchaseScreen({
           },
 
           onCancel: (data: any) => {
-            console.log('⚠️  PayPal payment cancelled:', data);
             setIsProcessing(false);
           }
         });
@@ -235,7 +227,6 @@ export default function CreditsPurchaseScreen({
         if (paypalContainerRef.current) {
           await buttons.render('#paypal-buttons-container');
           paypalButtonsRendered.current = true;
-          console.log('✅ PayPal buttons rendered');
         }
 
       } catch (error) {

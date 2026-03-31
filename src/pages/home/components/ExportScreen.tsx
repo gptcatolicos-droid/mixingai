@@ -48,6 +48,18 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
   const exportLufsHistoryRef = useRef<number[]>([]);
   const lufsFrameRef = useRef(0);
 
+  // Estados de mastering
+  const [showMasterModal, setShowMasterModal] = useState(false);
+  const [isMastering, setIsMastering] = useState(false);
+  const [masterProgress, setMasterProgress] = useState(0);
+  const [masterStep, setMasterStep] = useState('');
+  const [masterBuffer, setMasterBuffer] = useState<AudioBuffer|null>(null);
+  const [masterUrl, setMasterUrl] = useState<string|null>(null);
+  const [masterWaveform, setMasterWaveform] = useState<Float32Array|null>(null);
+  const [activeTab, setActiveTab] = useState<'mix'|'master'>('mix');
+  const masterCanvasRef = useRef<HTMLCanvasElement>(null);
+  const lufsFrameRef = useRef(0);
+
   useEffect(() => {
     if (exportData && !exportAudioContext) {
       const ctx = new AudioContext();
@@ -209,6 +221,141 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
     setTimeout(() => startPlayback(newTime), 50);
   }, [exportAudioContext, exportData, exportSourceNode, startPlayback]);
 
+  // =============================================
+  // MASTERING CON IA
+  // =============================================
+  const handleMaster = async () => {
+    if (!exportData) return;
+    setIsMastering(true); setMasterProgress(0); setMasterStep('Analizando mezcla...');
+    try {
+      const offCtx = new OfflineAudioContext(2, exportData.audioBuffer.length, exportData.audioBuffer.sampleRate);
+      const src = offCtx.createBufferSource();
+      src.buffer = exportData.audioBuffer;
+
+      // 1. Noise gate suave (highpass 40hz para cortar ruido de fondo)
+      setMasterProgress(15); setMasterStep('Reducción de ruido...');
+      await new Promise(r => setTimeout(r, 600));
+      const noiseGate = offCtx.createBiquadFilter();
+      noiseGate.type = 'highpass'; noiseGate.frequency.value = 40; noiseGate.Q.value = 0.5;
+
+      // 2. EQ de mastering — realce sutil de presencia y aire
+      setMasterProgress(30); setMasterStep('Aplicando EQ de mastering...');
+      await new Promise(r => setTimeout(r, 600));
+      const eqLow = offCtx.createBiquadFilter();
+      eqLow.type = 'lowshelf'; eqLow.frequency.value = 80; eqLow.gain.value = 1.5;
+      const eqMid = offCtx.createBiquadFilter();
+      eqMid.type = 'peaking'; eqMid.frequency.value = 3500; eqMid.Q.value = 0.7; eqMid.gain.value = 0.8;
+      const eqHigh = offCtx.createBiquadFilter();
+      eqHigh.type = 'highshelf'; eqHigh.frequency.value = 10000; eqHigh.gain.value = 1.2;
+
+      // 3. Compresión de mastering — suave y transparente
+      setMasterProgress(50); setMasterStep('Compresión de mastering...');
+      await new Promise(r => setTimeout(r, 600));
+      const comp = offCtx.createDynamicsCompressor();
+      comp.threshold.value = -18; comp.knee.value = 12;
+      comp.ratio.value = 2; comp.attack.value = 0.01; comp.release.value = 0.3;
+
+      // 4. Limiter true peak
+      setMasterProgress(70); setMasterStep('True peak limiter...');
+      await new Promise(r => setTimeout(r, 600));
+      const limiter = offCtx.createDynamicsCompressor();
+      limiter.threshold.value = -1.0; limiter.knee.value = 0;
+      limiter.ratio.value = 20; limiter.attack.value = 0.0003; limiter.release.value = 0.05;
+
+      // Cadena: src → noiseGate → eqLow → eqMid → eqHigh → comp → limiter → dest
+      src.connect(noiseGate);
+      noiseGate.connect(eqLow);
+      eqLow.connect(eqMid);
+      eqMid.connect(eqHigh);
+      eqHigh.connect(comp);
+      comp.connect(limiter);
+      limiter.connect(offCtx.destination);
+      src.start(0);
+
+      setMasterProgress(80); setMasterStep('Renderizando master...');
+      await new Promise(r => setTimeout(r, 400));
+      const rendered = await offCtx.startRendering();
+
+      // 5. Normalizar a -12 LUFS
+      setMasterProgress(90); setMasterStep('Normalizando a -12 LUFS...');
+      await new Promise(r => setTimeout(r, 500));
+      const normalized = normalizeLUFS(rendered, -12);
+
+      // Generar peaks para waveform
+      const peaks = generateMasterPeaks(normalized, 800);
+      setMasterWaveform(peaks);
+
+      // Crear URL descarga
+      const wavBlob = bufferToWavMaster(normalized);
+      const url = URL.createObjectURL(wavBlob);
+      setMasterUrl(url);
+      setMasterBuffer(normalized);
+      setMasterProgress(100); setMasterStep('¡Master listo!');
+      await new Promise(r => setTimeout(r, 500));
+      setIsMastering(false);
+      setActiveTab('master');
+    } catch(e) {
+      console.error('Mastering error:', e);
+      setIsMastering(false);
+    }
+  };
+
+  const normalizeLUFS = (buffer: AudioBuffer, targetLufs: number): AudioBuffer => {
+    const ch0 = buffer.getChannelData(0);
+    let rmsSum = 0;
+    for (let i = 0; i < ch0.length; i++) rmsSum += ch0[i] * ch0[i];
+    const rms = Math.sqrt(rmsSum / ch0.length);
+    const currLufs = rms > 0 ? 20 * Math.log10(rms) - 0.691 : -60;
+    const gain = Math.pow(10, (targetLufs - currLufs) / 20);
+    const ceiling = 0.891;
+    let peakAfterGain = 0;
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const d = buffer.getChannelData(c);
+      for (let i = 0; i < d.length; i++) { const abs = Math.abs(d[i] * gain); if (abs > peakAfterGain) peakAfterGain = abs; }
+    }
+    const safeGain = peakAfterGain > ceiling ? gain * (ceiling / peakAfterGain) : gain;
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const d = buffer.getChannelData(c);
+      for (let i = 0; i < d.length; i++) {
+        d[i] *= safeGain;
+        if (d[i] > ceiling) d[i] = ceiling;
+        else if (d[i] < -ceiling) d[i] = -ceiling;
+      }
+    }
+    return buffer;
+  };
+
+  const generateMasterPeaks = (buffer: AudioBuffer, samples: number): Float32Array => {
+    const peaks = new Float32Array(samples);
+    const channelData = buffer.getChannelData(0);
+    const sampleSize = Math.floor(channelData.length / samples);
+    for (let i = 0; i < samples; i++) {
+      let max = 0;
+      for (let j = i*sampleSize; j < Math.min((i+1)*sampleSize, channelData.length); j++)
+        max = Math.max(max, Math.abs(channelData[j]));
+      peaks[i] = max;
+    }
+    return peaks;
+  };
+
+  const bufferToWavMaster = (buffer: AudioBuffer): Blob => {
+    const len=buffer.length, ch=buffer.numberOfChannels, sr=buffer.sampleRate;
+    const bps=3, ba=ch*bps, br=sr*ba, ds=len*ba, bs=44+ds;
+    const ab=new ArrayBuffer(bs), view=new DataView(ab);
+    const ws=(o:number,s:string)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
+    ws(0,'RIFF'); view.setUint32(4,bs-8,true); ws(8,'WAVE'); ws(12,'fmt ');
+    view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,ch,true);
+    view.setUint32(24,sr,true); view.setUint32(28,br,true); view.setUint16(32,ba,true);
+    view.setUint16(34,24,true); ws(36,'data'); view.setUint32(40,ds,true);
+    let offset=44;
+    for(let i=0;i<len;i++) for(let c=0;c<ch;c++){
+      const s=Math.max(-1,Math.min(1,buffer.getChannelData(c)[i]));
+      const v=Math.round(s*8388607);
+      if(offset+2<ab.byteLength){view.setInt8(offset,v&0xFF);view.setInt8(offset+1,(v>>8)&0xFF);view.setInt8(offset+2,(v>>16)&0xFF);offset+=3;}
+    }
+    return new Blob([ab],{type:'audio/wav'});
+  };
+
   const handleDirectDownload = async (format: 'mp3' | 'wav') => {
     if (!exportData) return;
     setIsDownloading(true); setDownloadFormat(format); setDownloadProgress(0);
@@ -229,6 +376,18 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
 
   const dur = exportData?.audioBuffer?.duration ?? 0;
 
+  // Dibujar waveform del master cuando cambia
+  useEffect(() => {
+    if (!masterCanvasRef.current || !masterWaveform) return;
+    drawWaveform({
+      canvas: masterCanvasRef.current,
+      waveformPeaks: masterWaveform,
+      currentTime: 0, duration: dur,
+      style: 'soundcloud',
+      colors: { played: '#F59E0B', unplayed: 'rgba(245,158,11,0.2)', playhead: '#EF6C00' }
+    });
+  }, [masterWaveform, dur]);
+
   return (
     <div style={S.page}>
       <Header user={user} onLogout={() => {}} onCreditsUpdate={onCreditsUpdate} />
@@ -238,9 +397,6 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
           <div>
-            <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'4px'}}>
-              <img src="/logo.png" alt="MixingMusic.AI" style={{height:'24px',width:'auto',filter:'brightness(0) invert(1)',opacity:0.85}} />
-            </div>
             <h1 style={{fontSize:'26px',fontWeight:600,letterSpacing:'-0.5px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>
               Tu Mezcla Final
             </h1>
@@ -248,7 +404,14 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
               Optimizada con IA · 44.1 kHz / 24 bits · {exportData?.finalLufs.toFixed(1)} LUFS
             </p>
           </div>
-          <button onClick={onBack} style={{...S.ghostBtn,padding:'10px 18px'}}>← Volver al Mezclador</button>
+          <button onClick={()=>{
+            // Detener audio antes de volver
+            if(exportSourceNode){try{exportSourceNode.stop();exportSourceNode.disconnect();}catch(e){}}
+            exportAnalyserRef.current=null;
+            if(vuAnimRef.current)cancelAnimationFrame(vuAnimRef.current);
+            if(exportTimeUpdateRef.current)clearInterval(exportTimeUpdateRef.current);
+            onBack();
+          }} style={{...S.ghostBtn,padding:'10px 18px'}}>← Volver al Mezclador</button>
         </div>
 
         {exportData ? (
@@ -324,23 +487,112 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
               </div>
             </div>
 
-            {/* Botones de descarga */}
-            <div style={{display:'flex',gap:'12px',justifyContent:'center',flexWrap:'wrap',marginBottom:'16px'}}>
-              <button onClick={()=>handleDirectDownload('mp3')} disabled={isDownloading}
-                style={{...S.glowBtn,padding:'14px 28px',fontSize:'14px',opacity:isDownloading?0.5:1,display:'flex',alignItems:'center',gap:'8px'}}>
-                <i className="ri-download-line"></i>
-                Descargar .MP3
-              </button>
-              <button onClick={()=>handleDirectDownload('wav')} disabled={isDownloading}
-                style={{background:'linear-gradient(135deg,#7C3AED,#4F46E5)',border:'none',color:'#fff',padding:'14px 28px',borderRadius:'980px',fontSize:'14px',fontWeight:600,cursor:'pointer',boxShadow:'0 0 20px rgba(124,58,237,0.4)',fontFamily:'inherit',display:'flex',alignItems:'center',gap:'8px',opacity:isDownloading?0.5:1}}>
-                <i className="ri-download-2-line"></i>
-                Descargar .WAV
-              </button>
-            </div>
+            {/* Tabs Mezcla / Master — solo si ya hay master */}
+            {masterBuffer && (
+              <div style={{display:'flex',gap:'8px',marginBottom:'16px'}}>
+                <button onClick={()=>setActiveTab('mix')}
+                  style={{flex:1,padding:'10px',borderRadius:'10px',border:`1px solid ${activeTab==='mix'?'#C026D3':'rgba(192,38,211,0.2)'}`,background:activeTab==='mix'?'rgba(192,38,211,0.12)':'transparent',color:activeTab==='mix'?'#EC4899':'#9B7EC8',fontSize:'12px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>
+                  Mezcla · -20 LUFS
+                </button>
+                <button onClick={()=>setActiveTab('master')}
+                  style={{flex:1,padding:'10px',borderRadius:'10px',border:`1px solid ${activeTab==='master'?'#F59E0B':'rgba(245,158,11,0.2)'}`,background:activeTab==='master'?'rgba(245,158,11,0.12)':'transparent',color:activeTab==='master'?'#F59E0B':'#9B7EC8',fontSize:'12px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>
+                  ✦ Master · -12 LUFS
+                </button>
+              </div>
+            )}
 
-            <div style={{textAlign:'center',fontSize:'12px',color:'rgba(155,126,200,0.6)'}}>
-              Descarga gratuita · WAV 24bit / MP3
-            </div>
+            {/* PANTALLA MASTER */}
+            {activeTab==='master' && masterBuffer && (
+              <div style={{marginBottom:'16px'}}>
+                {/* Badge masterizado */}
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                    <div style={{width:'32px',height:'32px',borderRadius:'9px',background:'linear-gradient(135deg,#F59E0B,#EF6C00)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'}}>✦</div>
+                    <div>
+                      <div style={{fontSize:'13px',fontWeight:700,color:'#F8F0FF'}}>Master Final</div>
+                      <div style={{fontSize:'11px',color:'#9B7EC8'}}>Procesado con IA · -12 LUFS · WAV 24-bit</div>
+                    </div>
+                  </div>
+                  <span style={{background:'rgba(245,158,11,0.15)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:'980px',padding:'4px 12px',fontSize:'11px',fontWeight:700,color:'#F59E0B'}}>✦ MASTERIZADO</span>
+                </div>
+                {/* Waveform master — color ámbar */}
+                <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'12px',padding:'12px',border:'1px solid rgba(245,158,11,0.15)',marginBottom:'14px'}}>
+                  <canvas ref={masterCanvasRef} width={1200} height={100} style={{width:'100%',height:'70px',borderRadius:'8px',display:'block'}} />
+                </div>
+                {/* Chain info */}
+                <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'12px',padding:'14px',marginBottom:'14px',border:'1px solid rgba(245,158,11,0.1)'}}>
+                  <div style={{fontSize:'10px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px'}}>Cadena de mastering aplicada</div>
+                  {[
+                    {icon:'🔇',label:'Noise Reduction',val:'Highpass 40Hz'},
+                    {icon:'📊',label:'EQ Mastering',val:'+1.5dB Low · +0.8dB Pres · +1.2dB Air'},
+                    {icon:'🗜️',label:'Compresión',val:'Ratio 2:1 · Thr -18dB'},
+                    {icon:'⛔',label:'True Peak Limiter',val:'-1.0 dBFS'},
+                    {icon:'✅',label:'Output',val:'-12 LUFS'},
+                  ].map((item,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'6px 8px',background:i===4?'rgba(74,222,128,0.08)':'rgba(8,4,16,0.4)',borderRadius:'7px',marginBottom:'4px',border:i===4?'1px solid rgba(74,222,128,0.15)':'1px solid transparent'}}>
+                      <span style={{fontSize:'14px'}}>{item.icon}</span>
+                      <span style={{fontSize:'11px',fontWeight:600,color:i===4?'#4ade80':'#C9B8F0',flex:1}}>{item.label}</span>
+                      <span style={{fontSize:'10px',color:i===4?'#4ade80':'#9B7EC8',fontFamily:"'DM Mono',monospace"}}>{item.val}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Botón descargar master */}
+                <button onClick={()=>{
+                  if(!masterUrl) return;
+                  const a = document.createElement('a');
+                  a.href = masterUrl; a.download = 'master-mixingmusic.wav'; a.click();
+                }}
+                  style={{width:'100%',background:'linear-gradient(135deg,#F59E0B,#EF6C00)',border:'none',color:'#fff',padding:'16px',borderRadius:'980px',fontSize:'15px',fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 24px rgba(245,158,11,0.4)',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'}}>
+                  <i className="ri-download-2-line" style={{fontSize:'18px'}}></i>
+                  Descargar Master .WAV — -12 LUFS
+                </button>
+              </div>
+            )}
+
+            {/* PANTALLA MEZCLA (default) */}
+            {(activeTab==='mix' || !masterBuffer) && (
+              <div>
+                {/* Botones de descarga */}
+                <div style={{display:'flex',gap:'12px',justifyContent:'center',flexWrap:'wrap',marginBottom:'12px'}}>
+                  <button onClick={()=>handleDirectDownload('mp3')} disabled={isDownloading}
+                    style={{...S.glowBtn,padding:'14px 28px',fontSize:'14px',opacity:isDownloading?0.5:1,display:'flex',alignItems:'center',gap:'8px'}}>
+                    <i className="ri-download-line"></i>
+                    Descargar .MP3
+                  </button>
+                  <button onClick={()=>handleDirectDownload('wav')} disabled={isDownloading}
+                    style={{background:'linear-gradient(135deg,#7C3AED,#4F46E5)',border:'none',color:'#fff',padding:'14px 28px',borderRadius:'980px',fontSize:'14px',fontWeight:600,cursor:'pointer',boxShadow:'0 0 20px rgba(124,58,237,0.4)',fontFamily:'inherit',display:'flex',alignItems:'center',gap:'8px',opacity:isDownloading?0.5:1}}>
+                    <i className="ri-download-2-line"></i>
+                    Descargar .WAV
+                  </button>
+                </div>
+                <div style={{textAlign:'center',fontSize:'12px',color:'rgba(155,126,200,0.6)',marginBottom:'16px'}}>
+                  Descarga gratuita · WAV 24bit / MP3
+                </div>
+
+                {/* BOTÓN MASTERIZAR */}
+                {!isMastering && !masterBuffer && (
+                  <button onClick={()=>handleMaster()}
+                    style={{width:'100%',background:'linear-gradient(135deg,#F59E0B,#EF6C00)',border:'none',color:'#fff',padding:'18px',borderRadius:'16px',fontSize:'16px',fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 28px rgba(245,158,11,0.4)',display:'flex',alignItems:'center',justifyContent:'center',gap:'12px',marginTop:'4px'}}>
+                    <span style={{fontSize:'20px'}}>✦</span>
+                    MASTERIZAR con IA
+                    <span style={{background:'rgba(255,255,255,0.2)',borderRadius:'50%',width:'28px',height:'28px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'14px'}}>→</span>
+                  </button>
+                )}
+
+                {/* Modal mastering en progreso */}
+                {isMastering && (
+                  <div style={{background:'rgba(15,10,26,0.95)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:'16px',padding:'24px',textAlign:'center'}}>
+                    <div style={{fontSize:'32px',marginBottom:'12px'}}>✦</div>
+                    <div style={{fontSize:'16px',fontWeight:700,color:'#F8F0FF',marginBottom:'6px'}}>Masterizando con IA</div>
+                    <div style={{fontSize:'13px',color:'#9B7EC8',marginBottom:'16px'}}>{masterStep}</div>
+                    <div style={{height:'6px',background:'rgba(245,158,11,0.15)',borderRadius:'3px',overflow:'hidden',marginBottom:'8px'}}>
+                      <div style={{height:'100%',background:'linear-gradient(90deg,#F59E0B,#EF6C00)',borderRadius:'3px',width:`${masterProgress}%`,transition:'width 0.4s ease'}}></div>
+                    </div>
+                    <div style={{fontSize:'12px',color:'#F59E0B',fontFamily:"'DM Mono',monospace"}}>{masterProgress}%</div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'400px'}}>

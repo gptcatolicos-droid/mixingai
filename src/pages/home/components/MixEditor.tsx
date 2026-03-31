@@ -14,7 +14,23 @@ interface Stem {
   gainNode: GainNode; panNode: StereoPannerNode; analyserNode: AnalyserNode;
   sourceNode?: AudioBufferSourceNode; volume: number; pan: number;
   muted: boolean; fftData: Uint8Array; waveformPeaks: Float32Array;
+  instrument: string; icon: string; selected: boolean;
 }
+
+// Detección de instrumento por nombre de archivo (Opción A)
+const detectInstrument = (filename: string): { instrument: string; icon: string } => {
+  const n = filename.toLowerCase().replace(/[_\-\.]/g,' ');
+  if (/voz|voc|vocal|lead|singer|coro|choir|bgv|bg voc|backing/.test(n)) return { instrument:'Voz', icon:'🎤' };
+  if (/kick|bombo|drum|perc|beat|snare|hi.hat|hihat|cymbal|rimshot/.test(n)) return { instrument:'Batería', icon:'🥁' };
+  if (/bass|bajo|808|sub/.test(n)) return { instrument:'Bajo', icon:'🎸' };
+  if (/guitar|guitarra|gtr|electric|acoustic/.test(n)) return { instrument:'Guitarra', icon:'🎸' };
+  if (/piano|keys|keyboard|teclado|synth|pad|organ/.test(n)) return { instrument:'Teclado', icon:'🎹' };
+  if (/brass|trumpet|trompeta|horn|tromb|sax/.test(n)) return { instrument:'Viento', icon:'🎺' };
+  if (/string|violin|viola|cello|orquesta/.test(n)) return { instrument:'Cuerda', icon:'🎻' };
+  if (/fx|effect|efecto|noise|amb|reverb/.test(n)) return { instrument:'FX', icon:'🎛️' };
+  if (/solo|lead.gtr|lead.guitar/.test(n)) return { instrument:'Solo', icon:'🎸' };
+  return { instrument:'Pista', icon:'🎵' };
+};
 import { MixPreset, PRESETS } from './PresetScreen';
 
 interface MixEditorProps {
@@ -62,6 +78,9 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const [reverbActive, setReverbActive] = useState(reverbOn);
   const [delayActive, setDelayActive] = useState(delayOn);
   const [widenerActive, setWidenerActive] = useState(stereoOn);
+  const [selectedStems, setSelectedStems] = useState<Set<string>>(new Set());
+  const [editingVolumeId, setEditingVolumeId] = useState<string|null>(null);
+  const [editingVolumeVal, setEditingVolumeVal] = useState('');
   const [momentaryLufs, setMomentaryLufs] = useState(-60.0);
   const [integratedLufs, setIntegratedLufs] = useState(-60.0);
   const [activePreset, setActivePreset] = useState<MixPreset|undefined>(initialPreset);
@@ -166,9 +185,10 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         const analyserNode = audioContext.createAnalyser();
         analyserNode.fftSize = 512; analyserNode.smoothingTimeConstant = 0.7;
         gainNode.connect(panNode); panNode.connect(analyserNode); analyserNode.connect(masterGain);
+        const { instrument, icon } = detectInstrument(file.name);
         stemsArr.push({ id:`stem-${i}`, name:file.name, file, buffer, gainNode, panNode, analyserNode,
           volume:0, pan:0, muted:false, fftData:new Uint8Array(analyserNode.frequencyBinCount),
-          waveformPeaks:generateWaveformPeaks(buffer,400) });
+          waveformPeaks:generateWaveformPeaks(buffer,400), instrument, icon, selected:false });
         maxDur = Math.max(maxDur, buffer.duration);
       }
       setStems(stemsArr); setDuration(maxDur); startFFTAnimation();
@@ -255,6 +275,42 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     };
     update();
   }, []);
+
+  // Selección múltiple de stems
+  const toggleStemSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedStems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedStems(new Set(stems.map(s => s.id)));
+  const clearSelection = () => setSelectedStems(new Set());
+
+  // Mover todos los seleccionados juntos
+  const updateSelectedVolume = (delta: number) => {
+    setStems(prev => prev.map(s => {
+      if (!selectedStems.has(s.id)) return s;
+      const newVol = Math.max(-60, Math.min(12, s.volume + delta));
+      const ctx = audioContextRef.current;
+      if (s.gainNode && ctx) s.gainNode.gain.setTargetAtTime(Math.pow(10,newVol/20), ctx.currentTime, 0.05);
+      return { ...s, volume: newVol };
+    }));
+  };
+
+  // Edición manual de dB
+  const startEditVolume = (stem: Stem) => {
+    setEditingVolumeId(stem.id);
+    setEditingVolumeVal(stem.volume.toFixed(1));
+  };
+
+  const commitEditVolume = (id: string) => {
+    const val = parseFloat(editingVolumeVal);
+    if (!isNaN(val)) updateStemVolume(id, Math.max(-60, Math.min(12, val)));
+    setEditingVolumeId(null);
+  };
 
   const adjustGlobalEQ = useCallback((band: 'bass'|'mid'|'high', dir: 'up'|'down') => {
     const ctx = audioContextRef.current; if (!ctx) return;
@@ -412,9 +468,9 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         }
       }
       // gain ya aplicado arriba con -2dB de headroom
-      setExportProgress(75); setExportStep('Normalizando a -14 LUFS...'); await new Promise(r=>setTimeout(r,800));
+      setExportProgress(75); setExportStep('Normalizando a -20 LUFS...'); await new Promise(r=>setTimeout(r,800));
       const rendered = await offCtx.startRendering();
-      const normalized = normalizeTo14LUFS(rendered);
+      const normalized = normalizeTo20LUFS(rendered);
       setExportProgress(95); setExportStep('Generando archivo...'); await new Promise(r=>setTimeout(r,500));
       const peaks = generateWaveformPeaks(normalized,800);
       const wavBlob = bufferToWav(normalized,24);
@@ -423,12 +479,12 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       // Limpiar estado ANTES de llamar onExport para evitar setState en componente desmontado
       setIsExporting(false); setExportProgress(0); setExportStep('');
       await new Promise(r=>setTimeout(r,50)); // microtask para que React procese el cleanup
-      onExport({ audioBuffer:normalized, audioUrl:wavUrl, waveformPeaks:peaks, finalLufs:-14.0, presetName:(activePreset||initialPreset)?.name });
+      onExport({ audioBuffer:normalized, audioUrl:wavUrl, waveformPeaks:peaks, finalLufs:-20.0, presetName:(activePreset||initialPreset)?.name });
     } catch(e) { console.error('Export error:', e); setIsExporting(false); }
   };
 
-  const normalizeTo14LUFS = (buffer: AudioBuffer): AudioBuffer => {
-    const target = -14;
+  const normalizeTo20LUFS = (buffer: AudioBuffer): AudioBuffer => {
+    const target = -20;
     // Calcular RMS para LUFS aproximado
     const ch0 = buffer.getChannelData(0);
     let rmsSum = 0;
@@ -820,35 +876,81 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           </div>
         </div>
 
-        {/* Stems grid — mobile: 2 col, tablet: 3, desktop: 4+ */}
+        {/* Stems grid */}
         {stems.length>0&&(
-          <div className="stems-grid">
-            {stems.map(stem=>(
-              <div key={stem.id} style={{...C.card,borderColor:stem.muted?'rgba(248,113,113,0.3)':undefined}}>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
-                  <span style={{fontSize:'11px',fontWeight:600,color:'#F8F0FF',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'calc(100% - 36px)'}}>
-                    {stem.name.replace(/\.[^.]+$/,'').toUpperCase()}
-                  </span>
-                  <button onClick={()=>toggleStemMute(stem.id)}
-                    style={{width:'26px',height:'26px',borderRadius:'7px',background:stem.muted?'rgba(248,113,113,0.15)':'linear-gradient(135deg,#C026D3,#7C3AED)',border:stem.muted?'1px solid rgba(248,113,113,0.4)':'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                    <i className={stem.muted?'ri-volume-mute-line':'ri-volume-up-line'} style={{color:'#fff',fontSize:'11px'}}></i>
+          <div>
+            {/* Toolbar de selección múltiple */}
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px',flexWrap:'wrap'}}>
+              <button onClick={selectAll} style={{fontSize:'11px',padding:'4px 10px',borderRadius:'6px',background:'rgba(192,38,211,0.1)',border:'1px solid rgba(192,38,211,0.2)',color:'#C026D3',cursor:'pointer',fontFamily:'inherit'}}>
+                Seleccionar todo
+              </button>
+              {selectedStems.size>0&&<>
+                <button onClick={clearSelection} style={{fontSize:'11px',padding:'4px 10px',borderRadius:'6px',background:'transparent',border:'1px solid rgba(192,38,211,0.2)',color:'#9B7EC8',cursor:'pointer',fontFamily:'inherit'}}>
+                  Limpiar ({selectedStems.size})
+                </button>
+                <div style={{display:'flex',alignItems:'center',gap:'4px',background:'rgba(192,38,211,0.08)',borderRadius:'8px',padding:'2px 8px'}}>
+                  <span style={{fontSize:'11px',color:'#9B7EC8'}}>Mover sel.:</span>
+                  <button onClick={()=>updateSelectedVolume(-1)} style={{width:'22px',height:'22px',borderRadius:'4px',background:'rgba(192,38,211,0.15)',border:'none',color:'#F8F0FF',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                  <button onClick={()=>updateSelectedVolume(1)} style={{width:'22px',height:'22px',borderRadius:'4px',background:'rgba(192,38,211,0.15)',border:'none',color:'#F8F0FF',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                </div>
+              </>}
+            </div>
+            <div className="stems-grid">
+            {stems.map(stem=>{
+              const isSel = selectedStems.has(stem.id);
+              return (
+              <div key={stem.id} onClick={e=>toggleStemSelect(stem.id,e)}
+                style={{...C.card,
+                  borderColor: stem.muted?'rgba(248,113,113,0.4)':isSel?'rgba(192,38,211,0.6)':'rgba(192,38,211,0.15)',
+                  boxShadow: isSel?'0 0 10px rgba(192,38,211,0.25)':'none',
+                  cursor:'pointer',transition:'all 0.15s'}}>
+                {/* Header: icono instrumento + nombre + mute */}
+                <div style={{display:'flex',alignItems:'center',gap:'5px',marginBottom:'8px'}}>
+                  <span style={{fontSize:'16px',flexShrink:0}}>{stem.icon}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:'10px',fontWeight:700,color:'#F8F0FF',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      {stem.name.replace(/\.[^.]+$/,'').toUpperCase()}
+                    </div>
+                    <div style={{fontSize:'9px',color:'#9B7EC8'}}>{stem.instrument}</div>
+                  </div>
+                  <button onClick={e=>{e.stopPropagation();toggleStemMute(stem.id);}}
+                    style={{width:'24px',height:'24px',borderRadius:'6px',flexShrink:0,
+                      background:stem.muted?'rgba(248,113,113,0.2)':'rgba(192,38,211,0.15)',
+                      border:stem.muted?'1px solid rgba(248,113,113,0.5)':'1px solid rgba(192,38,211,0.2)',
+                      cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    <i className={stem.muted?'ri-volume-mute-line':'ri-volume-up-line'} style={{color:stem.muted?'#f87171':'#C026D3',fontSize:'11px'}}></i>
                   </button>
                 </div>
                 {/* Mini FFT */}
-                <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'6px',height:'28px',overflow:'hidden',border:'1px solid rgba(192,38,211,0.08)',marginBottom:'8px'}}>
-                  <canvas width={200} height={30} style={{width:'100%',height:'100%',display:'block'}}
-                    ref={c=>{ if(c&&stem.fftData) drawMiniFFT(c,stem.fftData,'#C026D3'); }} />
+                <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'6px',height:'24px',overflow:'hidden',border:'1px solid rgba(192,38,211,0.08)',marginBottom:'8px',opacity:stem.muted?0.3:1}}>
+                  <canvas width={200} height={28} style={{width:'100%',height:'100%',display:'block'}}
+                    ref={c=>{ if(c&&stem.fftData) drawMiniFFT(c,stem.fftData,stem.muted?'#666':'#C026D3'); }} />
                 </div>
-                {/* Volume */}
-                <div style={{marginBottom:'8px'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px',marginBottom:'3px'}}>
+                {/* Volume con edición manual */}
+                <div style={{marginBottom:'6px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px',marginBottom:'3px',alignItems:'center'}}>
                     <span style={{color:'#9B7EC8'}}>Vol</span>
-                    <span style={{...C.mono,color:'#C026D3',fontWeight:500}}>{stem.volume>0?'+':''}{stem.volume.toFixed(1)} dB</span>
+                    {editingVolumeId===stem.id ? (
+                      <input type="number" min="-60" max="12" step="0.1"
+                        value={editingVolumeVal}
+                        onChange={e=>setEditingVolumeVal(e.target.value)}
+                        onBlur={()=>commitEditVolume(stem.id)}
+                        onKeyDown={e=>{if(e.key==='Enter')commitEditVolume(stem.id);if(e.key==='Escape')setEditingVolumeId(null);}}
+                        onClick={e=>e.stopPropagation()}
+                        autoFocus
+                        style={{width:'50px',background:'rgba(192,38,211,0.15)',border:'1px solid #C026D3',borderRadius:'4px',color:'#F8F0FF',fontSize:'10px',padding:'1px 4px',fontFamily:'monospace',textAlign:'right'}} />
+                    ) : (
+                      <span onClick={e=>{e.stopPropagation();startEditVolume(stem);}}
+                        style={{...C.mono,color:'#C026D3',fontWeight:500,cursor:'text',borderBottom:'1px dashed rgba(192,38,211,0.3)',paddingBottom:'1px'}}>
+                        {stem.volume>0?'+':''}{stem.volume.toFixed(1)} dB
+                      </span>
+                    )}
                   </div>
                   <div style={C.track}>
                     <div style={C.trackFill(((stem.volume+60)/72)*100)}></div>
                     <input type="range" min="-60" max="12" step="0.1" value={stem.volume}
-                      onChange={e=>updateStemVolume(stem.id,parseFloat(e.target.value))}
+                      onChange={e=>{e.stopPropagation();updateStemVolume(stem.id,parseFloat(e.target.value));}}
+                      onClick={e=>e.stopPropagation()}
                       style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%'}} />
                   </div>
                 </div>
@@ -861,12 +963,15 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                   <div style={C.track}>
                     <div style={C.trackFill(((stem.pan+1)/2)*100)}></div>
                     <input type="range" min="-1" max="1" step="0.01" value={stem.pan}
-                      onChange={e=>updateStemPan(stem.id,parseFloat(e.target.value))}
+                      onChange={e=>{e.stopPropagation();updateStemPan(stem.id,parseFloat(e.target.value));}}
+                      onClick={e=>e.stopPropagation()}
                       style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%'}} />
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
+            </div>
           </div>
         )}
       </div>

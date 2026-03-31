@@ -328,7 +328,7 @@ const BlogPage: React.FC = () => {
                 <li><Link to="/" className="hover:text-white transition-colors text-sm">
                   {selectedLanguage === 'en' ? 'Home' : 'Inicio'}
                 </Link></li>
-                <li><Link to="/pricing" className="hover:text-white transition-colors text-sm">
+                <li><Link to="/" className="hover:text-white transition-colors text-sm">
                   {selectedLanguage === 'en' ? 'Pricing' : 'Precios'}
                 </Link></li>
                 <li><Link to="/auth/register" className="hover:text-white transition-colors text-sm">

@@ -145,7 +145,7 @@ const BillingPage: React.FC = () => {
   };
 
   const handleUpgradePlan = () => {
-    navigate('/pricing');
+    navigate('/');
   };
 
   const getCardIcon = (type: string) => {

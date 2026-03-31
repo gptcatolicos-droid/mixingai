@@ -381,7 +381,7 @@ const BlogArticlePage: React.FC = () => {
                   {selectedLanguage === 'en' ? 'Home' : 'Inicio'}
                 </Link></li>
                 <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
-                <li><Link to="/pricing" className="hover:text-white transition-colors">
+                <li><Link to="/" className="hover:text-white transition-colors">
                   {selectedLanguage === 'en' ? 'Pricing' : 'Precios'}
                 </Link></li>
                 <li><Link to="/auth/register" className="hover:text-white transition-colors">
