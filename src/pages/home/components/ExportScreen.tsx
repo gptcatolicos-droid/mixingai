@@ -310,25 +310,28 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
   };
 
   const normalizeLUFS = (buffer: AudioBuffer, targetLufs: number): AudioBuffer => {
-    const ch0 = buffer.getChannelData(0);
-    let rmsSum = 0;
-    for (let i = 0; i < ch0.length; i++) rmsSum += ch0[i] * ch0[i];
-    const rms = Math.sqrt(rmsSum / ch0.length);
-    const currLufs = rms > 0 ? 20 * Math.log10(rms) - 0.691 : -60;
+    // Calcular RMS promediando TODOS los canales para LUFS correcto
+    let rmsSum = 0; let totalSamples = 0;
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const d = buffer.getChannelData(c);
+      for (let i = 0; i < d.length; i++) { rmsSum += d[i] * d[i]; totalSamples++; }
+    }
+    const rms = Math.sqrt(rmsSum / totalSamples);
+    const currLufs = rms > 0.000001 ? 20 * Math.log10(rms) - 0.691 : -60;
     const gain = Math.pow(10, (targetLufs - currLufs) / 20);
-    const ceiling = 0.891;
+    const ceiling = 0.891; // -1 dBFS true peak
+    // Verificar peak después del gain
     let peakAfterGain = 0;
     for (let c = 0; c < buffer.numberOfChannels; c++) {
       const d = buffer.getChannelData(c);
       for (let i = 0; i < d.length; i++) { const abs = Math.abs(d[i] * gain); if (abs > peakAfterGain) peakAfterGain = abs; }
     }
     const safeGain = peakAfterGain > ceiling ? gain * (ceiling / peakAfterGain) : gain;
+    // Aplicar ganancia con hard clip
     for (let c = 0; c < buffer.numberOfChannels; c++) {
       const d = buffer.getChannelData(c);
       for (let i = 0; i < d.length; i++) {
-        d[i] *= safeGain;
-        if (d[i] > ceiling) d[i] = ceiling;
-        else if (d[i] < -ceiling) d[i] = -ceiling;
+        d[i] = Math.max(-ceiling, Math.min(ceiling, d[i] * safeGain));
       }
     }
     return buffer;

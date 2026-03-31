@@ -87,6 +87,7 @@ export default function HomePage() {
         masterData={masterData}
         mixData={exportData || pendingExportData}
         onBack={() => setScreen('export')}
+        onBackToMixer={() => setScreen('mixer')}
       />
     );
   }
