@@ -21,6 +21,8 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
   const [integratedLufs, setIntegratedLufs] = useState(-60.0);
   const [vuLeft, setVuLeft] = useState(0);
   const [vuRight, setVuRight] = useState(0);
+  const [outputGain, setOutputGain] = useState(1.0); // 1.0 = 0dB
+  const gainNodeRef = useRef<GainNode|null>(null);
 
   const audioCtxRef     = useRef<AudioContext|null>(null);
   const sourceRef       = useRef<AudioBufferSourceNode|null>(null);
@@ -65,9 +67,21 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
     const drawCh = (level: number, x: number, cw: number) => {
       const segs = 24, segH = Math.floor((h - segs) / segs);
       for (let i = 0; i < segs; i++) {
-        const lit = level >= (1 - i/segs);
-        ctx.fillStyle = i < segs*0.6 ? (lit?'#4ade80':'rgba(74,222,128,0.07)') : i < segs*0.85 ? (lit?'#FBBF24':'rgba(251,191,36,0.07)') : (lit?'#EF4444':'rgba(239,68,68,0.07)');
-        ctx.fillRect(x, i*(segH+1), cw, segH);
+        // i=0 → TOP (rojo/clipping), i=segs-1 → BOTTOM (verde/bajo)
+        // El nivel llena de ABAJO hacia ARRIBA
+        // Segmento i se ilumina si level > (segs-1-i)/segs
+        const normalized = (segs - 1 - i) / segs; // 0=bottom, 1=top
+        const lit = level > normalized;
+        // Colores: top=rojo, medio=amarillo, bajo=verde
+        const isRed    = i < segs * 0.15;  // top 15% = rojo
+        const isYellow = i < segs * 0.35;  // siguiente 20% = amarillo
+        // Verde = resto (bottom 65%)
+        let color: string;
+        if (isRed)    color = lit ? '#EF4444' : 'rgba(239,68,68,0.07)';
+        else if (isYellow) color = lit ? '#FBBF24' : 'rgba(251,191,36,0.07)';
+        else          color = lit ? '#4ade80' : 'rgba(74,222,128,0.07)';
+        ctx.fillStyle = color;
+        ctx.fillRect(x, i * (segH + 1), cw, segH);
       }
     };
     drawCh(vuLeft,  2, Math.floor((w-6)/2));
@@ -124,12 +138,15 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
     const anlL = ctx.createAnalyser(); anlL.fftSize = 512;
     const anlR = ctx.createAnalyser(); anlR.fftSize = 512;
     analyserLRef.current = anlL; analyserRRef.current = anlR;
+    // Nodo de gain para el slider de output
+    const gn = ctx.createGain(); gn.gain.value = outputGain;
+    gainNodeRef.current = gn;
     if (nCh >= 2) {
       const split = ctx.createChannelSplitter(2);
       src.connect(split); split.connect(anlL,0); split.connect(anlR,1);
-      anlL.connect(ctx.destination); anlR.connect(ctx.destination);
+      anlL.connect(gn); anlR.connect(gn); gn.connect(ctx.destination);
     } else {
-      src.connect(anlL); anlL.connect(anlR); anlR.connect(ctx.destination);
+      src.connect(anlL); anlL.connect(gn); gn.connect(ctx.destination);
     }
     const offset = pausedAtRef.current;
     src.start(0, offset); startTimeRef.current = ctx.currentTime - offset;
@@ -148,13 +165,50 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
     };
   };
 
+  const seekTo = (pos: number) => {
+    const time = Math.max(0, Math.min(pos, dur));
+    pausedAtRef.current = time; setCurrentTime(time);
+    if (isPlaying) {
+      // Detener fuente actual y reiniciar desde nueva posición sin cambiar estado de play
+      if (sourceRef.current) { try { sourceRef.current.stop(); sourceRef.current.disconnect(); } catch(e){} sourceRef.current = null; }
+      if (timeRef.current) clearInterval(timeRef.current);
+      const ctx = audioCtxRef.current;
+      if (!ctx || !activeBuffer) return;
+      const src = ctx.createBufferSource(); src.buffer = activeBuffer;
+      const anlL = analyserLRef.current!; const anlR = analyserRRef.current!;
+      const gn = gainNodeRef.current || ctx.createGain();
+      gainNodeRef.current = gn; gn.gain.value = outputGain;
+      if (activeBuffer.numberOfChannels >= 2) {
+        const split = ctx.createChannelSplitter(2);
+        src.connect(split); split.connect(anlL,0); split.connect(anlR,1);
+        anlL.connect(gn); anlR.connect(gn); gn.connect(ctx.destination);
+      } else { src.connect(anlL); anlL.connect(gn); gn.connect(ctx.destination); }
+      src.start(0, time); startTimeRef.current = ctx.currentTime - time;
+      sourceRef.current = src;
+      timeRef.current = window.setInterval(() => {
+        const t = Math.min(ctx.currentTime - startTimeRef.current, dur);
+        setCurrentTime(t);
+        if (t >= dur - 0.05) { clearInterval(timeRef.current); if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current); setIsPlaying(false); setCurrentTime(0); pausedAtRef.current=0; sourceRef.current=null; setVuLeft(0); setVuRight(0); }
+      }, 80);
+      src.onended = () => { clearInterval(timeRef.current); if(vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current); setIsPlaying(false); pausedAtRef.current=0; setCurrentTime(0); sourceRef.current=null; setVuLeft(0); setVuRight(0); };
+    }
+  };
+
   const handleWaveformClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!activeBuffer) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const seekTo = Math.max(0, Math.min(((e.clientX - rect.left)/rect.width)*dur, dur));
-    pausedAtRef.current = seekTo; setCurrentTime(seekTo);
-    if (isPlaying) { stopAudio(); setTimeout(() => { pausedAtRef.current = seekTo; togglePlay(); }, 50); }
+    seekTo(((e.clientX - rect.left) / rect.width) * dur);
   };
+
+  // Cambiar gain en tiempo real
+  const handleGainChange = (val: number) => {
+    setOutputGain(val);
+    if (gainNodeRef.current && audioCtxRef.current) {
+      gainNodeRef.current.gain.setTargetAtTime(val, audioCtxRef.current.currentTime, 0.05);
+    }
+  };
+
+  const gainDb = outputGain > 0 ? (20 * Math.log10(outputGain)).toFixed(1) : '-∞';
 
   const tabColor = activeTab==='master' ? '#F59E0B' : '#C026D3';
   const tabGlow  = activeTab==='master' ? 'rgba(245,158,11,0.5)' : 'rgba(192,38,211,0.5)';
@@ -237,7 +291,7 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
               {/* Timeline */}
               <div>
                 <div style={{ height:'5px', background:'rgba(255,255,255,0.08)', borderRadius:'3px', overflow:'hidden', marginBottom:'8px', cursor:'pointer' }}
-                  onClick={e => { const rect=e.currentTarget.getBoundingClientRect(); const s=((e.clientX-rect.left)/rect.width)*dur; pausedAtRef.current=s; setCurrentTime(s); }}>
+                  onClick={e => { const rect=e.currentTarget.getBoundingClientRect(); seekTo(((e.clientX-rect.left)/rect.width)*dur); }}>
                   <div style={{ height:'100%', width:`${dur>0?(currentTime/dur)*100:0}%`, background:`linear-gradient(90deg,${activeTab==='master'?'#F59E0B,#EF6C00':'#EC4899,#C026D3'})`, borderRadius:'3px', transition:'width 0.08s linear' }} />
                 </div>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:'11px', color:'#9B7EC8', fontFamily:'monospace' }}>
@@ -263,6 +317,21 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
               </div>
             </div>
           </div>
+        </div>
+
+        {/* SLIDER OUTPUT GAIN */}
+        <div style={{ background:'rgba(20,14,34,0.8)', border:`1px solid rgba(255,255,255,0.06)`, borderRadius:'14px', padding:'14px 20px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'16px' }}>
+          <div style={{ flexShrink:0 }}>
+            <div style={{ fontSize:'10px', fontWeight:700, color:'#9B7EC8', letterSpacing:'0.8px', textTransform:'uppercase' as const, marginBottom:'2px' }}>Output Gain</div>
+            <div style={{ fontSize:'18px', fontWeight:800, fontFamily:'monospace', color: outputGain > 0.9 ? '#EF4444' : outputGain > 0.7 ? '#FBBF24' : '#4ade80', lineHeight:1 }}>{gainDb} dB</div>
+          </div>
+          <input type="range" min="0.1" max="1.0" step="0.01" value={outputGain}
+            onChange={e => handleGainChange(parseFloat(e.target.value))}
+            style={{ flex:1, accentColor: activeTab==='master' ? '#F59E0B' : '#C026D3', height:'4px', cursor:'pointer' }} />
+          <button onClick={() => handleGainChange(1.0)}
+            style={{ flexShrink:0, background:'transparent', border:'1px solid rgba(255,255,255,0.1)', color:'#9B7EC8', padding:'4px 10px', borderRadius:'6px', fontSize:'11px', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+            Reset
+          </button>
         </div>
 
         {/* CADENA — solo master */}

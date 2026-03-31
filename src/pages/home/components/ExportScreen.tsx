@@ -46,6 +46,8 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
   const vuAnimRef = useRef<number>();
   const [exportMomentaryLufs, setExportMomentaryLufs] = useState(-60.0);
   const [exportIntegratedLufs, setExportIntegratedLufs] = useState(-60.0);
+  const [playGain, setPlayGain] = useState(1.0);
+  const playGainNodeRef = useRef<GainNode|null>(null);
   const exportLufsHistoryRef = useRef<number[]>([]);
   // Estados de mastering
   const [showMasterModal, setShowMasterModal] = useState(false);
@@ -104,10 +106,14 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
     limiter.threshold.value = -1.0; limiter.knee.value = 0;
     limiter.ratio.value = 20; limiter.attack.value = 0.0003; limiter.release.value = 0.05;
 
-    // Cadena: source → analyser → limiter → destination
+    // Gain node para slider de output
+    const pgn = exportAudioContext.createGain(); pgn.gain.value = playGain;
+    playGainNodeRef.current = pgn;
+    // Cadena: source → analyser → limiter → gainNode → destination
     sourceNode.connect(analyser);
     analyser.connect(limiter);
-    limiter.connect(exportAudioContext.destination);
+    limiter.connect(pgn);
+    pgn.connect(exportAudioContext.destination);
     exportAnalyserRef.current = analyser;
 
     const startTime = exportAudioContext.currentTime;
@@ -209,16 +215,21 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
 
   const handleWaveformSeek = useCallback((newTime: number) => {
     if (!exportData || !exportAudioContext) return;
+    const wasPlaying = isExportPlaying;
+    // Detener source actual
     if (exportSourceNode) { try { exportSourceNode.stop(); exportSourceNode.disconnect(); } catch(e) {} }
     exportAnalyserRef.current = null;
     if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
     if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
-    setIsExportPlaying(false);
     setExportCurrentTime(newTime);
     setExportPausedTime(newTime);
-    // Reiniciar playback desde la nueva posición con VU meter fresco
-    setTimeout(() => startPlayback(newTime), 50);
-  }, [exportAudioContext, exportData, exportSourceNode, startPlayback]);
+    if (wasPlaying) {
+      // Estaba sonando: retomar desde nueva posición sin pausa
+      setTimeout(() => startPlayback(newTime), 30);
+    } else {
+      setIsExportPlaying(false);
+    }
+  }, [exportAudioContext, exportData, exportSourceNode, isExportPlaying, startPlayback]);
 
   // =============================================
   // MASTERING CON IA
@@ -590,6 +601,31 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
                     Descargar .WAV
                   </button>
                 </div>
+                {/* SLIDER OUTPUT GAIN — control de volumen en reproducción */}
+                <div style={{background:'rgba(15,10,26,0.6)',border:'1px solid rgba(192,38,211,0.12)',borderRadius:'12px',padding:'12px 16px',marginBottom:'12px',display:'flex',alignItems:'center',gap:'14px'}}>
+                  <div style={{flexShrink:0,minWidth:'64px'}}>
+                    <div style={{fontSize:'9px',fontWeight:700,color:'#9B7EC8',letterSpacing:'0.8px',textTransform:'uppercase' as const,marginBottom:'2px'}}>Output Gain</div>
+                    <div style={{fontSize:'16px',fontWeight:800,fontFamily:'monospace',lineHeight:1.2,color:playGain>0.9?'#EF4444':playGain>0.7?'#FBBF24':'#4ade80'}}>
+                      {playGain > 0 ? (20*Math.log10(playGain)).toFixed(1) : '-∞'} dB
+                    </div>
+                  </div>
+                  <input type="range" min="0.1" max="1.0" step="0.01" value={playGain}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value);
+                      setPlayGain(v);
+                      if (playGainNodeRef.current && exportAudioContext) {
+                        playGainNodeRef.current.gain.setTargetAtTime(v, exportAudioContext.currentTime, 0.05);
+                      }
+                    }}
+                    style={{flex:1,accentColor:'#C026D3',cursor:'pointer',height:'4px'}} />
+                  <button onClick={() => {
+                    setPlayGain(1.0);
+                    if (playGainNodeRef.current && exportAudioContext) {
+                      playGainNodeRef.current.gain.setTargetAtTime(1.0, exportAudioContext.currentTime, 0.05);
+                    }
+                  }} style={{flexShrink:0,background:'transparent',border:'1px solid rgba(255,255,255,0.1)',color:'#9B7EC8',padding:'4px 10px',borderRadius:'6px',fontSize:'11px',cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>Reset</button>
+                </div>
+
                 <div style={{textAlign:'center',fontSize:'12px',color:'rgba(155,126,200,0.6)',marginBottom:'16px'}}>
                   Descarga gratuita · WAV 24bit / MP3
                 </div>
