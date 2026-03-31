@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import UpgradeModal from './UpgradeModal';
 import Header from '@/components/feature/Header';
 import UploadModal from '@/components/feature/UploadModal';
 import { drawFFTAnalyzer, drawMiniFFT } from '@/utils/drawFFT';
@@ -287,6 +288,8 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
   // Preset por stem
   const [openStemPresetId, setOpenStemPresetId] = useState<string|null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeTrigger, setUpgradeTrigger] = useState<'master'|'export'|'limit'>('export');
   const [bulkDbInput, setBulkDbInput] = useState('');
 
   const applyStemPreset = (stem: Stem, preset: MixPreset) => {
@@ -453,7 +456,35 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     setAllFiles([...allFiles,...newFiles]);
   };
 
+  const checkMixLimit = (): boolean => {
+    try {
+      const stored = localStorage.getItem('audioMixerUser');
+      if (!stored) return true; // guest = permitir
+      const u = JSON.parse(stored);
+      if (u.is_pro || u.plan === 'pro') return true; // Pro ilimitado
+      const count = u.mixes_this_month || 0;
+      if (count >= 2) { // Free: max 2
+        setUpgradeTrigger('limit');
+        setShowUpgradeModal(true);
+        return false;
+      }
+      return true;
+    } catch { return true; }
+  };
+
+  const incrementMixCount = () => {
+    try {
+      const stored = localStorage.getItem('audioMixerUser');
+      if (!stored) return;
+      const u = JSON.parse(stored);
+      if (u.is_pro || u.plan === 'pro') return;
+      u.mixes_this_month = (u.mixes_this_month || 0) + 1;
+      localStorage.setItem('audioMixerUser', JSON.stringify(u));
+    } catch {}
+  };
+
   const handleExportMix = async () => {
+    if (!checkMixLimit()) return;
     if (!audioContextRef.current || stems.length===0) return;
     if (isPlaying) { handleStop(); await new Promise(r=>setTimeout(r,100)); }
     setIsExporting(true); setExportProgress(0); setExportStep('Inicializando procesamiento IA...');
@@ -526,6 +557,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       // Limpiar estado ANTES de llamar onExport para evitar setState en componente desmontado
       setIsExporting(false); setExportProgress(0); setExportStep('');
       await new Promise(r=>setTimeout(r,50)); // microtask para que React procese el cleanup
+      incrementMixCount();
       onExport({ audioBuffer:normalized, audioUrl:wavUrl, waveformPeaks:peaks, finalLufs:-20.0, presetName:(activePreset||initialPreset)?.name });
     } catch(e) { console.error('Export error:', e); setIsExporting(false); }
   };
@@ -1071,6 +1103,14 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       </div>
 
 
+      {showUpgradeModal && (
+        <UpgradeModal
+          trigger={upgradeTrigger}
+          onClose={() => setShowUpgradeModal(false)}
+          user={(() => { try { const u = localStorage.getItem('audioMixerUser'); return u ? JSON.parse(u) : null; } catch { return null; } })()}
+          onSuccess={() => setShowUpgradeModal(false)}
+        />
+      )}
       <UploadModal isOpen={showUploadModal} onClose={()=>setShowUploadModal(false)}
         onUploadComplete={handleUploadMoreStems} userCredits={user.credits} onCreditsUpdate={onCreditsUpdate} />
     </div>

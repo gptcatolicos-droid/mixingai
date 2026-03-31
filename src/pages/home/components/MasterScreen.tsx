@@ -21,13 +21,13 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
   const [integratedLufs, setIntegratedLufs] = useState(-60.0);
   const [vuLeft, setVuLeft] = useState(0);
   const [vuRight, setVuRight] = useState(0);
-  const [outputGain, setOutputGain] = useState(1.0); // 1.0 = 0dB
-  const gainNodeRef = useRef<GainNode|null>(null);
+  const [outputGain, setOutputGain] = useState(1.0);
 
   const audioCtxRef     = useRef<AudioContext|null>(null);
   const sourceRef       = useRef<AudioBufferSourceNode|null>(null);
   const analyserLRef    = useRef<AnalyserNode|null>(null);
   const analyserRRef    = useRef<AnalyserNode|null>(null);
+  const gainNodeRef     = useRef<GainNode|null>(null);
   const masterCanvasRef = useRef<HTMLCanvasElement>(null);
   const mixCanvasRef    = useRef<HTMLCanvasElement>(null);
   const vuCanvasRef     = useRef<HTMLCanvasElement>(null);
@@ -36,6 +36,7 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
   const lufsHistRef     = useRef<number[]>([]);
   const startTimeRef    = useRef(0);
   const pausedAtRef     = useRef(0);
+  const isPlayingRef    = useRef(false); // ref para usar en callbacks async
 
   const activeBuffer = activeTab==='master' ? masterData.audioBuffer : mixData?.audioBuffer;
   const dur = activeBuffer?.duration ?? 0;
@@ -67,21 +68,12 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
     const drawCh = (level: number, x: number, cw: number) => {
       const segs = 24, segH = Math.floor((h - segs) / segs);
       for (let i = 0; i < segs; i++) {
-        // i=0 → TOP (rojo/clipping), i=segs-1 → BOTTOM (verde/bajo)
-        // El nivel llena de ABAJO hacia ARRIBA
-        // Segmento i se ilumina si level > (segs-1-i)/segs
-        const normalized = (segs - 1 - i) / segs; // 0=bottom, 1=top
+        const normalized = (segs - 1 - i) / segs;
         const lit = level > normalized;
-        // Colores: top=rojo, medio=amarillo, bajo=verde
-        const isRed    = i < segs * 0.15;  // top 15% = rojo
-        const isYellow = i < segs * 0.35;  // siguiente 20% = amarillo
-        // Verde = resto (bottom 65%)
-        let color: string;
-        if (isRed)    color = lit ? '#EF4444' : 'rgba(239,68,68,0.07)';
-        else if (isYellow) color = lit ? '#FBBF24' : 'rgba(251,191,36,0.07)';
-        else          color = lit ? '#4ade80' : 'rgba(74,222,128,0.07)';
-        ctx.fillStyle = color;
-        ctx.fillRect(x, i * (segH + 1), cw, segH);
+        const isRed    = i < segs * 0.15;
+        const isYellow = i < segs * 0.35;
+        ctx.fillStyle = isRed ? (lit?'#EF4444':'rgba(239,68,68,0.07)') : isYellow ? (lit?'#FBBF24':'rgba(251,191,36,0.07)') : (lit?'#4ade80':'rgba(74,222,128,0.07)');
+        ctx.fillRect(x, i*(segH+1), cw, segH);
       }
     };
     drawCh(vuLeft,  2, Math.floor((w-6)/2));
@@ -90,8 +82,16 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
 
   useEffect(() => { drawVU(); }, [drawVU]);
 
+  const resetMeters = () => {
+    setMomentaryLufs(-60); setIntegratedLufs(-60);
+    setVuLeft(0); setVuRight(0);
+    lufsHistRef.current = [];
+    drawVU();
+  };
+
   const startVULoop = useCallback(() => {
     const loop = () => {
+      if (!isPlayingRef.current) return; // parar si ya no suena
       const anlL = analyserLRef.current; const anlR = analyserRRef.current;
       if (!anlL || !anlR) return;
       const bL = new Float32Array(anlL.fftSize); const bR = new Float32Array(anlR.fftSize);
@@ -113,18 +113,67 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
     vuAnimRef.current = requestAnimationFrame(loop);
   }, []);
 
+  // BUG FIX 3: Stop completo al cambiar de tab
   useEffect(() => {
-    stopAudio(); setCurrentTime(0); pausedAtRef.current = 0;
-    setMomentaryLufs(-60); setIntegratedLufs(-60); setVuLeft(0); setVuRight(0);
-    lufsHistRef.current = [];
+    stopAudio();
+    setCurrentTime(0); pausedAtRef.current = 0;
+    resetMeters();
   }, [activeTab]);
 
   const stopAudio = useCallback(() => {
+    isPlayingRef.current = false;
     if (sourceRef.current) { try { sourceRef.current.stop(); sourceRef.current.disconnect(); } catch(e){} sourceRef.current = null; }
     if (timeRef.current) clearInterval(timeRef.current);
     if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
     setIsPlaying(false); setVuLeft(0); setVuRight(0);
   }, []);
+
+  const handleStop = () => {
+    stopAudio();
+    setCurrentTime(0); pausedAtRef.current = 0;
+    resetMeters();
+  };
+
+  const buildAndStartSource = useCallback((time: number) => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || !activeBuffer) return;
+    const src = ctx.createBufferSource();
+    src.buffer = activeBuffer;
+    const anlL = ctx.createAnalyser(); anlL.fftSize = 512;
+    const anlR = ctx.createAnalyser(); anlR.fftSize = 512;
+    analyserLRef.current = anlL; analyserRRef.current = anlR;
+    const gn = ctx.createGain(); gn.gain.value = outputGain;
+    gainNodeRef.current = gn;
+    if (activeBuffer.numberOfChannels >= 2) {
+      const split = ctx.createChannelSplitter(2);
+      src.connect(split); split.connect(anlL,0); split.connect(anlR,1);
+      anlL.connect(gn); anlR.connect(gn); gn.connect(ctx.destination);
+    } else { src.connect(anlL); anlL.connect(gn); gn.connect(ctx.destination); }
+    src.start(0, time); startTimeRef.current = ctx.currentTime - time;
+    sourceRef.current = src;
+    isPlayingRef.current = true;
+    setIsPlaying(true);
+    startVULoop();
+    timeRef.current = window.setInterval(() => {
+      if (!audioCtxRef.current) return;
+      const t = Math.min(audioCtxRef.current.currentTime - startTimeRef.current, dur);
+      setCurrentTime(t);
+      if (t >= dur - 0.05) {
+        clearInterval(timeRef.current);
+        if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+        isPlayingRef.current = false;
+        setIsPlaying(false); setCurrentTime(0); pausedAtRef.current = 0;
+        sourceRef.current = null; setVuLeft(0); setVuRight(0);
+      }
+    }, 80);
+    src.onended = () => {
+      clearInterval(timeRef.current);
+      if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+      isPlayingRef.current = false;
+      setIsPlaying(false); pausedAtRef.current = 0; setCurrentTime(0);
+      sourceRef.current = null; setVuLeft(0); setVuRight(0);
+    };
+  }, [activeBuffer, outputGain, dur, startVULoop]);
 
   const togglePlay = async () => {
     if (isPlaying) { pausedAtRef.current = currentTime; stopAudio(); return; }
@@ -132,65 +181,24 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
     const ctx = audioCtxRef.current || new AudioContext();
     audioCtxRef.current = ctx;
     if (ctx.state === 'suspended') await ctx.resume();
-    const src = ctx.createBufferSource();
-    src.buffer = activeBuffer;
-    const nCh = activeBuffer.numberOfChannels;
-    const anlL = ctx.createAnalyser(); anlL.fftSize = 512;
-    const anlR = ctx.createAnalyser(); anlR.fftSize = 512;
-    analyserLRef.current = anlL; analyserRRef.current = anlR;
-    // Nodo de gain para el slider de output
-    const gn = ctx.createGain(); gn.gain.value = outputGain;
-    gainNodeRef.current = gn;
-    if (nCh >= 2) {
-      const split = ctx.createChannelSplitter(2);
-      src.connect(split); split.connect(anlL,0); split.connect(anlR,1);
-      anlL.connect(gn); anlR.connect(gn); gn.connect(ctx.destination);
-    } else {
-      src.connect(anlL); anlL.connect(gn); gn.connect(ctx.destination);
-    }
-    const offset = pausedAtRef.current;
-    src.start(0, offset); startTimeRef.current = ctx.currentTime - offset;
-    sourceRef.current = src; setIsPlaying(true); startVULoop();
-    timeRef.current = window.setInterval(() => {
-      const t = Math.min(ctx.currentTime - startTimeRef.current, dur);
-      setCurrentTime(t);
-      if (t >= dur - 0.05) {
-        clearInterval(timeRef.current); if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
-        setIsPlaying(false); setCurrentTime(0); pausedAtRef.current = 0; sourceRef.current = null; setVuLeft(0); setVuRight(0);
-      }
-    }, 80);
-    src.onended = () => {
-      clearInterval(timeRef.current); if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
-      setIsPlaying(false); pausedAtRef.current = 0; setCurrentTime(0); sourceRef.current = null; setVuLeft(0); setVuRight(0);
-    };
+    buildAndStartSource(pausedAtRef.current);
   };
 
+  // BUG FIX 2: Seek con VU reiniciado correctamente
   const seekTo = (pos: number) => {
     const time = Math.max(0, Math.min(pos, dur));
     pausedAtRef.current = time; setCurrentTime(time);
     if (isPlaying) {
-      // Detener fuente actual y reiniciar desde nueva posición sin cambiar estado de play
+      // Detener source actual
+      isPlayingRef.current = false;
       if (sourceRef.current) { try { sourceRef.current.stop(); sourceRef.current.disconnect(); } catch(e){} sourceRef.current = null; }
       if (timeRef.current) clearInterval(timeRef.current);
-      const ctx = audioCtxRef.current;
-      if (!ctx || !activeBuffer) return;
-      const src = ctx.createBufferSource(); src.buffer = activeBuffer;
-      const anlL = analyserLRef.current!; const anlR = analyserRRef.current!;
-      const gn = gainNodeRef.current || ctx.createGain();
-      gainNodeRef.current = gn; gn.gain.value = outputGain;
-      if (activeBuffer.numberOfChannels >= 2) {
-        const split = ctx.createChannelSplitter(2);
-        src.connect(split); split.connect(anlL,0); split.connect(anlR,1);
-        anlL.connect(gn); anlR.connect(gn); gn.connect(ctx.destination);
-      } else { src.connect(anlL); anlL.connect(gn); gn.connect(ctx.destination); }
-      src.start(0, time); startTimeRef.current = ctx.currentTime - time;
-      sourceRef.current = src;
-      timeRef.current = window.setInterval(() => {
-        const t = Math.min(ctx.currentTime - startTimeRef.current, dur);
-        setCurrentTime(t);
-        if (t >= dur - 0.05) { clearInterval(timeRef.current); if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current); setIsPlaying(false); setCurrentTime(0); pausedAtRef.current=0; sourceRef.current=null; setVuLeft(0); setVuRight(0); }
-      }, 80);
-      src.onended = () => { clearInterval(timeRef.current); if(vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current); setIsPlaying(false); pausedAtRef.current=0; setCurrentTime(0); sourceRef.current=null; setVuLeft(0); setVuRight(0); };
+      if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+      // Resetear VU antes de reiniciar
+      setVuLeft(0); setVuRight(0);
+      lufsHistRef.current = [];
+      // Reiniciar desde nueva posición
+      setTimeout(() => buildAndStartSource(time), 30);
     }
   };
 
@@ -200,21 +208,20 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
     seekTo(((e.clientX - rect.left) / rect.width) * dur);
   };
 
-  // Cambiar gain en tiempo real
   const handleGainChange = (val: number) => {
     setOutputGain(val);
-    if (gainNodeRef.current && audioCtxRef.current) {
+    if (gainNodeRef.current && audioCtxRef.current)
       gainNodeRef.current.gain.setTargetAtTime(val, audioCtxRef.current.currentTime, 0.05);
-    }
   };
 
   const gainDb = outputGain > 0 ? (20 * Math.log10(outputGain)).toFixed(1) : '-∞';
-
   const tabColor = activeTab==='master' ? '#F59E0B' : '#C026D3';
   const tabGlow  = activeTab==='master' ? 'rgba(245,158,11,0.5)' : 'rgba(192,38,211,0.5)';
 
   return (
-    <div style={{ minHeight:'100vh', background:'#0D0A14', color:'#F8F0FF', fontFamily:"'Outfit', system-ui, sans-serif" }}>
+    // BUG FIX 4: Mismo fondo que el resto del sitio
+    <div style={{ minHeight:'100vh', background:'#0D0A14', backgroundImage:'url(/studio-bg.png)', backgroundSize:'cover', backgroundPosition:'center', backgroundAttachment:'fixed', color:'#F8F0FF', fontFamily:"'Outfit', system-ui, sans-serif" }}>
+      <div style={{ minHeight:'100vh', background:'rgba(8,4,16,0.78)' }}>
 
       {/* TOPBAR */}
       <div style={{ background:'rgba(13,10,20,0.97)', borderBottom:'1px solid rgba(245,158,11,0.18)', padding:'0 20px', height:'58px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:100, backdropFilter:'blur(12px)' }}>
@@ -258,8 +265,7 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
         </div>
 
         {/* PLAYER CARD */}
-        <div style={{ background:'rgba(20,14,34,0.95)', border:`1px solid ${tabColor}33`, borderRadius:'20px', overflow:'hidden', marginBottom:'16px', borderTop:`3px solid ${tabColor}` }}>
-          {/* Header */}
+        <div style={{ background:'rgba(20,14,34,0.92)', border:`1px solid ${tabColor}33`, borderRadius:'20px', overflow:'hidden', marginBottom:'14px', borderTop:`3px solid ${tabColor}` }}>
           <div style={{ padding:'16px 20px', borderBottom:'1px solid rgba(255,255,255,0.05)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <div>
               <div style={{ fontSize:'15px', fontWeight:700, color:'#F8F0FF' }}>{activeTab==='master' ? '✦ Master Final' : '🎛️ Mezcla Original'}</div>
@@ -270,8 +276,8 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
             </span>
           </div>
 
-          {/* Waveform */}
           <div style={{ padding:'16px 20px 0' }}>
+            {/* Waveform */}
             <div style={{ background:'rgba(8,4,16,0.8)', borderRadius:'10px', padding:'10px', border:`1px solid ${tabColor}18`, cursor:'pointer', marginBottom:'16px' }}>
               <div style={{ display:activeTab==='master'?'block':'none' }}>
                 <canvas ref={masterCanvasRef} width={1400} height={100} style={{ width:'100%', height:'76px', display:'block', borderRadius:'6px' }} onClick={handleWaveformClick} />
@@ -281,12 +287,17 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
               </div>
             </div>
 
-            {/* Controls row */}
-            <div style={{ display:'grid', gridTemplateColumns:'auto 1fr auto', gap:'16px', alignItems:'center', paddingBottom:'16px' }}>
+            {/* Controls row: Play + Stop + Timeline + VU + LUFS */}
+            <div style={{ display:'grid', gridTemplateColumns:'auto auto 1fr auto', gap:'12px', alignItems:'center', paddingBottom:'16px' }}>
               {/* Play */}
               <button onClick={togglePlay}
                 style={{ width:'52px', height:'52px', borderRadius:'50%', background:`linear-gradient(135deg,${activeTab==='master'?'#F59E0B,#EF6C00':'#EC4899,#C026D3'})`, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px', flexShrink:0, boxShadow:`0 0 24px ${tabGlow}` }}>
                 {isPlaying ? '⏸' : '▶'}
+              </button>
+              {/* BUG FIX 1: Botón STOP */}
+              <button onClick={handleStop}
+                style={{ width:'40px', height:'40px', borderRadius:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', flexShrink:0, color:'#9B7EC8' }}>
+                ⏹
               </button>
               {/* Timeline */}
               <div>
@@ -319,15 +330,15 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
           </div>
         </div>
 
-        {/* SLIDER OUTPUT GAIN */}
-        <div style={{ background:'rgba(20,14,34,0.8)', border:`1px solid rgba(255,255,255,0.06)`, borderRadius:'14px', padding:'14px 20px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'16px' }}>
+        {/* GAIN SLIDER */}
+        <div style={{ background:'rgba(20,14,34,0.8)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'14px', padding:'14px 20px', marginBottom:'14px', display:'flex', alignItems:'center', gap:'16px' }}>
           <div style={{ flexShrink:0 }}>
             <div style={{ fontSize:'10px', fontWeight:700, color:'#9B7EC8', letterSpacing:'0.8px', textTransform:'uppercase' as const, marginBottom:'2px' }}>Output Gain</div>
-            <div style={{ fontSize:'18px', fontWeight:800, fontFamily:'monospace', color: outputGain > 0.9 ? '#EF4444' : outputGain > 0.7 ? '#FBBF24' : '#4ade80', lineHeight:1 }}>{gainDb} dB</div>
+            <div style={{ fontSize:'18px', fontWeight:800, fontFamily:'monospace', color:outputGain>0.9?'#EF4444':outputGain>0.7?'#FBBF24':'#4ade80', lineHeight:1 }}>{gainDb} dB</div>
           </div>
           <input type="range" min="0.1" max="1.0" step="0.01" value={outputGain}
             onChange={e => handleGainChange(parseFloat(e.target.value))}
-            style={{ flex:1, accentColor: activeTab==='master' ? '#F59E0B' : '#C026D3', height:'4px', cursor:'pointer' }} />
+            style={{ flex:1, accentColor:tabColor, height:'4px', cursor:'pointer' }} />
           <button onClick={() => handleGainChange(1.0)}
             style={{ flexShrink:0, background:'transparent', border:'1px solid rgba(255,255,255,0.1)', color:'#9B7EC8', padding:'4px 10px', borderRadius:'6px', fontSize:'11px', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
             Reset
@@ -336,7 +347,7 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
 
         {/* CADENA — solo master */}
         {activeTab==='master' && (
-          <div style={{ background:'rgba(20,14,34,0.95)', border:'1px solid rgba(245,158,11,0.12)', borderRadius:'16px', padding:'18px', marginBottom:'16px' }}>
+          <div style={{ background:'rgba(20,14,34,0.92)', border:'1px solid rgba(245,158,11,0.12)', borderRadius:'16px', padding:'18px', marginBottom:'16px' }}>
             <div style={{ fontSize:'10px', fontWeight:700, letterSpacing:'1.2px', textTransform:'uppercase' as const, color:'#9B7EC8', marginBottom:'12px' }}>Cadena de mastering aplicada</div>
             {CHAIN.map((item, i) => (
               <div key={i} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:item.success?'rgba(74,222,128,0.08)':'rgba(8,4,16,0.5)', borderRadius:'10px', marginBottom:'4px', border:item.success?'1px solid rgba(74,222,128,0.2)':'1px solid rgba(255,255,255,0.04)' }}>
@@ -356,6 +367,7 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
         <div style={{ textAlign:'center', fontSize:'12px', color:'rgba(248,240,255,0.35)', marginBottom:'32px' }}>
           ✅ Listo para Spotify · Apple Music · YouTube Music
         </div>
+      </div>
       </div>
     </div>
   );

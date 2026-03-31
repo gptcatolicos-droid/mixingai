@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Header from '@/components/feature/Header';
 import { drawWaveform, handleWaveformClick } from '@/utils/drawWaveform';
+import UpgradeModal from './UpgradeModal';
 
 interface User {
   id: string; firstName: string; lastName: string; email: string;
@@ -18,7 +19,7 @@ interface ExportScreenProps {
 const fmt = (s: number) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 
 const S = {
-  page: {minHeight:'100vh',background:'transparent',fontFamily:"'DM Sans',system-ui,sans-serif"},
+  page: {minHeight:'100vh',background:'#0D0A14',fontFamily:"'Outfit',system-ui,sans-serif"},
   card: {background:'rgba(26,16,40,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'18px',padding:'24px'},
   label: {fontSize:'10px',fontWeight:600,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'12px',display:'block'},
   mono: {fontFamily:"'DM Mono',monospace"},
@@ -55,6 +56,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
   const [masterProgress, setMasterProgress] = useState(0);
   const [masterStep, setMasterStep] = useState('');
   const [masterBuffer, setMasterBuffer] = useState<AudioBuffer|null>(null);
+  const [showUpgradePaywall, setShowUpgradePaywall] = useState(false);
   const [masterUrl, setMasterUrl] = useState<string|null>(null);
   const [masterWaveform, setMasterWaveform] = useState<Float32Array|null>(null);
   const [activeTab, setActiveTab] = useState<'mix'|'master'>('mix');
@@ -425,7 +427,10 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
   }, [masterWaveform, dur]);
 
   return (
-    <div style={S.page}>
+    <div style={{...S.page, position:'relative' as const, backgroundImage:'url(/studio-bg.png)', backgroundSize:'cover', backgroundPosition:'center top', backgroundAttachment:'fixed'}}>
+      {/* Overlay oscuro — igual que el mezclador */}
+      <div style={{position:'absolute' as const, inset:0, background:'rgba(8,4,16,0.82)', zIndex:0}} />
+      <div style={{position:'relative' as const, zIndex:1}}>
       <Header user={user} onLogout={() => {}} onCreditsUpdate={onCreditsUpdate} />
 
       <div style={{maxWidth:'900px',padding:'0 12px',margin:'0 auto',padding:'20px 20px 60px'}}>
@@ -632,7 +637,15 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
 
                 {/* BOTÓN MASTERIZAR */}
                 {!isMastering && !masterBuffer && (
-                  <button onClick={()=>handleMaster()}
+                  <button onClick={()=>{
+                    const u = localStorage.getItem('audioMixerUser');
+                    const user = u ? JSON.parse(u) : null;
+                    if (user && (user.is_pro || user.plan === 'pro')) {
+                      handleMaster();
+                    } else {
+                      setShowUpgradePaywall(true);
+                    }
+                  }}
                     style={{width:'100%',background:'linear-gradient(135deg,#F59E0B,#EF6C00)',border:'none',color:'#fff',padding:'18px',borderRadius:'16px',fontSize:'16px',fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 28px rgba(245,158,11,0.4)',display:'flex',alignItems:'center',justifyContent:'center',gap:'12px',marginTop:'4px'}}>
                     <span style={{fontSize:'20px'}}>✦</span>
                     MASTERIZAR con IA
@@ -750,6 +763,16 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
           </div>
         </div>
       )}
+      {showUpgradePaywall && (
+        <UpgradeModal
+          trigger="master"
+          onClose={() => setShowUpgradePaywall(false)}
+          user={(() => { try { const u = localStorage.getItem('audioMixerUser'); return u ? JSON.parse(u) : null; } catch { return null; } })()}
+          onSuccess={() => { setShowUpgradePaywall(false); handleMaster(); }}
+        />
+      )}
+    </div>
+      </div>
     </div>
   );
 }

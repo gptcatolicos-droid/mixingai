@@ -163,13 +163,14 @@ const FAQ: React.FC<FAQProps> = ({ language }) => {
             ? 'Get 500 free credits and start mixing your music professionally today.'
             : 'Obtén 500 créditos gratis y comienza a mezclar tu música profesionalmente hoy.'}
         </p>
-        <a
+        <button
           onClick={()=>{window.location.href="/auth/register";}}
           className="inline-flex items-center bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all"
+          style={{border:'none',cursor:'pointer',fontFamily:'inherit'}}
         >
           <i className="ri-music-2-line mr-2"></i>
           {language === 'en' ? 'Start Free Now' : 'Comenzar Gratis Ahora'}
-        </a>
+        </button>
       </div>
     </div>
   );
