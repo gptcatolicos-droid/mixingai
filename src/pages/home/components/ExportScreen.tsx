@@ -46,8 +46,6 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
   const [exportMomentaryLufs, setExportMomentaryLufs] = useState(-60.0);
   const [exportIntegratedLufs, setExportIntegratedLufs] = useState(-60.0);
   const exportLufsHistoryRef = useRef<number[]>([]);
-  const lufsFrameRef = useRef(0);
-
   // Estados de mastering
   const [showMasterModal, setShowMasterModal] = useState(false);
   const [isMastering, setIsMastering] = useState(false);
