@@ -254,21 +254,31 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
       comp.threshold.value = -18; comp.knee.value = 12;
       comp.ratio.value = 2; comp.attack.value = 0.01; comp.release.value = 0.3;
 
-      // 4. Limiter true peak
+      // 4. Brick-wall limiter (dos etapas para evitar clipping)
       setMasterProgress(70); setMasterStep('True peak limiter...');
       await new Promise(r => setTimeout(r, 600));
+      // Etapa 1: pre-limiter suave
+      const preLimit = offCtx.createDynamicsCompressor();
+      preLimit.threshold.value = -3.0; preLimit.knee.value = 3;
+      preLimit.ratio.value = 10; preLimit.attack.value = 0.001; preLimit.release.value = 0.1;
+      // Etapa 2: brick-wall
       const limiter = offCtx.createDynamicsCompressor();
-      limiter.threshold.value = -1.0; limiter.knee.value = 0;
-      limiter.ratio.value = 20; limiter.attack.value = 0.0003; limiter.release.value = 0.05;
+      limiter.threshold.value = -0.5; limiter.knee.value = 0;
+      limiter.ratio.value = 20; limiter.attack.value = 0.0001; limiter.release.value = 0.05;
+      // Gain de salida reducido para headroom seguro
+      const outputGain = offCtx.createGain();
+      outputGain.gain.value = 0.89; // -1dBFS headroom
 
-      // Cadena: src → noiseGate → eqLow → eqMid → eqHigh → comp → limiter → dest
+      // Cadena: src → noiseGate → eqLow → eqMid → eqHigh → comp → preLimit → limiter → outputGain → dest
       src.connect(noiseGate);
       noiseGate.connect(eqLow);
       eqLow.connect(eqMid);
       eqMid.connect(eqHigh);
       eqHigh.connect(comp);
-      comp.connect(limiter);
-      limiter.connect(offCtx.destination);
+      comp.connect(preLimit);
+      preLimit.connect(limiter);
+      limiter.connect(outputGain);
+      outputGain.connect(offCtx.destination);
       src.start(0);
 
       setMasterProgress(80); setMasterStep('Renderizando master...');
@@ -327,11 +337,14 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
       for (let i = 0; i < d.length; i++) { const abs = Math.abs(d[i] * gain); if (abs > peakAfterGain) peakAfterGain = abs; }
     }
     const safeGain = peakAfterGain > ceiling ? gain * (ceiling / peakAfterGain) : gain;
-    // Aplicar ganancia con hard clip
+    // Aplicar ganancia con soft clip (tanh) + hard clip
     for (let c = 0; c < buffer.numberOfChannels; c++) {
       const d = buffer.getChannelData(c);
       for (let i = 0; i < d.length; i++) {
-        d[i] = Math.max(-ceiling, Math.min(ceiling, d[i] * safeGain));
+        const s = d[i] * safeGain;
+        // Soft clip suave con tanh para evitar distorsión abrupta
+        const softClipped = Math.tanh(s * 1.5) / 1.5;
+        d[i] = Math.max(-ceiling, Math.min(ceiling, softClipped));
       }
     }
     return buffer;
@@ -591,16 +604,35 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
                   </button>
                 )}
 
-                {/* Modal mastering en progreso */}
+                {/* Modal mastering — overlay full screen */}
                 {isMastering && (
-                  <div style={{background:'rgba(15,10,26,0.95)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:'16px',padding:'24px',textAlign:'center'}}>
-                    <div style={{fontSize:'32px',marginBottom:'12px'}}>✦</div>
-                    <div style={{fontSize:'16px',fontWeight:700,color:'#F8F0FF',marginBottom:'6px'}}>Masterizando con IA</div>
-                    <div style={{fontSize:'13px',color:'#9B7EC8',marginBottom:'16px'}}>{masterStep}</div>
-                    <div style={{height:'6px',background:'rgba(245,158,11,0.15)',borderRadius:'3px',overflow:'hidden',marginBottom:'8px'}}>
-                      <div style={{height:'100%',background:'linear-gradient(90deg,#F59E0B,#EF6C00)',borderRadius:'3px',width:`${masterProgress}%`,transition:'width 0.4s ease'}}></div>
+                  <div style={{position:'fixed',inset:0,background:'rgba(8,4,16,0.92)',backdropFilter:'blur(8px)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+                    <div style={{background:'linear-gradient(135deg,rgba(36,22,54,0.98),rgba(20,12,36,0.98))',border:'1px solid rgba(245,158,11,0.3)',borderRadius:'24px',padding:'48px 40px',maxWidth:'420px',width:'100%',textAlign:'center',boxShadow:'0 0 60px rgba(245,158,11,0.2)'}}>
+                      {/* Icono animado */}
+                      <div style={{width:'72px',height:'72px',borderRadius:'50%',background:'linear-gradient(135deg,rgba(245,158,11,0.2),rgba(239,108,0,0.1))',border:'2px solid rgba(245,158,11,0.4)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px',fontSize:'32px'}}>✦</div>
+                      <div style={{fontSize:'22px',fontWeight:800,color:'#F8F0FF',marginBottom:'8px',letterSpacing:'-0.5px'}}>Masterizando con IA</div>
+                      <div style={{fontSize:'14px',color:'#F59E0B',marginBottom:'28px',fontWeight:600}}>{masterStep}</div>
+                      {/* Cadena de pasos */}
+                      {[
+                        {label:'Noise Reduction',done:masterProgress>20},
+                        {label:'EQ Mastering',done:masterProgress>40},
+                        {label:'Compresión',done:masterProgress>60},
+                        {label:'True Peak Limiter',done:masterProgress>80},
+                        {label:'Normalizar -12 LUFS',done:masterProgress>=100},
+                      ].map((step,i)=>(
+                        <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px',padding:'8px 12px',borderRadius:'8px',background:step.done?'rgba(74,222,128,0.08)':'rgba(8,4,16,0.4)',border:`1px solid ${step.done?'rgba(74,222,128,0.2)':'rgba(255,255,255,0.04)'}`,transition:'all 0.3s'}}>
+                          <span style={{fontSize:'16px',flexShrink:0}}>{step.done?'✅':'⏳'}</span>
+                          <span style={{fontSize:'12px',fontWeight:600,color:step.done?'#4ade80':'#9B7EC8',flex:1,textAlign:'left'}}>{step.label}</span>
+                        </div>
+                      ))}
+                      {/* Barra de progreso */}
+                      <div style={{marginTop:'20px'}}>
+                        <div style={{height:'6px',background:'rgba(245,158,11,0.12)',borderRadius:'3px',overflow:'hidden',marginBottom:'8px'}}>
+                          <div style={{height:'100%',background:'linear-gradient(90deg,#F59E0B,#EF6C00)',borderRadius:'3px',width:`${masterProgress}%`,transition:'width 0.5s ease'}}></div>
+                        </div>
+                        <div style={{fontSize:'13px',color:'#F59E0B',fontFamily:'monospace',fontWeight:700}}>{masterProgress}%</div>
+                      </div>
                     </div>
-                    <div style={{fontSize:'12px',color:'#F59E0B',fontFamily:"'DM Mono',monospace"}}>{masterProgress}%</div>
                   </div>
                 )}
               </div>

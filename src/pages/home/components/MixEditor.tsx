@@ -12,9 +12,11 @@ interface User {
 interface Stem {
   id: string; name: string; file: File; buffer: AudioBuffer;
   gainNode: GainNode; panNode: StereoPannerNode; analyserNode: AnalyserNode;
+  eqLow: BiquadFilterNode; eqMid: BiquadFilterNode; eqHigh: BiquadFilterNode;
   sourceNode?: AudioBufferSourceNode; volume: number; pan: number;
   muted: boolean; fftData: Uint8Array; waveformPeaks: Float32Array;
   instrument: string; icon: string; selected: boolean;
+  stemPresetId: string | null;
 }
 
 // Detección de instrumento por nombre de archivo (Opción A)
@@ -184,11 +186,18 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         const panNode = audioContext.createStereoPanner();
         const analyserNode = audioContext.createAnalyser();
         analyserNode.fftSize = 512; analyserNode.smoothingTimeConstant = 0.7;
-        gainNode.connect(panNode); panNode.connect(analyserNode); analyserNode.connect(masterGain);
+        // EQ nodes por stem (bypass por defecto — gain=0)
+        const eqLow  = audioContext.createBiquadFilter(); eqLow.type  = 'lowshelf';  eqLow.frequency.value  = 80;   eqLow.gain.value  = 0;
+        const eqMid  = audioContext.createBiquadFilter(); eqMid.type  = 'peaking';   eqMid.frequency.value  = 1000; eqMid.gain.value  = 0; eqMid.Q.value = 0.8;
+        const eqHigh = audioContext.createBiquadFilter(); eqHigh.type = 'highshelf'; eqHigh.frequency.value = 8000; eqHigh.gain.value = 0;
+        // Cadena: gain → eqLow → eqMid → eqHigh → pan → analyser → master
+        gainNode.connect(eqLow); eqLow.connect(eqMid); eqMid.connect(eqHigh); eqHigh.connect(panNode); panNode.connect(analyserNode); analyserNode.connect(masterGain);
         const { instrument, icon } = detectInstrument(file.name);
         stemsArr.push({ id:`stem-${i}`, name:file.name, file, buffer, gainNode, panNode, analyserNode,
+          eqLow, eqMid, eqHigh,
           volume:0, pan:0, muted:false, fftData:new Uint8Array(analyserNode.frequencyBinCount),
-          waveformPeaks:generateWaveformPeaks(buffer,400), instrument, icon, selected:false });
+          waveformPeaks:generateWaveformPeaks(buffer,400), instrument, icon, selected:false,
+          stemPresetId: null });
         maxDur = Math.max(maxDur, buffer.duration);
       }
       setStems(stemsArr); setDuration(maxDur); startFFTAnimation();
@@ -275,6 +284,44 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     };
     update();
   }, []);
+
+  // Preset por stem
+  const [openStemPresetId, setOpenStemPresetId] = useState<string|null>(null);
+  const [bulkDbInput, setBulkDbInput] = useState('');
+
+  const applyStemPreset = (stem: Stem, preset: MixPreset) => {
+    const ctx = audioContextRef.current;
+    if (!ctx) return;
+    // Aplicar EQ del preset al stem
+    stem.eqLow.gain.setTargetAtTime(preset.bass, ctx.currentTime, 0.05);
+    stem.eqMid.gain.setTargetAtTime(preset.mid, ctx.currentTime, 0.05);
+    stem.eqHigh.gain.setTargetAtTime(preset.high, ctx.currentTime, 0.05);
+    // Actualizar state
+    setStems(prev => prev.map(s => s.id===stem.id ? {...s, stemPresetId: preset.id} : s));
+    setOpenStemPresetId(null);
+  };
+
+  const clearStemPreset = (stem: Stem) => {
+    const ctx = audioContextRef.current;
+    if (!ctx) return;
+    stem.eqLow.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    stem.eqMid.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    stem.eqHigh.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    setStems(prev => prev.map(s => s.id===stem.id ? {...s, stemPresetId: null} : s));
+  };
+
+  // Aplicar dB manual a todos los seleccionados
+  const applyBulkDb = (dbStr: string) => {
+    const db = parseFloat(dbStr);
+    if (isNaN(db)) return;
+    const clamped = Math.max(-60, Math.min(12, db));
+    setStems(prev => prev.map(s => {
+      if (!selectedStems.has(s.id)) return s;
+      const ctx = audioContextRef.current;
+      if (s.gainNode && ctx) s.gainNode.gain.setTargetAtTime(Math.pow(10,clamped/20), ctx.currentTime, 0.05);
+      return { ...s, volume: clamped };
+    }));
+  };
 
   // Selección múltiple de stems
   const toggleStemSelect = (id: string, e: React.MouseEvent) => {
@@ -879,20 +926,39 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         {/* Stems grid */}
         {stems.length>0&&(
           <div>
-            {/* Toolbar de selección múltiple */}
-            <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px',flexWrap:'wrap'}}>
-              <button onClick={selectAll} style={{fontSize:'11px',padding:'4px 10px',borderRadius:'6px',background:'rgba(192,38,211,0.1)',border:'1px solid rgba(192,38,211,0.2)',color:'#C026D3',cursor:'pointer',fontFamily:'inherit'}}>
-                Seleccionar todo
+            {/* Toolbar de selección múltiple — prominente */}
+            <div style={{background:'rgba(192,38,211,0.06)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'12px',padding:'10px 14px',marginBottom:'12px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+              <button onClick={selectedStems.size===stems.length ? clearSelection : selectAll}
+                style={{fontSize:'12px',fontWeight:700,padding:'6px 14px',borderRadius:'8px',background:selectedStems.size===stems.length?'rgba(192,38,211,0.25)':'rgba(192,38,211,0.12)',border:'1px solid rgba(192,38,211,0.35)',color:'#C026D3',cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
+                {selectedStems.size===stems.length ? `✓ Todos (${stems.length})` : `Seleccionar todo (${stems.length})`}
               </button>
-              {selectedStems.size>0&&<>
-                <button onClick={clearSelection} style={{fontSize:'11px',padding:'4px 10px',borderRadius:'6px',background:'transparent',border:'1px solid rgba(192,38,211,0.2)',color:'#9B7EC8',cursor:'pointer',fontFamily:'inherit'}}>
-                  Limpiar ({selectedStems.size})
-                </button>
-                <div style={{display:'flex',alignItems:'center',gap:'4px',background:'rgba(192,38,211,0.08)',borderRadius:'8px',padding:'2px 8px'}}>
-                  <span style={{fontSize:'11px',color:'#9B7EC8'}}>Mover sel.:</span>
-                  <button onClick={()=>updateSelectedVolume(-1)} style={{width:'22px',height:'22px',borderRadius:'4px',background:'rgba(192,38,211,0.15)',border:'none',color:'#F8F0FF',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
-                  <button onClick={()=>updateSelectedVolume(1)} style={{width:'22px',height:'22px',borderRadius:'4px',background:'rgba(192,38,211,0.15)',border:'none',color:'#F8F0FF',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+              {selectedStems.size>0 && <>
+                <div style={{width:'1px',height:'24px',background:'rgba(192,38,211,0.2)',flexShrink:0}}></div>
+                <span style={{fontSize:'11px',color:'#9B7EC8',flexShrink:0}}>{selectedStems.size} stem{selectedStems.size>1?'s':''} sel.</span>
+                {/* Campo manual de dB — prominente */}
+                <div style={{display:'flex',alignItems:'center',gap:'6px',background:'rgba(8,4,16,0.5)',borderRadius:'8px',padding:'4px 10px',border:'1px solid rgba(192,38,211,0.25)'}}>
+                  <span style={{fontSize:'11px',color:'#9B7EC8',flexShrink:0}}>Poner a:</span>
+                  <input type="number" min="-60" max="12" step="0.5"
+                    value={bulkDbInput}
+                    onChange={e=>setBulkDbInput(e.target.value)}
+                    onKeyDown={e=>{if(e.key==='Enter'){applyBulkDb(bulkDbInput);setBulkDbInput('');}}}
+                    placeholder="-6.0"
+                    style={{width:'56px',background:'transparent',border:'none',outline:'none',color:'#EC4899',fontSize:'13px',fontFamily:'monospace',fontWeight:700,textAlign:'center'}} />
+                  <span style={{fontSize:'11px',color:'#9B7EC8',flexShrink:0}}>dB</span>
+                  <button onClick={()=>{applyBulkDb(bulkDbInput);setBulkDbInput('');}}
+                    style={{background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'3px 10px',borderRadius:'6px',fontSize:'11px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
+                    ↵
+                  </button>
                 </div>
+                {/* Ajuste fino ±1dB */}
+                <div style={{display:'flex',alignItems:'center',gap:'3px'}}>
+                  <button onClick={()=>updateSelectedVolume(-1)} style={{width:'26px',height:'26px',borderRadius:'6px',background:'rgba(192,38,211,0.12)',border:'1px solid rgba(192,38,211,0.2)',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>−</button>
+                  <span style={{fontSize:'10px',color:'#9B7EC8',padding:'0 2px'}}>1dB</span>
+                  <button onClick={()=>updateSelectedVolume(1)} style={{width:'26px',height:'26px',borderRadius:'6px',background:'rgba(192,38,211,0.12)',border:'1px solid rgba(192,38,211,0.2)',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>+</button>
+                </div>
+                <button onClick={clearSelection} style={{marginLeft:'auto',fontSize:'11px',padding:'4px 10px',borderRadius:'6px',background:'transparent',border:'1px solid rgba(255,255,255,0.1)',color:'#9B7EC8',cursor:'pointer',fontFamily:'inherit'}}>
+                  ✕ Limpiar
+                </button>
               </>}
             </div>
             <div className="stems-grid">
@@ -900,7 +966,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
               const isSel = selectedStems.has(stem.id);
               return (
               <div key={stem.id} onClick={e=>toggleStemSelect(stem.id,e)}
-                style={{...C.card,
+                style={{...C.card, position:'relative' as const,
                   borderColor: stem.muted?'rgba(248,113,113,0.4)':isSel?'rgba(192,38,211,0.6)':'rgba(192,38,211,0.15)',
                   boxShadow: isSel?'0 0 10px rgba(192,38,211,0.25)':'none',
                   cursor:'pointer',transition:'all 0.15s'}}>
@@ -955,7 +1021,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                   </div>
                 </div>
                 {/* Pan */}
-                <div>
+                <div style={{marginBottom:'8px'}}>
                   <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px',marginBottom:'3px'}}>
                     <span style={{color:'#9B7EC8'}}>Pan</span>
                     <span style={{...C.mono,color:'#C026D3',fontWeight:500}}>{stem.pan===0?'C':stem.pan>0?`R${(stem.pan*100).toFixed(0)}`:`L${(Math.abs(stem.pan)*100).toFixed(0)}`}</span>
@@ -967,6 +1033,34 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                       onClick={e=>e.stopPropagation()}
                       style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%'}} />
                   </div>
+                </div>
+                {/* Mini-preset por stem */}
+                <div onClick={e=>e.stopPropagation()}>
+                  <button onClick={e=>{e.stopPropagation();setOpenStemPresetId(openStemPresetId===stem.id?null:stem.id);}}
+                    style={{width:'100%',background:stem.stemPresetId?`${PRESETS.find(p=>p.id===stem.stemPresetId)?.color}18`:'rgba(255,255,255,0.04)',border:`1px solid ${stem.stemPresetId?PRESETS.find(p=>p.id===stem.stemPresetId)?.color+'44':'rgba(255,255,255,0.08)'}`,borderRadius:'7px',padding:'5px 8px',color:stem.stemPresetId?PRESETS.find(p=>p.id===stem.stemPresetId)?.color:'#9B7EC8',fontSize:'10px',fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                    <span>{stem.stemPresetId ? `✦ ${PRESETS.find(p=>p.id===stem.stemPresetId)?.name}` : '+ Preset EQ'}</span>
+                    <span style={{fontSize:'9px',opacity:0.6}}>{openStemPresetId===stem.id?'▲':'▼'}</span>
+                  </button>
+                  {openStemPresetId===stem.id && (
+                    <div style={{position:'absolute',zIndex:50,background:'rgba(15,10,26,0.98)',border:'1px solid rgba(192,38,211,0.3)',borderRadius:'12px',padding:'10px',width:'220px',boxShadow:'0 8px 32px rgba(0,0,0,0.6)',marginTop:'4px'}}>
+                      <div style={{fontSize:'10px',fontWeight:700,color:'#9B7EC8',marginBottom:'8px',letterSpacing:'0.5px',textTransform:'uppercase'}}>Preset EQ para este stem</div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'5px',marginBottom:'8px'}}>
+                        {PRESETS.map(p=>(
+                          <button key={p.id} onClick={()=>applyStemPreset(stem,p)}
+                            style={{padding:'6px 8px',borderRadius:'7px',border:`1px solid ${p.color}44`,background:stem.stemPresetId===p.id?`${p.color}22`:'rgba(8,4,16,0.6)',color:stem.stemPresetId===p.id?p.color:'#C9B8F0',fontSize:'10px',fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:'5px',textAlign:'left'}}>
+                            <div style={{width:'8px',height:'8px',borderRadius:'50%',background:p.color,flexShrink:0}}></div>
+                            {p.name}
+                          </button>
+                        ))}
+                      </div>
+                      {stem.stemPresetId && (
+                        <button onClick={()=>clearStemPreset(stem)}
+                          style={{width:'100%',padding:'5px',borderRadius:'6px',background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.25)',color:'#f87171',fontSize:'10px',fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                          ✕ Quitar preset
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               );
