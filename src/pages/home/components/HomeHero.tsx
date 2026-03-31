@@ -69,21 +69,32 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
 
       {/* HERO */}
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '100px 20px 60px', textAlign: 'center', position: 'relative' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(192,38,211,0.1)', border: '1px solid rgba(192,38,211,0.3)', borderRadius: '980px', padding: '6px 16px', fontSize: '13px', color: '#C026D3', fontWeight: 600, marginBottom: '28px' }}>
-          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }}></span>
-          Mezclas Ilimitadas — Completamente Gratis
+        {/* LOGO DE MARCA — grande, identidad corporativa */}
+        <div style={{ marginBottom: '32px' }}>
+          <img src="/logo-brand.png" alt="mixingmusic.ai"
+            style={{ height: 'clamp(48px, 7vw, 80px)', width: 'auto', maxWidth: '500px', filter: 'brightness(0) invert(1)', opacity: 0.95 }} />
         </div>
-        <h1 style={{ fontSize: 'clamp(38px,7vw,80px)', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-2px', marginBottom: '20px', maxWidth: '900px' }}>
-          <span style={S.grad}>Mezcla tu música</span><br />
-          <span style={{ color: '#F8F0FF' }}>como un profesional</span>
+
+        {/* HEADLINE PRINCIPAL — propuesta de valor */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: '980px', padding: '6px 16px', fontSize: '13px', color: '#4ade80', fontWeight: 700, marginBottom: '24px', letterSpacing: '0.3px' }}>
+          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#4ade80', display: 'inline-block', animation: 'pulse 2s infinite' }}></span>
+          ✅ Listo para Spotify · Apple Music · YouTube Music
+        </div>
+
+        <h1 style={{ fontSize: 'clamp(36px,6.5vw,76px)', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-2px', marginBottom: '16px', maxWidth: '920px' }}>
+          Tu próxima mezcla con<br />
+          <span style={S.grad}>Mastering IA</span>
+          <span style={{ color: '#F8F0FF' }}>, lista en</span>{' '}
+          <span style={{ color: '#F59E0B' }}>3 minutos</span>
         </h1>
-        <p style={{ fontSize: 'clamp(16px,2.5vw,20px)', color: 'rgba(248,240,255,0.65)', maxWidth: '600px', lineHeight: 1.7, marginBottom: '40px' }}>
-          Sube tus pistas, nuestra IA las mezcla con calidad de estudio.<br />Sin límites, sin costo, sin complicaciones.
+        <p style={{ fontSize: 'clamp(16px,2.2vw,19px)', color: 'rgba(248,240,255,0.6)', maxWidth: '580px', lineHeight: 1.7, marginBottom: '40px' }}>
+          Sube tus stems, nuestra IA los mezcla y masteriza con calidad de estudio.<br />
+          Sin instalar nada · Sin tarjeta · 100% gratis para empezar.
         </p>
         <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '60px' }}>
           <button onClick={() => setShowChat(true)}
-            style={{ background: 'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)', border: 'none', color: '#fff', padding: '16px 36px', borderRadius: '980px', fontSize: '17px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 0 32px rgba(192,38,211,0.5)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            🎛️ Mezclar gratis ahora
+            style={{ background: 'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)', border: 'none', color: '#fff', padding: '20px 52px', borderRadius: '980px', fontSize: '20px', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 0 48px rgba(192,38,211,0.65)', display: 'flex', alignItems: 'center', gap: '12px', letterSpacing: '-0.3px' }}>
+            🎛️ Comenzar gratis
           </button>
           <a href="#como-funciona" style={{ background: 'transparent', border: '1px solid rgba(192,38,211,0.3)', color: '#9B7EC8', padding: '16px 32px', borderRadius: '980px', fontSize: '16px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
             Ver cómo funciona ↓
