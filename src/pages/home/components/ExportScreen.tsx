@@ -442,7 +442,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
               Tu Mezcla Final
             </h1>
             <p style={{color:'#9B7EC8',fontSize:'13px',marginTop:'4px'}}>
-              Optimizada con IA · 44.1 kHz / 24 bits · {exportData?.finalLufs.toFixed(1)} LUFS
+              Optimizada con IA · 44.1 kHz{'/'} 24 bits · {exportData?.finalLufs.toFixed(1)} LUFS
             </p>
           </div>
           <button onClick={()=>{
@@ -484,7 +484,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
 
             {/* Tiempo */}
             <div style={{textAlign:'center',...S.mono,color:'#9B7EC8',fontSize:'14px',fontWeight:500,marginBottom:'28px'}}>
-              {fmt(exportCurrentTime)} / {fmt(dur)}
+              {fmt(exportCurrentTime)}{' / '}{fmt(dur)}
             </div>
 
             {/* MIX BUS MASTER con VU meter en tiempo real */}
@@ -632,7 +632,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
                 </div>
 
                 <div style={{textAlign:'center',fontSize:'12px',color:'rgba(155,126,200,0.6)',marginBottom:'16px'}}>
-                  Descarga gratuita · WAV 24bit / MP3
+                  Descarga gratuita · WAV 24bit{'/'} MP3
                 </div>
 
                 {/* BOTÓN MASTERIZAR */}
