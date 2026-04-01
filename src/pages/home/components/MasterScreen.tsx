@@ -369,6 +369,7 @@ export default function MasterScreen({ masterData, mixData, onBack, onBackToMixe
         </div>
       </div>
       </div>
+      </div>
     </div>
   );
 }

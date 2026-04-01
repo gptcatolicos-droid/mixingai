@@ -427,10 +427,7 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
   }, [masterWaveform, dur]);
 
   return (
-    <div style={{...S.page, position:'relative' as const, backgroundImage:'url(/studio-bg.png)', backgroundSize:'cover', backgroundPosition:'center top', backgroundAttachment:'fixed'}}>
-      {/* Overlay oscuro — igual que el mezclador */}
-      <div style={{position:'absolute' as const, inset:0, background:'rgba(8,4,16,0.82)', zIndex:0}} />
-      <div style={{position:'relative' as const, zIndex:1}}>
+    <div style={{...S.page, backgroundImage:'url(/studio-bg.png)', backgroundSize:'cover', backgroundPosition:'center top', backgroundAttachment:'fixed', backgroundBlendMode:'darken', backgroundColor:'rgba(8,4,16,0.82)'}}>
       <Header user={user} onLogout={() => {}} onCreditsUpdate={onCreditsUpdate} />
 
       <div style={{maxWidth:'900px',padding:'0 12px',margin:'0 auto',padding:'20px 20px 60px'}}>
@@ -771,8 +768,6 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
           onSuccess={() => { setShowUpgradePaywall(false); handleMaster(); }}
         />
       )}
-    </div>
-      </div>
     </div>
   );
 }

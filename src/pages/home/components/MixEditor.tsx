@@ -717,7 +717,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
             <span style={C.label}>Timeline</span>
             <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-              <span style={{...C.mono,fontSize:'12px',color:'#9B7EC8'}}>{fmt(currentTime)} / {fmt(duration)}</span>
+              <span style={{...C.mono,fontSize:'12px',color:'#9B7EC8'}}>{fmt(currentTime)}{' / '}{fmt(duration)}</span>
               <button onClick={handlePlayPause} disabled={stems.length===0}
                 style={{width:'42px',height:'42px',borderRadius:'50%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 16px rgba(236,72,153,0.5)',flexShrink:0}}>
                 <i className={isPlaying?'ri-pause-fill':'ri-play-fill'} style={{color:'#fff',fontSize:'18px',marginLeft:isPlaying?0:'2px'}}></i>

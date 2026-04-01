@@ -124,7 +124,7 @@ export default function UploadModal({
         {selectedFiles.length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Archivos seleccionados ({selectedFiles.length}/{maxFiles})
+              Archivos seleccionados ({selectedFiles.length}{' / '}{maxFiles})
             </h3>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {selectedFiles.map((file, index) => (

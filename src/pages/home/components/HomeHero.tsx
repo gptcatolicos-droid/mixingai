@@ -367,5 +367,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         </div>
       </div>
     </div>
+    </div>
+    </div>
   );
 }
