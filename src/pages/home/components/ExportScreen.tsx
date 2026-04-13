@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Header from '@/components/feature/Header';
 import { drawWaveform, handleWaveformClick } from '@/utils/drawWaveform';
-import UpgradeModal from './UpgradeModal';
 
 interface User {
   id: string; firstName: string; lastName: string; email: string;
@@ -13,11 +12,401 @@ interface ExportScreenProps {
   exportData: { audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array; finalLufs: number; mp3Url?: string; wavUrl?: string; presetName?: string; } | null;
   exportProgress: number; exportStep: string;
   onBack: () => void; onCreditsUpdate: (newCredits: number) => void;
-  onGoToMaster?: (data: { audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array }) => void;
 }
 
 const fmt = (s: number) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 
+// =============================================
+// EQ PRESETS
+// =============================================
+interface EQPreset { id: string; name: string; bands: number[]; }
+
+const EQ_PRESETS: EQPreset[] = [
+  { id:'default',  name:'Default',          bands:[0,0,0,0,0,0,0,0,0,0,0,0] },
+  { id:'car',      name:'Car',              bands:[0,3,4,2,1,0,-1,0,1,2,2,1] },
+  { id:'iphone',   name:'iPhone',           bands:[0,-2,-1,0,1,2,2,1,0,-1,-2,-3] },
+  { id:'macbook',  name:'MacBook',          bands:[0,-3,-2,0,1,2,2,1,-1,-2,-3,-4] },
+  { id:'headphones',name:'Headphones',      bands:[0,2,3,1,0,-1,0,1,2,3,3,2] },
+  { id:'tv',       name:'TV',               bands:[0,-4,-3,-1,0,2,3,2,1,0,-1,-2] },
+  { id:'theater',  name:'Home Theater',     bands:[0,5,4,3,1,0,-1,0,1,3,2,1] },
+  { id:'bt',       name:'Bluetooth Speaker',bands:[0,4,5,3,1,-1,-2,-1,0,1,1,0] },
+  { id:'studio',   name:'Studio Monitors',  bands:[0,0,0,0,0,0,0,0,0,0,0,0] },
+  { id:'gaming',   name:'Gaming Headset',   bands:[0,3,2,1,0,0,1,2,3,4,3,2] },
+  { id:'tablet',   name:'Tablet',           bands:[0,-2,-2,0,1,2,2,1,0,-1,-2,-3] },
+];
+
+const EQ_BAND_FREQS = [
+  { label:'Pre',    freq:null,  type:'gain'      as const },
+  { label:'30 Hz',  freq:30,    type:'lowshelf'  as const },
+  { label:'60 Hz',  freq:60,    type:'peaking'   as const },
+  { label:'170 Hz', freq:170,   type:'peaking'   as const },
+  { label:'310 Hz', freq:310,   type:'peaking'   as const },
+  { label:'600 Hz', freq:600,   type:'peaking'   as const },
+  { label:'1k Hz',  freq:1000,  type:'peaking'   as const },
+  { label:'3k Hz',  freq:3000,  type:'peaking'   as const },
+  { label:'6k Hz',  freq:6000,  type:'peaking'   as const },
+  { label:'12k Hz', freq:12000, type:'peaking'   as const },
+  { label:'14k Hz', freq:14000, type:'peaking'   as const },
+  { label:'16k Hz', freq:16000, type:'highshelf' as const },
+];
+
+// =============================================
+// PAYMENT MODAL
+// =============================================
+function PaymentModal({ onClose, onSuccess }: { onClose: ()=>void; onSuccess: ()=>void }) {
+  const [step, setStep] = useState<'choose'|'processing'|'done'>('choose');
+  const [method, setMethod] = useState<'paypal'|'mercadopago'|null>(null);
+
+  const handlePay = (m: 'paypal'|'mercadopago') => {
+    setMethod(m); setStep('processing');
+    setTimeout(() => {
+      setStep('done');
+      try {
+        const stored = localStorage.getItem('audioMixerUser');
+        const u = stored ? JSON.parse(stored) : {};
+        u.is_pro = true; u.plan = 'pro';
+        localStorage.setItem('audioMixerUser', JSON.stringify(u));
+      } catch {}
+    }, 2400);
+  };
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(8,4,16,0.96)',backdropFilter:'blur(14px)',zIndex:1100,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+      <div style={{background:'linear-gradient(135deg,rgba(26,16,40,0.99),rgba(15,10,26,0.99))',border:'1px solid rgba(192,38,211,0.35)',borderRadius:'24px',padding:'36px 32px',maxWidth:'420px',width:'100%',textAlign:'center',boxShadow:'0 0 60px rgba(192,38,211,0.25)'}}>
+        {step==='choose' && <>
+          <div style={{fontSize:'36px',marginBottom:'14px'}}>🎛️</div>
+          <h2 style={{fontSize:'22px',fontWeight:800,color:'#F8F0FF',marginBottom:'6px',letterSpacing:'-0.5px'}}>Mezclas Ilimitadas</h2>
+          <p style={{fontSize:'13px',color:'#9B7EC8',marginBottom:'6px'}}>Tu primera mezcla fue gratis.</p>
+          <p style={{fontSize:'13px',color:'#9B7EC8',marginBottom:'24px'}}>Desbloquea mezclas ilimitadas con Audio Lab por solo <span style={{color:'#EC4899',fontSize:'22px',fontWeight:800}}>$3.99</span></p>
+          <div style={{display:'flex',flexDirection:'column',gap:'12px',marginBottom:'20px'}}>
+            <button onClick={()=>handlePay('paypal')} style={{width:'100%',background:'#0070BA',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'15px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px',boxShadow:'0 4px 20px rgba(0,112,186,0.4)'}}>
+              <span style={{fontSize:'20px',background:'#fff',borderRadius:'4px',padding:'2px 6px',color:'#003087',fontWeight:900,fontFamily:'sans-serif'}}>P</span>
+              Pagar con PayPal
+            </button>
+            <button onClick={()=>handlePay('mercadopago')} style={{width:'100%',background:'linear-gradient(135deg,#009EE3,#00B1EA)',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'15px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px',boxShadow:'0 4px 20px rgba(0,158,227,0.4)'}}>
+              <span style={{fontSize:'20px'}}>💳</span>
+              Pagar con Mercado Pago
+            </button>
+          </div>
+          <button onClick={onClose} style={{background:'transparent',border:'none',color:'rgba(155,126,200,0.5)',fontSize:'12px',cursor:'pointer',fontFamily:'inherit'}}>Cancelar</button>
+        </>}
+        {step==='processing' && <>
+          <div style={{width:'64px',height:'64px',borderRadius:'50%',background:'rgba(192,38,211,0.12)',border:'2px solid rgba(192,38,211,0.4)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px',fontSize:'28px'}}>⏳</div>
+          <h2 style={{fontSize:'20px',fontWeight:800,color:'#F8F0FF',marginBottom:'8px'}}>Procesando pago...</h2>
+          <p style={{fontSize:'13px',color:'#9B7EC8',marginBottom:'20px'}}>Conectando con {method==='paypal'?'PayPal':'Mercado Pago'}...</p>
+          <div style={{height:'4px',background:'rgba(192,38,211,0.15)',borderRadius:'2px',overflow:'hidden'}}>
+            <div style={{height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3)',animation:'pay-prog 2.4s ease forwards',borderRadius:'2px'}}></div>
+          </div>
+          <style>{`@keyframes pay-prog{from{width:0}to{width:88%}}`}</style>
+        </>}
+        {step==='done' && <>
+          <div style={{width:'64px',height:'64px',borderRadius:'50%',background:'rgba(74,222,128,0.12)',border:'2px solid rgba(74,222,128,0.4)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px',fontSize:'28px'}}>✅</div>
+          <h2 style={{fontSize:'20px',fontWeight:800,color:'#4ade80',marginBottom:'8px'}}>¡Pago exitoso!</h2>
+          <p style={{fontSize:'13px',color:'#9B7EC8',marginBottom:'24px'}}>Ya tienes mezclas ilimitadas. ¡A crear música!</p>
+          <button onClick={onSuccess} style={{width:'100%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'15px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 24px rgba(192,38,211,0.4)'}}>
+            Abrir Audio Lab →
+          </button>
+        </>}
+      </div>
+    </div>
+  );
+}
+
+// =============================================
+// EQ FADER (vertical)
+// =============================================
+function EQFader({ value, onChange, label }: { value:number; onChange:(v:number)=>void; label:string }) {
+  return (
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'5px',minWidth:'54px',flex:1}}>
+      <span style={{fontSize:'10px',fontWeight:700,fontFamily:'monospace',color:value===0?'#9B7EC8':value>0?'#4ade80':'#EC4899',minHeight:'14px',textAlign:'center'}}>
+        {value>0?`+${value.toFixed(1)}`:value.toFixed(1)} dB
+      </span>
+      <div style={{position:'relative',height:'80px',display:'flex',alignItems:'center',justifyContent:'center',width:'100%'}}>
+        <input
+          type="range" min="-12" max="12" step="0.5" value={value}
+          onChange={e=>onChange(parseFloat(e.target.value))}
+          style={{
+            writingMode:'vertical-lr' as any,
+            direction:'rtl' as any,
+            WebkitAppearance:'slider-vertical' as any,
+            height:'80px',width:'20px',
+            accentColor:value>0?'#C026D3':value<0?'#EC4899':'#9B7EC8',
+            cursor:'pointer',
+          }}
+        />
+      </div>
+      <span style={{fontSize:'9px',color:'#9B7EC8',textAlign:'center',lineHeight:1.2,maxWidth:'52px'}}>{label}</span>
+    </div>
+  );
+}
+
+// =============================================
+// AUDIO LAB MODAL
+// =============================================
+interface AudioLabProps {
+  exportData: {audioBuffer:AudioBuffer;waveformPeaks:Float32Array;finalLufs:number;presetName?:string};
+  onClose: ()=>void;
+  onDownload: (bands:number[],preset:string)=>void;
+  isPro: boolean;
+  onPaywall: ()=>void;
+}
+
+function AudioLabModal({ exportData, onClose, onDownload, isPro, onPaywall }: AudioLabProps) {
+  const [selPreset, setSelPreset] = useState<EQPreset>(EQ_PRESETS[0]);
+  const [bands, setBands] = useState<number[]>([...EQ_PRESETS[0].bands]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [curTime, setCurTime] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportPct, setExportPct] = useState(0);
+
+  const ctxRef = useRef<AudioContext|null>(null);
+  const srcRef = useRef<AudioBufferSourceNode|null>(null);
+  const startRef = useRef(0);
+  const pausedRef = useRef(0);
+  const timerRef = useRef<number>();
+  const eqRef = useRef<(BiquadFilterNode|GainNode)[]>([]);
+  const wavRef = useRef<HTMLCanvasElement>(null);
+  const dur = exportData.audioBuffer.duration;
+
+  useEffect(()=>{
+    if(!wavRef.current) return;
+    drawWaveform({canvas:wavRef.current,waveformPeaks:exportData.waveformPeaks,currentTime:curTime,duration:dur,style:'soundcloud',colors:{played:'#C026D3',unplayed:'rgba(124,58,237,0.2)',playhead:'#EC4899'}});
+  },[curTime,dur]);
+
+  const updateLiveEQ = (b: number[]) => {
+    const nodes = eqRef.current; if(!nodes.length) return;
+    (nodes[0] as GainNode).gain.value = Math.pow(10, b[0]/20);
+    for(let i=1;i<Math.min(b.length,nodes.length);i++) (nodes[i] as BiquadFilterNode).gain.value = b[i];
+  };
+
+  const applyPreset = (p: EQPreset) => { setSelPreset(p); setBands([...p.bands]); updateLiveEQ([...p.bands]); };
+
+  const buildChain = (ctx: AudioContext, src: AudioNode): AudioNode => {
+    const ns: (BiquadFilterNode|GainNode)[] = [];
+    const pg = ctx.createGain(); pg.gain.value = Math.pow(10,bands[0]/20); ns.push(pg);
+    src.connect(pg); let prev: AudioNode = pg;
+    for(let i=1;i<EQ_BAND_FREQS.length;i++){
+      const bd = EQ_BAND_FREQS[i]; const f = ctx.createBiquadFilter();
+      f.type = bd.type as any; f.frequency.value = bd.freq!; f.Q.value = 1.0; f.gain.value = bands[i]??0;
+      ns.push(f); prev.connect(f); prev=f;
+    }
+    eqRef.current = ns; return prev;
+  };
+
+  const stopAudio = () => {
+    if(srcRef.current){try{srcRef.current.stop();srcRef.current.disconnect();}catch{}srcRef.current=null;}
+    if(timerRef.current) clearInterval(timerRef.current);
+    setIsPlaying(false);
+  };
+
+  const togglePlay = async () => {
+    if(isPlaying){pausedRef.current=curTime;stopAudio();return;}
+    const ctx = ctxRef.current||new AudioContext(); ctxRef.current=ctx;
+    if(ctx.state==='suspended') await ctx.resume();
+    const s = ctx.createBufferSource(); s.buffer=exportData.audioBuffer;
+    const out = buildChain(ctx,s); out.connect(ctx.destination);
+    const off = pausedRef.current; s.start(0,off); startRef.current=ctx.currentTime-off;
+    srcRef.current=s; setIsPlaying(true);
+    timerRef.current=window.setInterval(()=>{
+      if(!ctxRef.current) return;
+      const t=Math.min(ctxRef.current.currentTime-startRef.current,dur); setCurTime(t);
+      if(t>=dur-0.05){stopAudio();setCurTime(0);pausedRef.current=0;}
+    },80);
+    s.onended=()=>{if(timerRef.current)clearInterval(timerRef.current);setIsPlaying(false);pausedRef.current=0;setCurTime(0);};
+  };
+
+  const handleBand = (i:number,v:number) => { const b=[...bands]; b[i]=v; setBands(b); updateLiveEQ(b); };
+
+  const handleDownload = async () => {
+    if(!isPro){onPaywall();return;}
+    setIsExporting(true); setExportPct(0); stopAudio();
+    try {
+      const s = exportData.audioBuffer;
+      const off = new OfflineAudioContext(s.numberOfChannels,s.length,s.sampleRate);
+      const src2 = off.createBufferSource(); src2.buffer=s;
+      const pg = off.createGain(); pg.gain.value=Math.pow(10,bands[0]/20); src2.connect(pg);
+      let prev: AudioNode = pg;
+      for(let i=1;i<EQ_BAND_FREQS.length;i++){
+        const bd=EQ_BAND_FREQS[i]; const f=off.createBiquadFilter();
+        f.type=bd.type as any; f.frequency.value=bd.freq!; f.Q.value=1.0; f.gain.value=bands[i]??0;
+        prev.connect(f); prev=f;
+      }
+      prev.connect(off.destination); src2.start(0);
+      setExportPct(35);
+      const rendered = await off.startRendering();
+      setExportPct(65);
+      normalizeTo(rendered,-20);
+      setExportPct(88);
+      const blob = bufferToWav(rendered);
+      const url = URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download=`mix-${selPreset.id}-20lufs.wav`; a.click();
+      URL.revokeObjectURL(url);
+      setExportPct(100); await new Promise(r=>setTimeout(r,500));
+      onDownload(bands,selPreset.name);
+    } catch(e){console.error(e);}
+    setIsExporting(false); setExportPct(0);
+  };
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(8,4,16,0.98)',backdropFilter:'blur(8px)',zIndex:1000,display:'flex',flexDirection:'column',overflowY:'auto'}}>
+      {/* TOPBAR */}
+      <div style={{background:'rgba(10,6,18,0.99)',borderBottom:'1px solid rgba(192,38,211,0.18)',padding:'0 20px',height:'56px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10,backdropFilter:'blur(12px)'}}>
+        <button onClick={onClose} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'#9B7EC8',padding:'6px 14px',borderRadius:'8px',fontSize:'12px',fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>← Volver</button>
+        <div style={{textAlign:'center'}}>
+          <div style={{fontSize:'9px',fontWeight:700,letterSpacing:'1.5px',color:'#C026D3',textTransform:'uppercase'}}>CREATOR TOOLS</div>
+          <div style={{fontSize:'17px',fontWeight:800,color:'#F8F0FF',letterSpacing:'-0.3px',lineHeight:1.1}}>Audio Lab (Beta)</div>
+        </div>
+        <div style={{display:'flex',gap:'6px'}}>
+          <span style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px',padding:'5px 10px',fontSize:'10px',fontWeight:600,color:'#9B7EC8',cursor:'pointer'}}>↩ Songs</span>
+          <span style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px',padding:'5px 10px',fontSize:'10px',fontWeight:600,color:'#9B7EC8',cursor:'pointer'}}>🏠 Home</span>
+        </div>
+      </div>
+
+      <div style={{maxWidth:'1000px',margin:'0 auto',padding:'24px 20px',width:'100%'}}>
+        <p style={{fontSize:'12px',color:'rgba(155,126,200,0.6)',marginBottom:'20px'}}>
+          Preview a waveform and test EQ presets. This version is UI + browser processing only.
+        </p>
+
+        {/* EQ PRESET BUTTONS */}
+        <div style={{display:'flex',flexWrap:'wrap',gap:'8px',marginBottom:'20px'}}>
+          {EQ_PRESETS.map(p=>(
+            <button key={p.id} onClick={()=>applyPreset(p)} style={{
+              padding:'8px 18px',borderRadius:'980px',fontSize:'12px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.15s',
+              background:selPreset.id===p.id?'rgba(192,38,211,0.18)':'rgba(255,255,255,0.04)',
+              border:`1px solid ${selPreset.id===p.id?'#C026D3':'rgba(255,255,255,0.1)'}`,
+              color:selPreset.id===p.id?'#EC4899':'#9B7EC8',
+              boxShadow:selPreset.id===p.id?'0 0 12px rgba(192,38,211,0.3)':'none',
+            }}>
+              {p.name}
+            </button>
+          ))}
+        </div>
+
+        {/* EQ FADERS */}
+        <div style={{background:'rgba(13,8,22,0.95)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'20px 16px 16px',marginBottom:'20px',overflow:'hidden'}}>
+          <div style={{overflowX:'auto'}}>
+            <div style={{display:'flex',gap:'2px',alignItems:'flex-end',minWidth:'600px',padding:'0 4px 8px'}}>
+              {EQ_BAND_FREQS.map((bd,i)=>(
+                <EQFader key={bd.label} value={bands[i]??0} onChange={v=>handleBand(i,v)} label={bd.label} />
+              ))}
+            </div>
+          </div>
+          {/* Band group labels */}
+          <div style={{display:'flex',gap:'6px',marginTop:'8px',flexWrap:'wrap'}}>
+            {[
+              {label:'Preamp: Pre',flex:'0 0 auto'},
+              {label:'Bass: 30 Hz – 170 Hz',flex:'1'},
+              {label:'Mid: 310 Hz – 3 kHz',flex:'1'},
+              {label:'High: 6 kHz – 16 kHz',flex:'1'},
+            ].map(({label,flex})=>(
+              <div key={label} style={{background:'rgba(36,22,54,0.7)',border:'1px solid rgba(192,38,211,0.18)',borderRadius:'8px',padding:'5px 12px',fontSize:'10px',fontWeight:700,color:'#9B7EC8',flex,textAlign:'center',whiteSpace:'nowrap'}}>
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* PLAYER */}
+        <div style={{background:'rgba(20,14,34,0.92)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'18px',marginBottom:'20px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+            <div>
+              <div style={{fontSize:'13px',fontWeight:700,color:'#F8F0FF'}}>🎛️ {exportData.presetName||'Tu Mezcla'} — EQ: {selPreset.name}</div>
+              <div style={{fontSize:'11px',color:'#9B7EC8'}}>Preview en tiempo real con EQ aplicado</div>
+            </div>
+            <span style={{background:'rgba(192,38,211,0.1)',border:'1px solid rgba(192,38,211,0.25)',borderRadius:'980px',padding:'4px 12px',fontSize:'11px',fontWeight:700,color:'#C026D3'}}>
+              {exportData.finalLufs?.toFixed(1)} LUFS → -20 LUFS
+            </span>
+          </div>
+          <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'10px',marginBottom:'14px',cursor:'pointer'}}
+            onClick={e=>{if(wavRef.current) handleWaveformClick(e as any,wavRef.current,dur,(t)=>{pausedRef.current=t;setCurTime(t);});}}>
+            <canvas ref={wavRef} width={1200} height={100} style={{width:'100%',height:'70px',borderRadius:'6px',display:'block'}} />
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+            <button onClick={togglePlay} style={{width:'52px',height:'52px',borderRadius:'50%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',cursor:'pointer',fontSize:'20px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 20px rgba(192,38,211,0.4)',flexShrink:0}}>
+              {isPlaying?'⏸':'▶'}
+            </button>
+            <div style={{flex:1}}>
+              <div style={{height:'4px',background:'rgba(255,255,255,0.08)',borderRadius:'2px',overflow:'hidden',marginBottom:'6px'}}>
+                <div style={{height:'100%',width:`${dur>0?(curTime/dur)*100:0}%`,background:'linear-gradient(90deg,#EC4899,#C026D3)',borderRadius:'2px',transition:'width 0.08s linear'}} />
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:'11px',color:'#9B7EC8',fontFamily:'monospace'}}>
+                <span>{fmt(curTime)}</span><span>{fmt(dur)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* DOWNLOAD */}
+        {!isExporting ? (
+          <button onClick={handleDownload} style={{width:'100%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'20px',borderRadius:'16px',fontSize:'17px',fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 36px rgba(192,38,211,0.45)',display:'flex',alignItems:'center',justifyContent:'center',gap:'12px',marginBottom:'10px'}}>
+            <span style={{fontSize:'22px'}}>⬇</span>
+            Descargar WAV — {selPreset.name} · -20 LUFS
+            {!isPro && <span style={{background:'rgba(255,255,255,0.12)',borderRadius:'8px',padding:'3px 10px',fontSize:'12px',fontWeight:600}}>$3.99</span>}
+          </button>
+        ) : (
+          <div style={{background:'rgba(20,14,34,0.92)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'16px',padding:'24px',textAlign:'center',marginBottom:'10px'}}>
+            <div style={{fontSize:'15px',fontWeight:700,color:'#F8F0FF',marginBottom:'12px'}}>Exportando con EQ {selPreset.name}...</div>
+            <div style={{height:'6px',background:'rgba(192,38,211,0.12)',borderRadius:'3px',overflow:'hidden',marginBottom:'8px'}}>
+              <div style={{height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3)',borderRadius:'3px',width:`${exportPct}%`,transition:'width 0.3s ease'}} />
+            </div>
+            <div style={{fontSize:'13px',color:'#C026D3',fontFamily:'monospace',fontWeight:600}}>{exportPct}%</div>
+          </div>
+        )}
+        <div style={{textAlign:'center',fontSize:'12px',color:'rgba(155,126,200,0.45)',marginBottom:'32px'}}>
+          EQ {selPreset.name} aplicado · Normalizado a -20 LUFS · WAV 24-bit
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Utils
+function normalizeTo(buffer: AudioBuffer, targetLufs: number): void {
+  let rmsSum=0, totalSamples=0;
+  for(let c=0;c<buffer.numberOfChannels;c++){
+    const d=buffer.getChannelData(c);
+    for(let i=0;i<d.length;i++){rmsSum+=d[i]*d[i];totalSamples++;}
+  }
+  const rms=Math.sqrt(rmsSum/totalSamples);
+  const currLufs=rms>0.000001?20*Math.log10(rms)-0.691:-60;
+  const gain=Math.pow(10,(targetLufs-currLufs)/20);
+  const ceiling=0.891;
+  let peak=0;
+  for(let c=0;c<buffer.numberOfChannels;c++){
+    const d=buffer.getChannelData(c);
+    for(let i=0;i<d.length;i++){const a=Math.abs(d[i]*gain);if(a>peak)peak=a;}
+  }
+  const sg=peak>ceiling?gain*(ceiling/peak):gain;
+  for(let c=0;c<buffer.numberOfChannels;c++){
+    const d=buffer.getChannelData(c);
+    for(let i=0;i<d.length;i++){
+      const s=d[i]*sg;
+      d[i]=Math.max(-ceiling,Math.min(ceiling,Math.tanh(s*1.3)/1.3));
+    }
+  }
+}
+
+function bufferToWav(buffer: AudioBuffer): Blob {
+  const len=buffer.length,ch=buffer.numberOfChannels,sr=buffer.sampleRate;
+  const bps=3,ba=ch*bps,br=sr*ba,ds=len*ba,bs=44+ds;
+  const ab=new ArrayBuffer(bs),view=new DataView(ab);
+  const ws=(o:number,s:string)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF');view.setUint32(4,bs-8,true);ws(8,'WAVE');ws(12,'fmt ');
+  view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,ch,true);
+  view.setUint32(24,sr,true);view.setUint32(28,br,true);view.setUint16(32,ba,true);
+  view.setUint16(34,24,true);ws(36,'data');view.setUint32(40,ds,true);
+  let offset=44;
+  for(let i=0;i<len;i++) for(let c=0;c<ch;c++){
+    const s=Math.max(-1,Math.min(1,buffer.getChannelData(c)[i]));
+    const v=Math.round(s*8388607);
+    if(offset+2<ab.byteLength){view.setInt8(offset,v&0xFF);view.setInt8(offset+1,(v>>8)&0xFF);view.setInt8(offset+2,(v>>16)&0xFF);offset+=3;}
+  }
+  return new Blob([ab],{type:'audio/wav'});
+}
+
+// =============================================
+// MAIN EXPORT SCREEN
+// =============================================
 const S = {
   page: {minHeight:'100vh',background:'#0D0A14',fontFamily:"'Outfit',system-ui,sans-serif"},
   card: {background:'rgba(26,16,40,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'18px',padding:'24px'},
@@ -25,451 +414,178 @@ const S = {
   mono: {fontFamily:"'DM Mono',monospace"},
   glowBtn: {background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',borderRadius:'980px',fontSize:'13px',fontWeight:600,cursor:'pointer',boxShadow:'0 0 20px rgba(192,38,211,0.4)',fontFamily:'inherit'},
   ghostBtn: {background:'transparent',border:'1px solid rgba(192,38,211,0.25)',color:'#9B7EC8',borderRadius:'980px',fontSize:'13px',cursor:'pointer',fontFamily:'inherit'},
-  progressBar: (pct: number) => ({height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'8px',width:`${pct}%`,transition:'width 0.4s ease'}),
+  progressBar: (pct:number)=>({height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'8px',width:`${pct}%`,transition:'width 0.4s ease'}),
   progressTrack: {background:'#241636',borderRadius:'8px',height:'6px',overflow:'hidden' as const},
 };
 
-export default function ExportScreen({ user, projectId, exportData, exportProgress, exportStep, onBack, onCreditsUpdate, onGoToMaster }: ExportScreenProps) {
+export default function ExportScreen({ user, projectId, exportData, exportProgress, exportStep, onBack, onCreditsUpdate }: ExportScreenProps) {
   const [isExportPlaying, setIsExportPlaying] = useState(false);
   const [exportCurrentTime, setExportCurrentTime] = useState(0);
   const [exportPausedTime, setExportPausedTime] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
-  const [downloadFormat, setDownloadFormat] = useState<'mp3' | 'wav' | null>(null);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [deductedCreditsInfo, setDeductedCreditsInfo] = useState<{format:string;creditsDeducted:number;remainingCredits:number}|null>(null);
-  const [exportAudioContext, setExportAudioContext] = useState<AudioContext | null>(null);
-  const [exportSourceNode, setExportSourceNode] = useState<AudioBufferSourceNode | null>(null);
+  const [downloadFormat, setDownloadFormat] = useState<'mp3'|'wav'|null>(null);
+  const [exportAudioContext, setExportAudioContext] = useState<AudioContext|null>(null);
+  const [exportSourceNode, setExportSourceNode] = useState<AudioBufferSourceNode|null>(null);
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
   const vuCanvasRef = useRef<HTMLCanvasElement>(null);
   const exportTimeUpdateRef = useRef<number>();
-  const exportAnalyserRef = useRef<AnalyserNode | null>(null);
+  const exportAnalyserRef = useRef<AnalyserNode|null>(null);
   const vuAnimRef = useRef<number>();
   const [exportMomentaryLufs, setExportMomentaryLufs] = useState(-60.0);
   const [exportIntegratedLufs, setExportIntegratedLufs] = useState(-60.0);
   const [playGain, setPlayGain] = useState(1.0);
   const playGainNodeRef = useRef<GainNode|null>(null);
   const exportLufsHistoryRef = useRef<number[]>([]);
-  // Estados de mastering
-  const [showMasterModal, setShowMasterModal] = useState(false);
-  const [isMastering, setIsMastering] = useState(false);
-  const [masterProgress, setMasterProgress] = useState(0);
-  const [masterStep, setMasterStep] = useState('');
-  const [masterBuffer, setMasterBuffer] = useState<AudioBuffer|null>(null);
-  const [showUpgradePaywall, setShowUpgradePaywall] = useState(false);
-  const [masterUrl, setMasterUrl] = useState<string|null>(null);
-  const [masterWaveform, setMasterWaveform] = useState<Float32Array|null>(null);
-  const [activeTab, setActiveTab] = useState<'mix'|'master'>('mix');
-  const masterCanvasRef = useRef<HTMLCanvasElement>(null);
   const lufsFrameRef = useRef(0);
 
-  useEffect(() => {
-    if (exportData && !exportAudioContext) {
-      const ctx = new AudioContext();
-      setExportAudioContext(ctx);
-    }
-  }, [exportData, exportAudioContext]);
+  const [showAudioLab, setShowAudioLab] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
 
-  // Draw waveform con colores del tema — usa los peaks reales de la mezcla exportada
-  useEffect(() => {
-    const canvas = waveformCanvasRef.current;
-    if (!canvas || !exportData) return;
-    const peaks = exportData.waveformPeaks && exportData.waveformPeaks.length > 0
-      ? exportData.waveformPeaks
-      : (() => { const m = new Float32Array(800); for(let i=0;i<m.length;i++) m[i]=Math.random()*0.7+0.1; return m; })();
-    drawWaveform({
-      canvas, waveformPeaks: peaks, currentTime: exportCurrentTime,
-      duration: exportData.audioBuffer.duration, style: 'soundcloud',
-      colors: { played: '#C026D3', unplayed: 'rgba(124,58,237,0.2)', playhead: '#EC4899' }
-    });
-  }, [exportData, exportCurrentTime]);
+  const isPro = (()=>{ try{const u=localStorage.getItem('audioMixerUser');if(!u) return false;const p=JSON.parse(u);return p.is_pro||p.plan==='pro';}catch{return false;} })();
+  const hasUsedFreeMix = localStorage.getItem('mixingai_used_free')==='1';
 
-  // Función centralizada para iniciar playback con limiter + VU meter
-  const startPlayback = useCallback((offset: number) => {
-    if (!exportAudioContext || !exportData) return;
-    // Limpiar loops anteriores
-    if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
-    if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
-    exportAnalyserRef.current = null;
-    // Resetear historial LUFS para integrated correcto
-    exportLufsHistoryRef.current = [];
-    lufsFrameRef.current = 0;
+  const handleOpenAudioLab = () => {
+    if(!isPro && hasUsedFreeMix){setShowPaywall(true);return;}
+    if(!isPro) localStorage.setItem('mixingai_used_free','1');
+    setShowAudioLab(true);
+  };
+
+  useEffect(()=>{
+    if(exportData && !exportAudioContext) setExportAudioContext(new AudioContext());
+  },[exportData,exportAudioContext]);
+
+  useEffect(()=>{
+    const canvas=waveformCanvasRef.current; if(!canvas||!exportData) return;
+    const peaks=exportData.waveformPeaks?.length>0?exportData.waveformPeaks:(()=>{const m=new Float32Array(800);for(let i=0;i<m.length;i++)m[i]=Math.random()*0.7+0.1;return m;})();
+    drawWaveform({canvas,waveformPeaks:peaks,currentTime:exportCurrentTime,duration:exportData.audioBuffer.duration,style:'soundcloud',colors:{played:'#C026D3',unplayed:'rgba(124,58,237,0.2)',playhead:'#EC4899'}});
+  },[exportData,exportCurrentTime]);
+
+  const startPlayback = useCallback((offset:number)=>{
+    if(!exportAudioContext||!exportData) return;
+    if(vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+    if(exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
+    exportAnalyserRef.current=null; exportLufsHistoryRef.current=[]; lufsFrameRef.current=0;
     setExportMomentaryLufs(-60); setExportIntegratedLufs(-60);
-
-    const sourceNode = exportAudioContext.createBufferSource();
-    sourceNode.buffer = exportData.audioBuffer;
-
-    // Analyser para VU meter
-    const analyser = exportAudioContext.createAnalyser();
-    analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.6;
-
-    // Limiter anti-clipping en el playback también
-    const limiter = exportAudioContext.createDynamicsCompressor();
-    limiter.threshold.value = -1.0; limiter.knee.value = 0;
-    limiter.ratio.value = 20; limiter.attack.value = 0.0003; limiter.release.value = 0.05;
-
-    // Gain node para slider de output
-    const pgn = exportAudioContext.createGain(); pgn.gain.value = playGain;
-    playGainNodeRef.current = pgn;
-    // Cadena: source → analyser → limiter → gainNode → destination
-    sourceNode.connect(analyser);
-    analyser.connect(limiter);
-    limiter.connect(pgn);
-    pgn.connect(exportAudioContext.destination);
-    exportAnalyserRef.current = analyser;
-
-    const startTime = exportAudioContext.currentTime;
-    sourceNode.start(startTime, offset);
+    const sourceNode=exportAudioContext.createBufferSource(); sourceNode.buffer=exportData.audioBuffer;
+    const analyser=exportAudioContext.createAnalyser(); analyser.fftSize=2048; analyser.smoothingTimeConstant=0.6;
+    const limiter=exportAudioContext.createDynamicsCompressor();
+    limiter.threshold.value=-1.0;limiter.knee.value=0;limiter.ratio.value=20;limiter.attack.value=0.0003;limiter.release.value=0.05;
+    const pgn=exportAudioContext.createGain(); pgn.gain.value=playGain; playGainNodeRef.current=pgn;
+    sourceNode.connect(analyser);analyser.connect(limiter);limiter.connect(pgn);pgn.connect(exportAudioContext.destination);
+    exportAnalyserRef.current=analyser;
+    const startTime=exportAudioContext.currentTime; sourceNode.start(startTime,offset);
     setExportSourceNode(sourceNode); setIsExportPlaying(true);
-
-    // VU meter loop
-    const vuLoop = () => {
-      if (!exportAnalyserRef.current) return;
-      const td = new Float32Array(analyser.fftSize);
-      analyser.getFloatTimeDomainData(td);
-      let rmsSum = 0;
-      for (let i = 0; i < td.length; i++) rmsSum += td[i]*td[i];
-      const rms = Math.sqrt(rmsSum/td.length);
-      // LUFS momentary correcto: escalar al rango -10 a -30 para mezclas normalizadas
-      const momentary = rms > 0.0001 ? Math.max(-50, Math.min(-5, 20*Math.log10(rms)-0.691)) : -60;
-      // Canvas VU
-      const vc = vuCanvasRef.current;
-      if (vc) {
-        const ctx2 = vc.getContext('2d');
-        if (ctx2) {
-          const w = vc.width, h = vc.height;
-          ctx2.clearRect(0,0,w,h);
-          ctx2.fillStyle = 'rgba(8,4,16,0.8)'; ctx2.fillRect(0,0,w,h);
-          // Nivel visual: -50 = 0%, -5 = 100%
-          const level = Math.max(0, Math.min(1, (momentary + 50) / 45));
-          const barW = Math.floor(w/2) - 3;
-          const barH = Math.floor(h * level);
-          const gr = ctx2.createLinearGradient(0, h, 0, 0);
-          gr.addColorStop(0, '#4ade80');
-          gr.addColorStop(0.55, '#4ade80');
-          gr.addColorStop(0.75, '#FBBF24');
-          gr.addColorStop(0.88, '#EC4899');
-          gr.addColorStop(1, '#ef4444');
-          ctx2.fillStyle = gr;
-          if (barH > 0) {
-            ctx2.fillRect(2, h - barH, barW, barH);
-            ctx2.fillRect(barW + 4, h - Math.floor(barH * 0.95), barW, Math.floor(barH * 0.95));
-          }
-          // Línea -14 LUFS target = (50-14)/45 = 80% del rango
-          const targetY = h - Math.floor(h * (36/45));
-          ctx2.strokeStyle = 'rgba(74,222,128,0.7)'; ctx2.lineWidth = 1;
-          ctx2.setLineDash([3,3]);
-          ctx2.beginPath(); ctx2.moveTo(0, targetY); ctx2.lineTo(w, targetY); ctx2.stroke();
-          ctx2.setLineDash([]);
-        }
-      }
-      // LUFS state cada 4 frames
+    const vuLoop=()=>{
+      if(!exportAnalyserRef.current) return;
+      const td=new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(td);
+      let rmsSum=0; for(let i=0;i<td.length;i++) rmsSum+=td[i]*td[i];
+      const rms=Math.sqrt(rmsSum/td.length);
+      const momentary=rms>0.0001?Math.max(-50,Math.min(-5,20*Math.log10(rms)-0.691)):-60;
+      const vc=vuCanvasRef.current;
+      if(vc){const ctx2=vc.getContext('2d');if(ctx2){
+        const w=vc.width,h=vc.height; ctx2.clearRect(0,0,w,h); ctx2.fillStyle='rgba(8,4,16,0.8)'; ctx2.fillRect(0,0,w,h);
+        const level=Math.max(0,Math.min(1,(momentary+50)/45)); const barW=Math.floor(w/2)-3,barH=Math.floor(h*level);
+        const gr=ctx2.createLinearGradient(0,h,0,0); gr.addColorStop(0,'#4ade80');gr.addColorStop(0.55,'#4ade80');gr.addColorStop(0.75,'#FBBF24');gr.addColorStop(0.88,'#EC4899');gr.addColorStop(1,'#ef4444');
+        ctx2.fillStyle=gr; if(barH>0){ctx2.fillRect(2,h-barH,barW,barH);ctx2.fillRect(barW+4,h-Math.floor(barH*0.95),barW,Math.floor(barH*0.95));}
+        const tY=h-Math.floor(h*(36/45)); ctx2.strokeStyle='rgba(74,222,128,0.7)';ctx2.lineWidth=1;ctx2.setLineDash([3,3]);
+        ctx2.beginPath();ctx2.moveTo(0,tY);ctx2.lineTo(w,tY);ctx2.stroke();ctx2.setLineDash([]);
+      }}
       lufsFrameRef.current++;
-      if (lufsFrameRef.current % 4 === 0 && rms > 0.0001) {
-        setExportMomentaryLufs(momentary);
-        exportLufsHistoryRef.current.push(momentary);
-        if (exportLufsHistoryRef.current.length > 600) exportLufsHistoryRef.current.shift();
-        const validSamples = exportLufsHistoryRef.current.filter(v => v > -50);
-        if (validSamples.length > 0) {
-          const integrated = validSamples.reduce((a,b)=>a+b,0)/validSamples.length;
-          setExportIntegratedLufs(Math.max(-50, Math.min(-5, integrated)));
-        }
+      if(lufsFrameRef.current%4===0&&rms>0.0001){
+        setExportMomentaryLufs(momentary); exportLufsHistoryRef.current.push(momentary);
+        if(exportLufsHistoryRef.current.length>600) exportLufsHistoryRef.current.shift();
+        const valid=exportLufsHistoryRef.current.filter(v=>v>-50);
+        if(valid.length>0) setExportIntegratedLufs(Math.max(-50,Math.min(-5,valid.reduce((a,b)=>a+b,0)/valid.length)));
       }
-      vuAnimRef.current = requestAnimationFrame(vuLoop);
+      vuAnimRef.current=requestAnimationFrame(vuLoop);
     };
-    vuAnimRef.current = requestAnimationFrame(vuLoop);
-
-    sourceNode.onended = () => {
-      exportAnalyserRef.current = null;
-      if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
-      setIsExportPlaying(false); setExportPausedTime(0); setExportCurrentTime(0);
-      if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
+    vuAnimRef.current=requestAnimationFrame(vuLoop);
+    sourceNode.onended=()=>{
+      exportAnalyserRef.current=null; if(vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+      setIsExportPlaying(false);setExportPausedTime(0);setExportCurrentTime(0);
+      if(exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
     };
-    exportTimeUpdateRef.current = window.setInterval(() => {
-      const elapsed = exportAudioContext.currentTime - startTime + offset;
-      setExportCurrentTime(Math.min(elapsed, exportData.audioBuffer.duration));
-      if (elapsed >= exportData.audioBuffer.duration) {
-        setIsExportPlaying(false); setExportPausedTime(0); setExportCurrentTime(0);
-        if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
-      }
-    }, 100);
-  }, [exportAudioContext, exportData]);
+    exportTimeUpdateRef.current=window.setInterval(()=>{
+      const elapsed=exportAudioContext.currentTime-startTime+offset;
+      setExportCurrentTime(Math.min(elapsed,exportData.audioBuffer.duration));
+      if(elapsed>=exportData.audioBuffer.duration){setIsExportPlaying(false);setExportPausedTime(0);setExportCurrentTime(0);if(exportTimeUpdateRef.current)clearInterval(exportTimeUpdateRef.current);}
+    },100);
+  },[exportAudioContext,exportData,playGain]);
 
-  const handleExportPlayPause = useCallback(async () => {
-    if (!exportAudioContext || !exportData) return;
-    if (exportAudioContext.state === 'suspended') await exportAudioContext.resume();
-    if (isExportPlaying) {
-      exportSourceNode?.stop(); exportSourceNode?.disconnect();
-      exportAnalyserRef.current = null;
-      if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
-      setIsExportPlaying(false); setExportPausedTime(exportCurrentTime);
-      if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
-    } else {
-      startPlayback(exportPausedTime);
-    }
-  }, [exportAudioContext, exportData, isExportPlaying, exportCurrentTime, exportPausedTime, exportSourceNode, startPlayback]);
+  const handleExportPlayPause=useCallback(async()=>{
+    if(!exportAudioContext||!exportData) return;
+    if(exportAudioContext.state==='suspended') await exportAudioContext.resume();
+    if(isExportPlaying){
+      exportSourceNode?.stop();exportSourceNode?.disconnect();exportAnalyserRef.current=null;
+      if(vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+      setIsExportPlaying(false);setExportPausedTime(exportCurrentTime);
+      if(exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
+    } else { startPlayback(exportPausedTime); }
+  },[exportAudioContext,exportData,isExportPlaying,exportCurrentTime,exportPausedTime,exportSourceNode,startPlayback]);
 
-  const handleExportStop = useCallback(() => {
-    exportSourceNode?.stop(); exportSourceNode?.disconnect();
-    setIsExportPlaying(false); setExportPausedTime(0); setExportCurrentTime(0);
-    if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
-  }, [exportSourceNode]);
+  const handleExportStop=useCallback(()=>{
+    exportSourceNode?.stop();exportSourceNode?.disconnect();
+    setIsExportPlaying(false);setExportPausedTime(0);setExportCurrentTime(0);
+    if(exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
+  },[exportSourceNode]);
 
-  const handleWaveformSeek = useCallback((newTime: number) => {
-    if (!exportData || !exportAudioContext) return;
-    const wasPlaying = isExportPlaying;
-    // Detener source actual
-    if (exportSourceNode) { try { exportSourceNode.stop(); exportSourceNode.disconnect(); } catch(e) {} }
-    exportAnalyserRef.current = null;
-    if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
-    if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
-    setExportCurrentTime(newTime);
-    setExportPausedTime(newTime);
-    if (wasPlaying) {
-      // Estaba sonando: retomar desde nueva posición sin pausa
-      setTimeout(() => startPlayback(newTime), 30);
-    } else {
-      setIsExportPlaying(false);
-    }
-  }, [exportAudioContext, exportData, exportSourceNode, isExportPlaying, startPlayback]);
+  const handleWaveformSeek=useCallback((t:number)=>{
+    if(!exportData||!exportAudioContext) return;
+    const wasPlaying=isExportPlaying;
+    if(exportSourceNode){try{exportSourceNode.stop();exportSourceNode.disconnect();}catch{}}
+    exportAnalyserRef.current=null; if(vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+    if(exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
+    setExportCurrentTime(t);setExportPausedTime(t);
+    if(wasPlaying) setTimeout(()=>startPlayback(t),30); else setIsExportPlaying(false);
+  },[exportAudioContext,exportData,exportSourceNode,isExportPlaying,startPlayback]);
 
-  // =============================================
-  // MASTERING CON IA
-  // =============================================
-  const handleMaster = async () => {
-    if (!exportData) return;
-    setIsMastering(true); setMasterProgress(0); setMasterStep('Analizando mezcla...');
+  const handleDirectDownload=async(format:'mp3'|'wav')=>{
+    if(!exportData) return;
+    setIsDownloading(true);setDownloadFormat(format);setDownloadProgress(0);
     try {
-      const offCtx = new OfflineAudioContext(2, exportData.audioBuffer.length, exportData.audioBuffer.sampleRate);
-      const src = offCtx.createBufferSource();
-      src.buffer = exportData.audioBuffer;
-
-      // 1. Noise gate suave (highpass 40hz para cortar ruido de fondo)
-      setMasterProgress(15); setMasterStep('Reducción de ruido...');
-      await new Promise(r => setTimeout(r, 600));
-      const noiseGate = offCtx.createBiquadFilter();
-      noiseGate.type = 'highpass'; noiseGate.frequency.value = 40; noiseGate.Q.value = 0.5;
-
-      // 2. EQ de mastering — realce sutil de presencia y aire
-      setMasterProgress(30); setMasterStep('Aplicando EQ de mastering...');
-      await new Promise(r => setTimeout(r, 600));
-      const eqLow = offCtx.createBiquadFilter();
-      eqLow.type = 'lowshelf'; eqLow.frequency.value = 80; eqLow.gain.value = 1.5;
-      const eqMid = offCtx.createBiquadFilter();
-      eqMid.type = 'peaking'; eqMid.frequency.value = 3500; eqMid.Q.value = 0.7; eqMid.gain.value = 0.8;
-      const eqHigh = offCtx.createBiquadFilter();
-      eqHigh.type = 'highshelf'; eqHigh.frequency.value = 10000; eqHigh.gain.value = 1.2;
-
-      // 3. Compresión de mastering — suave y transparente
-      setMasterProgress(50); setMasterStep('Compresión de mastering...');
-      await new Promise(r => setTimeout(r, 600));
-      const comp = offCtx.createDynamicsCompressor();
-      comp.threshold.value = -18; comp.knee.value = 12;
-      comp.ratio.value = 2; comp.attack.value = 0.01; comp.release.value = 0.3;
-
-      // 4. Brick-wall limiter (dos etapas para evitar clipping)
-      setMasterProgress(70); setMasterStep('True peak limiter...');
-      await new Promise(r => setTimeout(r, 600));
-      // Etapa 1: pre-limiter suave
-      const preLimit = offCtx.createDynamicsCompressor();
-      preLimit.threshold.value = -3.0; preLimit.knee.value = 3;
-      preLimit.ratio.value = 10; preLimit.attack.value = 0.001; preLimit.release.value = 0.1;
-      // Etapa 2: brick-wall
-      const limiter = offCtx.createDynamicsCompressor();
-      limiter.threshold.value = -0.5; limiter.knee.value = 0;
-      limiter.ratio.value = 20; limiter.attack.value = 0.0001; limiter.release.value = 0.05;
-      // Gain de salida reducido para headroom seguro
-      const outputGain = offCtx.createGain();
-      outputGain.gain.value = 0.89; // -1dBFS headroom
-
-      // Cadena: src → noiseGate → eqLow → eqMid → eqHigh → comp → preLimit → limiter → outputGain → dest
-      src.connect(noiseGate);
-      noiseGate.connect(eqLow);
-      eqLow.connect(eqMid);
-      eqMid.connect(eqHigh);
-      eqHigh.connect(comp);
-      comp.connect(preLimit);
-      preLimit.connect(limiter);
-      limiter.connect(outputGain);
-      outputGain.connect(offCtx.destination);
-      src.start(0);
-
-      setMasterProgress(80); setMasterStep('Renderizando master...');
-      await new Promise(r => setTimeout(r, 400));
-      const rendered = await offCtx.startRendering();
-
-      // 5. Normalizar a -12 LUFS
-      setMasterProgress(90); setMasterStep('Normalizando a -12 LUFS...');
-      await new Promise(r => setTimeout(r, 500));
-      const normalized = normalizeLUFS(rendered, -12);
-
-      // Generar peaks para waveform
-      const peaks = generateMasterPeaks(normalized, 800);
-      setMasterWaveform(peaks);
-
-      // Crear URL descarga
-      const wavBlob = bufferToWavMaster(normalized);
-      const url = URL.createObjectURL(wavBlob);
-      setMasterUrl(url);
-      setMasterBuffer(normalized);
-      setMasterProgress(100); setMasterStep('¡Master listo!');
-      await new Promise(r => setTimeout(r, 500));
-      setIsMastering(false);
-      // Detener audio de la mezcla antes de ir al master
-      if (exportSourceNode) { try { exportSourceNode.stop(); exportSourceNode.disconnect(); } catch(e){} }
-      if (vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
-      if (exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
-      setIsExportPlaying(false);
-      // Navegar a pantalla de master separada
-      if (onGoToMaster) {
-        onGoToMaster({ audioBuffer: normalized, audioUrl: url, waveformPeaks: peaks });
-      } else {
-        setActiveTab('master');
-      }
-    } catch(e) {
-      console.error('Mastering error:', e);
-      setIsMastering(false);
-    }
+      const pi=setInterval(()=>setDownloadProgress(prev=>{if(prev>=90){clearInterval(pi);return prev;}return prev+Math.random()*15+5;}),200);
+      const blob=await createAudioBlob(exportData.audioBuffer,format);
+      clearInterval(pi);setDownloadProgress(100); await new Promise(r=>setTimeout(r,400));
+      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`mezcla-mixingmusic.${format}`; a.click(); URL.revokeObjectURL(url);
+    } catch(e){console.error(e);}
+    setIsDownloading(false);setDownloadProgress(0);setDownloadFormat(null);
   };
 
-  const normalizeLUFS = (buffer: AudioBuffer, targetLufs: number): AudioBuffer => {
-    // Calcular RMS promediando TODOS los canales para LUFS correcto
-    let rmsSum = 0; let totalSamples = 0;
-    for (let c = 0; c < buffer.numberOfChannels; c++) {
-      const d = buffer.getChannelData(c);
-      for (let i = 0; i < d.length; i++) { rmsSum += d[i] * d[i]; totalSamples++; }
-    }
-    const rms = Math.sqrt(rmsSum / totalSamples);
-    const currLufs = rms > 0.000001 ? 20 * Math.log10(rms) - 0.691 : -60;
-    const gain = Math.pow(10, (targetLufs - currLufs) / 20);
-    const ceiling = 0.891; // -1 dBFS true peak
-    // Verificar peak después del gain
-    let peakAfterGain = 0;
-    for (let c = 0; c < buffer.numberOfChannels; c++) {
-      const d = buffer.getChannelData(c);
-      for (let i = 0; i < d.length; i++) { const abs = Math.abs(d[i] * gain); if (abs > peakAfterGain) peakAfterGain = abs; }
-    }
-    const safeGain = peakAfterGain > ceiling ? gain * (ceiling / peakAfterGain) : gain;
-    // Aplicar ganancia con soft clip (tanh) + hard clip
-    for (let c = 0; c < buffer.numberOfChannels; c++) {
-      const d = buffer.getChannelData(c);
-      for (let i = 0; i < d.length; i++) {
-        const s = d[i] * safeGain;
-        // Soft clip suave con tanh para evitar distorsión abrupta
-        const softClipped = Math.tanh(s * 1.5) / 1.5;
-        d[i] = Math.max(-ceiling, Math.min(ceiling, softClipped));
-      }
-    }
-    return buffer;
+  const dur=exportData?.audioBuffer?.duration??0;
+
+  const stopAll=()=>{
+    if(exportSourceNode){try{exportSourceNode.stop();exportSourceNode.disconnect();}catch{}}
+    exportAnalyserRef.current=null; if(vuAnimRef.current) cancelAnimationFrame(vuAnimRef.current);
+    if(exportTimeUpdateRef.current) clearInterval(exportTimeUpdateRef.current);
   };
-
-  const generateMasterPeaks = (buffer: AudioBuffer, samples: number): Float32Array => {
-    const peaks = new Float32Array(samples);
-    const channelData = buffer.getChannelData(0);
-    const sampleSize = Math.floor(channelData.length / samples);
-    for (let i = 0; i < samples; i++) {
-      let max = 0;
-      for (let j = i*sampleSize; j < Math.min((i+1)*sampleSize, channelData.length); j++)
-        max = Math.max(max, Math.abs(channelData[j]));
-      peaks[i] = max;
-    }
-    return peaks;
-  };
-
-  const bufferToWavMaster = (buffer: AudioBuffer): Blob => {
-    const len=buffer.length, ch=buffer.numberOfChannels, sr=buffer.sampleRate;
-    const bps=3, ba=ch*bps, br=sr*ba, ds=len*ba, bs=44+ds;
-    const ab=new ArrayBuffer(bs), view=new DataView(ab);
-    const ws=(o:number,s:string)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
-    ws(0,'RIFF'); view.setUint32(4,bs-8,true); ws(8,'WAVE'); ws(12,'fmt ');
-    view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,ch,true);
-    view.setUint32(24,sr,true); view.setUint32(28,br,true); view.setUint16(32,ba,true);
-    view.setUint16(34,24,true); ws(36,'data'); view.setUint32(40,ds,true);
-    let offset=44;
-    for(let i=0;i<len;i++) for(let c=0;c<ch;c++){
-      const s=Math.max(-1,Math.min(1,buffer.getChannelData(c)[i]));
-      const v=Math.round(s*8388607);
-      if(offset+2<ab.byteLength){view.setInt8(offset,v&0xFF);view.setInt8(offset+1,(v>>8)&0xFF);view.setInt8(offset+2,(v>>16)&0xFF);offset+=3;}
-    }
-    return new Blob([ab],{type:'audio/wav'});
-  };
-
-  const handleDirectDownload = async (format: 'mp3' | 'wav') => {
-    if (!exportData) return;
-    setIsDownloading(true); setDownloadFormat(format); setDownloadProgress(0);
-    try {
-      const progressInterval = setInterval(() => {
-        setDownloadProgress(prev => { if (prev >= 90) { clearInterval(progressInterval); return prev; } return prev + Math.random()*15+5; });
-      }, 200);
-      const blob = await createAudioBlob(exportData.audioBuffer, format);
-      clearInterval(progressInterval); setDownloadProgress(100);
-      await new Promise(r => setTimeout(r, 400));
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `mezcla-mixingmusic.${format}`; a.click();
-      URL.revokeObjectURL(url);
-    } catch(e) { console.error(e); }
-    setIsDownloading(false); setDownloadProgress(0); setDownloadFormat(null);
-  };
-
-  const dur = exportData?.audioBuffer?.duration ?? 0;
-
-  // Dibujar waveform del master cuando cambia
-  useEffect(() => {
-    if (!masterCanvasRef.current || !masterWaveform) return;
-    drawWaveform({
-      canvas: masterCanvasRef.current,
-      waveformPeaks: masterWaveform,
-      currentTime: 0, duration: dur,
-      style: 'soundcloud',
-      colors: { played: '#F59E0B', unplayed: 'rgba(245,158,11,0.2)', playhead: '#EF6C00' }
-    });
-  }, [masterWaveform, dur]);
 
   return (
-    <div style={{...S.page, backgroundImage:'url(/studio-bg.png)', backgroundSize:'cover', backgroundPosition:'center top', backgroundAttachment:'fixed', backgroundBlendMode:'darken', backgroundColor:'rgba(8,4,16,0.82)'}}>
-      <Header user={user} onLogout={() => {}} onCreditsUpdate={onCreditsUpdate} />
+    <div style={{...S.page,backgroundImage:'url(/studio-bg.png)',backgroundSize:'cover',backgroundPosition:'center top',backgroundAttachment:'fixed',backgroundBlendMode:'darken',backgroundColor:'rgba(8,4,16,0.82)'}}>
+      <Header user={user} onLogout={()=>{}} onCreditsUpdate={onCreditsUpdate} />
 
-      <div style={{maxWidth:'900px',padding:'0 12px',margin:'0 auto',padding:'20px 20px 60px'}}>
+      <div style={{maxWidth:'900px',padding:'20px 20px 60px',margin:'0 auto'}}>
 
-        {/* Header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
           <div>
-            <h1 style={{fontSize:'26px',fontWeight:600,letterSpacing:'-0.5px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>
-              Tu Mezcla Final
-            </h1>
-            <p style={{color:'#9B7EC8',fontSize:'13px',marginTop:'4px'}}>
-              Optimizada con IA · 44.1 kHz{'/'} 24 bits · {exportData?.finalLufs.toFixed(1)} LUFS
-            </p>
+            <h1 style={{fontSize:'26px',fontWeight:600,letterSpacing:'-0.5px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Tu Mezcla Final</h1>
+            <p style={{color:'#9B7EC8',fontSize:'13px',marginTop:'4px'}}>Optimizada con IA · 44.1 kHz/24 bits · {exportData?.finalLufs.toFixed(1)} LUFS</p>
           </div>
-          <button onClick={()=>{
-            // Detener audio antes de volver
-            if(exportSourceNode){try{exportSourceNode.stop();exportSourceNode.disconnect();}catch(e){}}
-            exportAnalyserRef.current=null;
-            if(vuAnimRef.current)cancelAnimationFrame(vuAnimRef.current);
-            if(exportTimeUpdateRef.current)clearInterval(exportTimeUpdateRef.current);
-            onBack();
-          }} style={{...S.ghostBtn,padding:'10px 18px'}}>← Volver al Mezclador</button>
+          <button onClick={()=>{stopAll();onBack();}} style={{...S.ghostBtn,padding:'10px 18px'}}>← Volver al Mezclador</button>
         </div>
 
         {exportData ? (
           <div style={S.card}>
-            {/* Badge IA */}
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
               <span style={S.label}>Preview de tu Mezcla Final</span>
               <span style={{fontSize:'11px',fontWeight:600,padding:'4px 12px',borderRadius:'980px',background:'rgba(192,38,211,0.1)',color:'#C026D3',border:'1px solid rgba(192,38,211,0.25)'}}>
-                ✦ {exportData.presetName ? exportData.presetName + ' · ' : ''}Procesada con IA · {exportData.finalLufs.toFixed(1)} LUFS
+                ✦ {exportData.presetName?exportData.presetName+' · ':''}Procesada con IA · {exportData.finalLufs.toFixed(1)} LUFS
               </span>
             </div>
-
-            {/* Waveform — muestra los peaks REALES de la mezcla exportada */}
             <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'12px',padding:'12px',border:'1px solid rgba(192,38,211,0.1)',marginBottom:'20px'}}>
-              <canvas ref={waveformCanvasRef} width={1200} height={100}
-                style={{width:'100%',height:'70px',borderRadius:'8px',cursor:'pointer',display:'block'}}
-                onClick={e => { if(waveformCanvasRef.current) handleWaveformClick(e,waveformCanvasRef.current,dur,handleWaveformSeek); }} />
+              <canvas ref={waveformCanvasRef} width={1200} height={100} style={{width:'100%',height:'70px',borderRadius:'8px',cursor:'pointer',display:'block'}}
+                onClick={e=>{if(waveformCanvasRef.current) handleWaveformClick(e,waveformCanvasRef.current,dur,handleWaveformSeek);}} />
             </div>
-
-            {/* Controles */}
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'12px',marginBottom:'16px'}}>
               <button onClick={handleExportStop} style={{width:'40px',height:'40px',borderRadius:'50%',background:'#241636',border:'1px solid rgba(192,38,211,0.2)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <i className="ri-stop-fill" style={{color:'#9B7EC8',fontSize:'14px'}}></i>
@@ -478,20 +594,16 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
                 <i className={isExportPlaying?'ri-pause-fill':'ri-play-fill'} style={{color:'#fff',fontSize:'22px',marginLeft:isExportPlaying?0:'3px'}}></i>
               </button>
             </div>
+            <div style={{textAlign:'center',...S.mono,color:'#9B7EC8',fontSize:'14px',fontWeight:500,marginBottom:'28px'}}>{fmt(exportCurrentTime)}{' / '}{fmt(dur)}</div>
 
-            {/* Tiempo */}
-            <div style={{textAlign:'center',...S.mono,color:'#9B7EC8',fontSize:'14px',fontWeight:500,marginBottom:'28px'}}>
-              {fmt(exportCurrentTime)}{' / '}{fmt(dur)}
-            </div>
-
-            {/* MIX BUS MASTER con VU meter en tiempo real */}
-            <div style={{background:'linear-gradient(135deg,rgba(36,22,54,0.88),rgba(26,16,40,0.88))',border:'1px solid rgba(192,38,211,0.25)',borderRadius:'14px',padding:'16px',marginBottom:'16px',position:'relative',overflow:'hidden'}}>
+            {/* VU + LUFS */}
+            <div style={{background:'linear-gradient(135deg,rgba(36,22,54,0.88),rgba(26,16,40,0.88))',border:'1px solid rgba(192,38,211,0.25)',borderRadius:'14px',padding:'16px',marginBottom:'20px',position:'relative',overflow:'hidden'}}>
               <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)'}}></div>
               <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'14px'}}>
                 <i className="ri-equalizer-fill" style={{color:'#C026D3',fontSize:'13px'}}></i>
                 <span style={{fontSize:'10px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8'}}>Mix Bus Master</span>
-                {exportData.presetName && <span style={{background:'linear-gradient(135deg,#EC4899,#C026D3)',borderRadius:'980px',padding:'2px 10px',fontSize:'9px',color:'#fff',fontWeight:700}}>✦ {exportData.presetName}</span>}
-                <span style={{marginLeft:'auto',fontSize:'9px',color:isExportPlaying?'#4ade80':'#9B7EC8',fontFamily:"'DM Mono',monospace",fontWeight:600}}>{isExportPlaying?'▶ PLAYING':'■ STOPPED — dale Play para ver los LUFS'}</span>
+                {exportData.presetName&&<span style={{background:'linear-gradient(135deg,#EC4899,#C026D3)',borderRadius:'980px',padding:'2px 10px',fontSize:'9px',color:'#fff',fontWeight:700}}>✦ {exportData.presetName}</span>}
+                <span style={{marginLeft:'auto',fontSize:'9px',color:isExportPlaying?'#4ade80':'#9B7EC8',fontFamily:"'DM Mono',monospace",fontWeight:600}}>{isExportPlaying?'▶ PLAYING':'■ STOPPED'}</span>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'52px 1fr',gap:'14px',alignItems:'start'}}>
                 <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',gap:'4px'}}>
@@ -500,21 +612,15 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
                 </div>
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'8px'}}>
-                    <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'10px',textAlign:'center' as const,border:'1px solid rgba(192,38,211,0.08)'}}>
-                      <div style={{...S.mono,fontSize:'20px',fontWeight:600,color:exportMomentaryLufs>-14?'#f87171':exportMomentaryLufs<-30?'#9B7EC8':'#4ade80',transition:'color 0.3s'}}>{exportMomentaryLufs.toFixed(1)}</div>
-                      <div style={{fontSize:'9px',textTransform:'uppercase' as const,letterSpacing:'0.5px',color:'#9B7EC8',marginTop:'2px'}}>LUFS Momentary</div>
-                    </div>
-                    <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'10px',textAlign:'center' as const,border:'1px solid rgba(192,38,211,0.08)'}}>
-                      <div style={{...S.mono,fontSize:'20px',fontWeight:600,color:'#C026D3'}}>{exportIntegratedLufs.toFixed(1)}</div>
-                      <div style={{fontSize:'9px',textTransform:'uppercase' as const,letterSpacing:'0.5px',color:'#9B7EC8',marginTop:'2px'}}>LUFS Integrated</div>
-                    </div>
+                    {[{v:exportMomentaryLufs,label:'LUFS Momentary',color:exportMomentaryLufs>-14?'#f87171':exportMomentaryLufs<-30?'#9B7EC8':'#4ade80'},{v:exportIntegratedLufs,label:'LUFS Integrated',color:'#C026D3'}].map((x,i)=>(
+                      <div key={i} style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'10px',textAlign:'center' as const,border:'1px solid rgba(192,38,211,0.08)'}}>
+                        <div style={{...S.mono,fontSize:'20px',fontWeight:600,color:x.color,transition:'color 0.3s'}}>{x.v.toFixed(1)}</div>
+                        <div style={{fontSize:'9px',textTransform:'uppercase' as const,letterSpacing:'0.5px',color:'#9B7EC8',marginTop:'2px'}}>{x.label}</div>
+                      </div>
+                    ))}
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px'}}>
-                    {[
-                      {label:'Sample Rate',val:'44.1 kHz',color:'#C026D3'},
-                      {label:'Bit Depth',val:'24 bits',color:'#7C3AED'},
-                      {label:'Spotify',val:exportData.finalLufs.toFixed(1),sub:Math.abs(exportData.finalLufs+14)<0.5?'✓ Óptimo':'⚠ Check',color:Math.abs(exportData.finalLufs+14)<0.5?'#4ade80':'#FBBF24'},
-                    ].map(s=>(
+                    {[{label:'Sample Rate',val:'44.1 kHz',color:'#C026D3'},{label:'Bit Depth',val:'24 bits',color:'#7C3AED'},{label:'Spotify',val:exportData.finalLufs.toFixed(1),color:Math.abs(exportData.finalLufs+14)<0.5?'#4ade80':'#FBBF24'}].map(s=>(
                       <div key={s.label} style={{background:'rgba(15,10,26,0.6)',borderRadius:'8px',padding:'8px',textAlign:'center' as const,border:'1px solid rgba(192,38,211,0.06)'}}>
                         <div style={{...S.mono,fontSize:'13px',fontWeight:600,color:s.color}}>{s.val}</div>
                         <div style={{fontSize:'9px',color:'#9B7EC8'}}>{s.label}</div>
@@ -525,279 +631,112 @@ export default function ExportScreen({ user, projectId, exportData, exportProgre
               </div>
             </div>
 
-            {/* Tabs Mezcla / Master — solo si ya hay master */}
-            {masterBuffer && (
-              <div style={{display:'flex',gap:'8px',marginBottom:'16px'}}>
-                <button onClick={()=>setActiveTab('mix')}
-                  style={{flex:1,padding:'10px',borderRadius:'10px',border:`1px solid ${activeTab==='mix'?'#C026D3':'rgba(192,38,211,0.2)'}`,background:activeTab==='mix'?'rgba(192,38,211,0.12)':'transparent',color:activeTab==='mix'?'#EC4899':'#9B7EC8',fontSize:'12px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>
-                  Mezcla · -20 LUFS
-                </button>
-                <button onClick={()=>setActiveTab('master')}
-                  style={{flex:1,padding:'10px',borderRadius:'10px',border:`1px solid ${activeTab==='master'?'#F59E0B':'rgba(245,158,11,0.2)'}`,background:activeTab==='master'?'rgba(245,158,11,0.12)':'transparent',color:activeTab==='master'?'#F59E0B':'#9B7EC8',fontSize:'12px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>
-                  ✦ Master · -12 LUFS
-                </button>
+            {/* Direct downloads */}
+            <div style={{display:'flex',gap:'12px',justifyContent:'center',flexWrap:'wrap',marginBottom:'12px'}}>
+              <button onClick={()=>handleDirectDownload('mp3')} disabled={isDownloading} style={{...S.glowBtn,padding:'14px 28px',fontSize:'14px',opacity:isDownloading?0.5:1,display:'flex',alignItems:'center',gap:'8px'}}>
+                <i className="ri-download-line"></i>Descargar .MP3
+              </button>
+              <button onClick={()=>handleDirectDownload('wav')} disabled={isDownloading} style={{background:'linear-gradient(135deg,#7C3AED,#4F46E5)',border:'none',color:'#fff',padding:'14px 28px',borderRadius:'980px',fontSize:'14px',fontWeight:600,cursor:'pointer',boxShadow:'0 0 20px rgba(124,58,237,0.4)',fontFamily:'inherit',display:'flex',alignItems:'center',gap:'8px',opacity:isDownloading?0.5:1}}>
+                <i className="ri-download-2-line"></i>Descargar .WAV
+              </button>
+            </div>
+
+            {/* Output gain */}
+            <div style={{background:'rgba(15,10,26,0.6)',border:'1px solid rgba(192,38,211,0.12)',borderRadius:'12px',padding:'12px 16px',marginBottom:'20px',display:'flex',alignItems:'center',gap:'14px'}}>
+              <div style={{flexShrink:0,minWidth:'64px'}}>
+                <div style={{fontSize:'9px',fontWeight:700,color:'#9B7EC8',letterSpacing:'0.8px',textTransform:'uppercase' as const,marginBottom:'2px'}}>Output Gain</div>
+                <div style={{fontSize:'16px',fontWeight:800,fontFamily:'monospace',lineHeight:1.2,color:playGain>0.9?'#EF4444':playGain>0.7?'#FBBF24':'#4ade80'}}>
+                  {playGain>0?(20*Math.log10(playGain)).toFixed(1):'-∞'} dB
+                </div>
               </div>
-            )}
+              <input type="range" min="0.1" max="1.0" step="0.01" value={playGain}
+                onChange={e=>{const v=parseFloat(e.target.value);setPlayGain(v);if(playGainNodeRef.current&&exportAudioContext) playGainNodeRef.current.gain.setTargetAtTime(v,exportAudioContext.currentTime,0.05);}}
+                style={{flex:1,accentColor:'#C026D3',cursor:'pointer',height:'4px'}} />
+              <button onClick={()=>{setPlayGain(1.0);if(playGainNodeRef.current&&exportAudioContext) playGainNodeRef.current.gain.setTargetAtTime(1.0,exportAudioContext.currentTime,0.05);}}
+                style={{flexShrink:0,background:'transparent',border:'1px solid rgba(255,255,255,0.1)',color:'#9B7EC8',padding:'4px 10px',borderRadius:'6px',fontSize:'11px',cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>Reset</button>
+            </div>
 
-            {/* PANTALLA MASTER */}
-            {activeTab==='master' && masterBuffer && (
-              <div style={{marginBottom:'16px'}}>
-                {/* Badge masterizado */}
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                    <div style={{width:'32px',height:'32px',borderRadius:'9px',background:'linear-gradient(135deg,#F59E0B,#EF6C00)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'}}>✦</div>
-                    <div>
-                      <div style={{fontSize:'13px',fontWeight:700,color:'#F8F0FF'}}>Master Final</div>
-                      <div style={{fontSize:'11px',color:'#9B7EC8'}}>Procesado con IA · -12 LUFS · WAV 24-bit</div>
-                    </div>
-                  </div>
-                  <span style={{background:'rgba(245,158,11,0.15)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:'980px',padding:'4px 12px',fontSize:'11px',fontWeight:700,color:'#F59E0B'}}>✦ MASTERIZADO</span>
+            {/* AUDIO LAB CTA */}
+            <div style={{background:'linear-gradient(135deg,rgba(26,12,46,0.95),rgba(36,18,58,0.95))',border:'1px solid rgba(192,38,211,0.32)',borderRadius:'16px',padding:'20px',overflow:'hidden',position:'relative'}}>
+              <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)'}}></div>
+              <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'14px'}}>
+                <div style={{width:'44px',height:'44px',borderRadius:'12px',background:'linear-gradient(135deg,#EC4899,#C026D3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'22px',flexShrink:0}}>🎚️</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:'15px',fontWeight:800,color:'#F8F0FF'}}>Exportar con IA — Audio Lab</div>
+                  <div style={{fontSize:'11px',color:'#9B7EC8'}}>Elige EQ · Escucha el cambio · Descarga a -20 LUFS</div>
                 </div>
-                {/* Waveform master — color ámbar */}
-                <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'12px',padding:'12px',border:'1px solid rgba(245,158,11,0.15)',marginBottom:'14px'}}>
-                  <canvas ref={masterCanvasRef} width={1200} height={100} style={{width:'100%',height:'70px',borderRadius:'8px',display:'block'}} />
-                </div>
-                {/* Chain info */}
-                <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'12px',padding:'14px',marginBottom:'14px',border:'1px solid rgba(245,158,11,0.1)'}}>
-                  <div style={{fontSize:'10px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px'}}>Cadena de mastering aplicada</div>
-                  {[
-                    {icon:'🔇',label:'Noise Reduction',val:'Highpass 40Hz'},
-                    {icon:'📊',label:'EQ Mastering',val:'+1.5dB Low · +0.8dB Pres · +1.2dB Air'},
-                    {icon:'🗜️',label:'Compresión',val:'Ratio 2:1 · Thr -18dB'},
-                    {icon:'⛔',label:'True Peak Limiter',val:'-1.0 dBFS'},
-                    {icon:'✅',label:'Output',val:'-12 LUFS'},
-                  ].map((item,i)=>(
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'6px 8px',background:i===4?'rgba(74,222,128,0.08)':'rgba(8,4,16,0.4)',borderRadius:'7px',marginBottom:'4px',border:i===4?'1px solid rgba(74,222,128,0.15)':'1px solid transparent'}}>
-                      <span style={{fontSize:'14px'}}>{item.icon}</span>
-                      <span style={{fontSize:'11px',fontWeight:600,color:i===4?'#4ade80':'#C9B8F0',flex:1}}>{item.label}</span>
-                      <span style={{fontSize:'10px',color:i===4?'#4ade80':'#9B7EC8',fontFamily:"'DM Mono',monospace"}}>{item.val}</span>
-                    </div>
-                  ))}
-                </div>
-                {/* Botón descargar master */}
-                <button onClick={()=>{
-                  if(!masterUrl) return;
-                  const a = document.createElement('a');
-                  a.href = masterUrl; a.download = 'master-mixingmusic.wav'; a.click();
-                }}
-                  style={{width:'100%',background:'linear-gradient(135deg,#F59E0B,#EF6C00)',border:'none',color:'#fff',padding:'16px',borderRadius:'980px',fontSize:'15px',fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 24px rgba(245,158,11,0.4)',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'}}>
-                  <i className="ri-download-2-line" style={{fontSize:'18px'}}></i>
-                  Descargar Master .WAV — -12 LUFS
-                </button>
-              </div>
-            )}
-
-            {/* PANTALLA MEZCLA (default) */}
-            {(activeTab==='mix' || !masterBuffer) && (
-              <div>
-                {/* Botones de descarga */}
-                <div style={{display:'flex',gap:'12px',justifyContent:'center',flexWrap:'wrap',marginBottom:'12px'}}>
-                  <button onClick={()=>handleDirectDownload('mp3')} disabled={isDownloading}
-                    style={{...S.glowBtn,padding:'14px 28px',fontSize:'14px',opacity:isDownloading?0.5:1,display:'flex',alignItems:'center',gap:'8px'}}>
-                    <i className="ri-download-line"></i>
-                    Descargar .MP3
-                  </button>
-                  <button onClick={()=>handleDirectDownload('wav')} disabled={isDownloading}
-                    style={{background:'linear-gradient(135deg,#7C3AED,#4F46E5)',border:'none',color:'#fff',padding:'14px 28px',borderRadius:'980px',fontSize:'14px',fontWeight:600,cursor:'pointer',boxShadow:'0 0 20px rgba(124,58,237,0.4)',fontFamily:'inherit',display:'flex',alignItems:'center',gap:'8px',opacity:isDownloading?0.5:1}}>
-                    <i className="ri-download-2-line"></i>
-                    Descargar .WAV
-                  </button>
-                </div>
-                {/* SLIDER OUTPUT GAIN — control de volumen en reproducción */}
-                <div style={{background:'rgba(15,10,26,0.6)',border:'1px solid rgba(192,38,211,0.12)',borderRadius:'12px',padding:'12px 16px',marginBottom:'12px',display:'flex',alignItems:'center',gap:'14px'}}>
-                  <div style={{flexShrink:0,minWidth:'64px'}}>
-                    <div style={{fontSize:'9px',fontWeight:700,color:'#9B7EC8',letterSpacing:'0.8px',textTransform:'uppercase' as const,marginBottom:'2px'}}>Output Gain</div>
-                    <div style={{fontSize:'16px',fontWeight:800,fontFamily:'monospace',lineHeight:1.2,color:playGain>0.9?'#EF4444':playGain>0.7?'#FBBF24':'#4ade80'}}>
-                      {playGain > 0 ? (20*Math.log10(playGain)).toFixed(1) : '-∞'} dB
-                    </div>
-                  </div>
-                  <input type="range" min="0.1" max="1.0" step="0.01" value={playGain}
-                    onChange={e => {
-                      const v = parseFloat(e.target.value);
-                      setPlayGain(v);
-                      if (playGainNodeRef.current && exportAudioContext) {
-                        playGainNodeRef.current.gain.setTargetAtTime(v, exportAudioContext.currentTime, 0.05);
-                      }
-                    }}
-                    style={{flex:1,accentColor:'#C026D3',cursor:'pointer',height:'4px'}} />
-                  <button onClick={() => {
-                    setPlayGain(1.0);
-                    if (playGainNodeRef.current && exportAudioContext) {
-                      playGainNodeRef.current.gain.setTargetAtTime(1.0, exportAudioContext.currentTime, 0.05);
-                    }
-                  }} style={{flexShrink:0,background:'transparent',border:'1px solid rgba(255,255,255,0.1)',color:'#9B7EC8',padding:'4px 10px',borderRadius:'6px',fontSize:'11px',cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>Reset</button>
-                </div>
-
-                <div style={{textAlign:'center',fontSize:'12px',color:'rgba(155,126,200,0.6)',marginBottom:'16px'}}>
-                  Descarga gratuita · WAV 24bit{'/'} MP3
-                </div>
-
-                {/* BOTÓN MASTERIZAR */}
-                {!isMastering && !masterBuffer && (
-                  <button onClick={()=>{
-                    const u = localStorage.getItem('audioMixerUser');
-                    const user = u ? JSON.parse(u) : null;
-                    if (user && (user.is_pro || user.plan === 'pro')) {
-                      handleMaster();
-                    } else {
-                      setShowUpgradePaywall(true);
-                    }
-                  }}
-                    style={{width:'100%',background:'linear-gradient(135deg,#F59E0B,#EF6C00)',border:'none',color:'#fff',padding:'18px',borderRadius:'16px',fontSize:'16px',fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 28px rgba(245,158,11,0.4)',display:'flex',alignItems:'center',justifyContent:'center',gap:'12px',marginTop:'4px'}}>
-                    <span style={{fontSize:'20px'}}>✦</span>
-                    MASTERIZAR con IA
-                    <span style={{background:'rgba(255,255,255,0.2)',borderRadius:'50%',width:'28px',height:'28px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'14px'}}>→</span>
-                  </button>
+                {!isPro && !hasUsedFreeMix && (
+                  <span style={{background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'980px',padding:'5px 14px',fontSize:'11px',fontWeight:700,color:'#4ade80',flexShrink:0}}>✦ 1 gratis</span>
                 )}
-
-                {/* Modal mastering — overlay full screen */}
-                {isMastering && (
-                  <div style={{position:'fixed',inset:0,background:'rgba(8,4,16,0.92)',backdropFilter:'blur(8px)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
-                    <div style={{background:'linear-gradient(135deg,rgba(36,22,54,0.98),rgba(20,12,36,0.98))',border:'1px solid rgba(245,158,11,0.3)',borderRadius:'24px',padding:'48px 40px',maxWidth:'420px',width:'100%',textAlign:'center',boxShadow:'0 0 60px rgba(245,158,11,0.2)'}}>
-                      {/* Icono animado */}
-                      <div style={{width:'72px',height:'72px',borderRadius:'50%',background:'linear-gradient(135deg,rgba(245,158,11,0.2),rgba(239,108,0,0.1))',border:'2px solid rgba(245,158,11,0.4)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px',fontSize:'32px'}}>✦</div>
-                      <div style={{fontSize:'22px',fontWeight:800,color:'#F8F0FF',marginBottom:'8px',letterSpacing:'-0.5px'}}>Masterizando con IA</div>
-                      <div style={{fontSize:'14px',color:'#F59E0B',marginBottom:'28px',fontWeight:600}}>{masterStep}</div>
-                      {/* Cadena de pasos */}
-                      {[
-                        {label:'Noise Reduction',done:masterProgress>20},
-                        {label:'EQ Mastering',done:masterProgress>40},
-                        {label:'Compresión',done:masterProgress>60},
-                        {label:'True Peak Limiter',done:masterProgress>80},
-                        {label:'Normalizar -12 LUFS',done:masterProgress>=100},
-                      ].map((step,i)=>(
-                        <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px',padding:'8px 12px',borderRadius:'8px',background:step.done?'rgba(74,222,128,0.08)':'rgba(8,4,16,0.4)',border:`1px solid ${step.done?'rgba(74,222,128,0.2)':'rgba(255,255,255,0.04)'}`,transition:'all 0.3s'}}>
-                          <span style={{fontSize:'16px',flexShrink:0}}>{step.done?'✅':'⏳'}</span>
-                          <span style={{fontSize:'12px',fontWeight:600,color:step.done?'#4ade80':'#9B7EC8',flex:1,textAlign:'left'}}>{step.label}</span>
-                        </div>
-                      ))}
-                      {/* Barra de progreso */}
-                      <div style={{marginTop:'20px'}}>
-                        <div style={{height:'6px',background:'rgba(245,158,11,0.12)',borderRadius:'3px',overflow:'hidden',marginBottom:'8px'}}>
-                          <div style={{height:'100%',background:'linear-gradient(90deg,#F59E0B,#EF6C00)',borderRadius:'3px',width:`${masterProgress}%`,transition:'width 0.5s ease'}}></div>
-                        </div>
-                        <div style={{fontSize:'13px',color:'#F59E0B',fontFamily:'monospace',fontWeight:700}}>{masterProgress}%</div>
-                      </div>
-                    </div>
-                  </div>
+                {!isPro && hasUsedFreeMix && (
+                  <span style={{background:'rgba(245,158,11,0.12)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:'980px',padding:'5px 14px',fontSize:'11px',fontWeight:700,color:'#F59E0B',flexShrink:0}}>$3.99</span>
                 )}
               </div>
-            )}
+              <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
+                {['Car','iPhone','MacBook','Headphones','TV','Home Theater','Bluetooth','Studio','Gaming','Tablet'].map(p=>(
+                  <span key={p} style={{background:'rgba(192,38,211,0.08)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'980px',padding:'3px 10px',fontSize:'10px',fontWeight:600,color:'#9B7EC8'}}>{p}</span>
+                ))}
+              </div>
+              <button onClick={handleOpenAudioLab}
+                style={{width:'100%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'17px',borderRadius:'13px',fontSize:'15px',fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 28px rgba(192,38,211,0.45)',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'}}>
+                <span>🎛️</span>Abrir Audio Lab
+              </button>
+            </div>
           </div>
         ) : (
           <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'400px'}}>
             <div style={{...S.card,maxWidth:'420px',width:'100%',textAlign:'center'}}>
-              <div style={{width:'72px',height:'72px',margin:'0 auto 24px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'20px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 32px rgba(192,38,211,0.5)'}}>
-                <i className="ri-equalizer-fill" style={{color:'#fff',fontSize:'28px'}}></i>
-              </div>
-              <h3 style={{fontSize:'22px',fontWeight:600,color:'#F8F0FF',marginBottom:'10px'}}>
-                {exportProgress > 0 ? 'Procesando con IA' : 'Preparando mezcla...'}
-              </h3>
-              <p style={{color:'#9B7EC8',marginBottom:'24px',fontSize:'14px'}}>
-                {exportStep || 'Aplicando efectos y normalizando...'}
-              </p>
-              {exportProgress > 0 && (
-                <>
-                  <div style={S.progressTrack}><div style={S.progressBar(exportProgress)}></div></div>
-                  <div style={{...S.mono,color:'#C026D3',fontWeight:600,fontSize:'18px',marginTop:'10px'}}>{exportProgress}%</div>
-                </>
-              )}
-              {exportProgress === 0 && (
-                <div style={{display:'flex',justifyContent:'center',gap:'5px',marginTop:'8px'}}>
-                  {[0,150,300].map(d=>(
-                    <div key={d} style={{width:'8px',height:'8px',borderRadius:'50%',background:'#C026D3',animation:'bounce 1s infinite',animationDelay:`${d}ms`}}></div>
-                  ))}
-                </div>
-              )}
+              <h3 style={{fontSize:'22px',fontWeight:600,color:'#F8F0FF',marginBottom:'10px'}}>{exportProgress>0?'Procesando con IA':'Preparando mezcla...'}</h3>
+              <p style={{color:'#9B7EC8',marginBottom:'24px',fontSize:'14px'}}>{exportStep||'Aplicando efectos...'}</p>
+              {exportProgress>0&&<><div style={S.progressTrack}><div style={S.progressBar(exportProgress)}></div></div><div style={{...S.mono,color:'#C026D3',fontWeight:600,fontSize:'18px',marginTop:'10px'}}>{exportProgress}%</div></>}
             </div>
           </div>
         )}
-        <style>{`@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}`}</style>
       </div>
 
-      {/* Modal descargando */}
-      {isDownloading && (
+      {isDownloading&&(
         <div style={{position:'fixed',inset:0,background:'rgba(15,10,26,0.95)',backdropFilter:'blur(8px)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
           <div style={{...S.card,maxWidth:'420px',width:'100%',textAlign:'center'}}>
-            <div style={{width:'72px',height:'72px',margin:'0 auto 24px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'20px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 32px rgba(192,38,211,0.5)'}}>
-              <i className="ri-file-zip-line" style={{color:'#fff',fontSize:'28px'}}></i>
-            </div>
             <h3 style={{fontSize:'22px',fontWeight:600,color:'#F8F0FF',marginBottom:'10px'}}>Creando {downloadFormat?.toUpperCase()}</h3>
-            <p style={{color:'#9B7EC8',marginBottom:'24px',fontSize:'13px'}}>Comprimiendo tu mezcla optimizada con IA...</p>
             <div style={S.progressTrack}><div style={S.progressBar(downloadProgress)}></div></div>
             <div style={{...S.mono,color:'#C026D3',fontWeight:600,fontSize:'18px',marginTop:'10px'}}>{Math.round(downloadProgress)}%</div>
-            <div style={{fontSize:'12px',color:'rgba(155,126,200,0.5)',marginTop:'12px'}}>Preparando tu archivo...</div>
           </div>
         </div>
       )}
 
-      {/* Modal éxito */}
-      {showSuccessModal && deductedCreditsInfo && (
-        <div style={{position:'fixed',inset:0,background:'rgba(15,10,26,0.95)',backdropFilter:'blur(8px)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
-          <div style={{...S.card,maxWidth:'380px',width:'100%',textAlign:'center'}}>
-            <div style={{width:'60px',height:'60px',margin:'0 auto 20px',background:'linear-gradient(135deg,#4ade80,#22c55e)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 24px rgba(74,222,128,0.4)'}}>
-              <i className="ri-checkbox-circle-fill" style={{color:'#fff',fontSize:'26px'}}></i>
-            </div>
-            <h3 style={{fontSize:'20px',fontWeight:600,color:'#F8F0FF',marginBottom:'16px'}}>¡Descarga Completada!</h3>
-            <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'12px',padding:'14px',marginBottom:'20px',border:'1px solid rgba(74,222,128,0.15)'}}>
-              <div style={{fontSize:'13px',color:'#4ade80',fontWeight:600,marginBottom:'4px'}}>✓ Formato: {deductedCreditsInfo.format}</div>
-              <div style={{fontSize:'12px',color:'#9B7EC8'}}>Tu mezcla está lista para subir a Spotify, YouTube y más plataformas.</div>
-            </div>
-            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-              {deductedCreditsInfo.remainingCredits >= 500 ? (
-                <button onClick={()=>{setShowSuccessModal(false);onBack();}} style={{...S.glowBtn,padding:'12px',width:'100%'}}>
-                  + Crear Otra Mezcla
-                </button>
-              ) : (
-                <button onClick={()=>{setShowSuccessModal(false);window.location.href='/billing';}} style={{...S.glowBtn,padding:'12px',width:'100%'}}>
-                  Comprar Créditos
-                </button>
-              )}
-              <button onClick={()=>{setShowSuccessModal(false);onBack();}} style={{...S.ghostBtn,padding:'12px',width:'100%'}}>
-                Volver al Inicio
-              </button>
-            </div>
-          </div>
-        </div>
+      {showAudioLab&&exportData&&(
+        <AudioLabModal
+          exportData={exportData}
+          onClose={()=>setShowAudioLab(false)}
+          onDownload={()=>setShowAudioLab(false)}
+          isPro={isPro}
+          onPaywall={()=>{setShowAudioLab(false);setShowPaywall(true);}}
+        />
       )}
-      {showUpgradePaywall && (
-        <UpgradeModal
-          trigger="master"
-          onClose={() => setShowUpgradePaywall(false)}
-          user={(() => { try { const u = localStorage.getItem('audioMixerUser'); return u ? JSON.parse(u) : null; } catch { return null; } })()}
-          onSuccess={() => { setShowUpgradePaywall(false); handleMaster(); }}
+
+      {showPaywall&&(
+        <PaymentModal
+          onClose={()=>setShowPaywall(false)}
+          onSuccess={()=>{setShowPaywall(false);setShowAudioLab(true);}}
         />
       )}
     </div>
   );
 }
 
-async function createAudioBlob(buffer: AudioBuffer, format: 'mp3' | 'wav'): Promise<Blob> {
-  const length = buffer.length, channels = buffer.numberOfChannels, sampleRate = buffer.sampleRate;
-  const blockAlign = channels * 2, byteRate = sampleRate * blockAlign;
-  const dataSize = length * blockAlign, bufferSize = 44 + dataSize;
-  const arrayBuffer = new ArrayBuffer(bufferSize);
-  const view = new DataView(arrayBuffer);
-  const ws = (offset: number, s: string) => { for(let i=0;i<s.length;i++) view.setUint8(offset+i,s.charCodeAt(i)); };
-  ws(0,'RIFF'); view.setUint32(4,bufferSize-8,true); ws(8,'WAVE'); ws(12,'fmt ');
-  view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,channels,true);
-  view.setUint32(24,sampleRate,true); view.setUint32(28,byteRate,true);
-  view.setUint16(32,blockAlign,true); view.setUint16(34,16,true); ws(36,'data'); view.setUint32(40,dataSize,true);
-  let offset = 44;
-  for (let i=0;i<length;i++) for (let c=0;c<channels;c++) {
-    const s = Math.max(-1,Math.min(1,buffer.getChannelData(c)[i]));
-    view.setInt16(offset,Math.round(s*32767),true); offset+=2;
+async function createAudioBlob(buffer: AudioBuffer, format: 'mp3'|'wav'): Promise<Blob> {
+  const length=buffer.length,channels=buffer.numberOfChannels,sampleRate=buffer.sampleRate;
+  const blockAlign=channels*2,byteRate=sampleRate*blockAlign,dataSize=length*blockAlign,bufferSize=44+dataSize;
+  const arrayBuffer=new ArrayBuffer(bufferSize); const view=new DataView(arrayBuffer);
+  const ws=(offset:number,s:string)=>{for(let i=0;i<s.length;i++)view.setUint8(offset+i,s.charCodeAt(i));};
+  ws(0,'RIFF');view.setUint32(4,bufferSize-8,true);ws(8,'WAVE');ws(12,'fmt ');
+  view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,channels,true);
+  view.setUint32(24,sampleRate,true);view.setUint32(28,byteRate,true);
+  view.setUint16(32,blockAlign,true);view.setUint16(34,16,true);ws(36,'data');view.setUint32(40,dataSize,true);
+  let offset=44;
+  for(let i=0;i<length;i++) for(let c=0;c<channels;c++){
+    const s=Math.max(-1,Math.min(1,buffer.getChannelData(c)[i]));
+    view.setInt16(offset,Math.round(s*32767),true);offset+=2;
   }
   return new Blob([arrayBuffer],{type:format==='mp3'?'audio/mp3':'audio/wav'});
 }
-
-async function loadJSZip(): Promise<void> {
-  return new Promise((resolve,reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load JSZip'));
-    document.head.appendChild(script);
-  });
-}
-// Mobile styles injected
