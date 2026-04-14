@@ -6,16 +6,27 @@ import MixEditor from './components/MixEditor';
 import ExportScreen from './components/ExportScreen';
 
 interface ExportData {
-  audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array;
-  finalLufs: number; mp3Url?: string; wavUrl?: string; presetName?: string;
+  audioBuffer: AudioBuffer;
+  audioUrl: string;
+  waveformPeaks: Float32Array;
+  finalLufs: number;
+  mp3Url?: string;
+  wavUrl?: string;
+  presetName?: string;
+  iaEqPreset?: string;
 }
 
 type Screen = 'chat' | 'mixer' | 'export';
+
+// Module-level cache so ExportScreen survives re-renders
 let pendingExportData: ExportData | null = null;
 
 export default function HomePage() {
   const [user] = useState(() => {
-    try { const s = localStorage.getItem('audioMixerUser'); return s ? JSON.parse(s) : null; } catch { return null; }
+    try {
+      const s = localStorage.getItem('audioMixerUser');
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
   });
   const [screen, setScreen] = useState<Screen>('chat');
   const [selectedPreset, setSelectedPreset] = useState<MixPreset | null>(null);
@@ -24,12 +35,18 @@ export default function HomePage() {
   const [projectId] = useState(() => Date.now().toString());
 
   const handleStartMixer = (preset: MixPreset, files: File[]) => {
-    setSelectedPreset(preset); setUploadedFiles(files); setScreen('mixer');
-  };
-  const handleExport = (data: ExportData) => {
-    pendingExportData = data; setExportData(data); setScreen('export');
+    setSelectedPreset(preset);
+    setUploadedFiles(files);
+    setScreen('mixer');
   };
 
+  const handleExport = (data: ExportData) => {
+    pendingExportData = data;
+    setExportData(data);
+    setScreen('export');
+  };
+
+  // Logged-in users go to ProjectDashboard
   if (user) return <ProjectDashboard />;
 
   if (screen === 'mixer' && selectedPreset) {
