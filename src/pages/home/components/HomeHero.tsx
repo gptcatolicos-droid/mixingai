@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MixPreset, PRESETS } from './PresetScreen';
 import { blogArticles } from '../../../mocks/blogArticles';
-import AIChat from './AIChat';
 
 interface HomeHeroProps { onStartMixer: (preset: MixPreset, files: File[]) => void; }
 
@@ -34,7 +33,7 @@ const FAQ_ITEMS = [
   { q:'¿Qué formatos de audio acepta MixingMusic.AI?', a:'Acepta WAV, MP3, FLAC, AAC y M4A. Puedes subir hasta 12 stems simultáneamente. Recomendamos WAV 24-bit para mejor calidad en la exportación final.' },
   { q:'¿Qué significa -14 LUFS y por qué importa?', a:'LUFS es el estándar de volumen para plataformas de streaming. Spotify normaliza a -14 LUFS, YouTube a -13 LUFS. Si tu canción supera ese nivel, la plataforma la baja automáticamente y suena peor. Nuestra IA exporta siempre en el rango correcto.' },
   { q:'¿Cómo funciona el IA EQ?', a:'El IA EQ tiene 12 bandas (30Hz a 16kHz) con presets optimizados para cada dispositivo: Car, iPhone, MacBook, Headphones, TV, Home Theater, Bluetooth Speaker, Studio Monitors, Gaming Headset y Tablet. Escuchas el cambio en tiempo real y la exportación incluye el EQ aplicado a -20 LUFS.' },
-  { q:'¿Cuánto cuesta?', a:'La primera mezcla es 100% gratis. Después puedes obtener mezclas ilimitadas por $3.99. Puedes pagar con PayPal o Mercado Pago.' },
+  { q:'¿Cuánto cuesta?', a:'La primera mezcla es 100% gratis al registrarte. Después puedes obtener mezclas ilimitadas por $3.99. Puedes pagar con PayPal o Mercado Pago.' },
   { q:'¿Qué es el Mix Bus Master?', a:'Es el canal master donde se aplican todos los efectos finales: EQ, compresión, reverb, delay, IA EQ y el limiter anti-clipping. Es la misma arquitectura que usan los DAW profesionales como Pro Tools y Logic Pro.' },
 ];
 
@@ -45,8 +44,18 @@ const STATS = [
   { num:'$3.99', label:'Mezclas ilimitadas', icon:'∞' },
 ];
 
+// Pricing features list
+const PRICING_FEATURES = [
+  '✦ Mezclas ilimitadas sin restricciones',
+  '🎚️ IA EQ 12 bandas · Car, iPhone, TV, Studio y más',
+  '🎛️ 9 presets de género (Pop, Rock, Gospel, EDM…)',
+  '📁 Descarga WAV 24-bit + MP3',
+  '⚡ Exportación a -20 LUFS (listo para Spotify)',
+  '🔇 Reducción de ruido + Compresor IA',
+  '🎵 Hasta 12 stems simultáneos',
+];
+
 export default function HomeHero({ onStartMixer }: HomeHeroProps) {
-  const [showChat, setShowChat] = useState(false);
   const [openFaq, setOpenFaq] = useState<number|null>(null);
   const navigate = useNavigate();
   const [statsVisible, setStatsVisible] = useState(false);
@@ -64,7 +73,8 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
     return () => observer.disconnect();
   }, []);
 
-  if(showChat) return <AIChat user={null} onStartMixer={onStartMixer} onCreditsUpdate={()=>{}}/>;
+  // ALL CTAs → /auth/register
+  const goRegister = () => navigate('/auth/register');
 
   const S = {
     section: {padding:'80px 20px',maxWidth:'1100px',margin:'0 auto'} as React.CSSProperties,
@@ -72,12 +82,13 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
     sectionSub: {fontSize:'17px',color:'rgba(248,240,255,0.6)',marginBottom:'48px',lineHeight:1.6} as React.CSSProperties,
     grad: {background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'} as React.CSSProperties,
     card: {background:'rgba(26,16,40,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'24px'} as React.CSSProperties,
+    ctaBtn: {background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',border:'none',color:'#fff',borderRadius:'980px',fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 40px rgba(192,38,211,0.55)',display:'inline-flex',alignItems:'center',gap:'10px'} as React.CSSProperties,
   };
 
   return (
     <div style={{minHeight:'100vh',color:'#F8F0FF',fontFamily:"'Outfit',system-ui,sans-serif"}}>
 
-      {/* HERO */}
+      {/* ───── HERO ───── */}
       <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'100px 20px 60px',textAlign:'center',position:'relative'}}>
         <div style={{marginBottom:'32px'}}>
           <img src="/logo-brand.png" alt="mixingmusic.ai" style={{height:'clamp(44px,6vw,72px)',width:'auto',maxWidth:'480px'}}/>
@@ -93,12 +104,13 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
           <span style={{color:'#F59E0B'}}>3 minutos</span>
         </h1>
         <p style={{fontSize:'clamp(16px,2.2vw,19px)',color:'rgba(248,240,255,0.6)',maxWidth:'580px',lineHeight:1.7,marginBottom:'40px'}}>
-          Sube tus stems, nuestra IA los mezcla con calidad de estudio.<br/>
+          Regístrate, sube tus stems y nuestra IA los mezcla con calidad de estudio.<br/>
           Sin instalar nada · 1 mezcla gratis · $3.99 ilimitadas
         </p>
         <div style={{display:'flex',gap:'14px',flexWrap:'wrap',justifyContent:'center',marginBottom:'60px'}}>
-          <button onClick={()=>setShowChat(true)}
-            style={{background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',border:'none',color:'#fff',padding:'20px 52px',borderRadius:'980px',fontSize:'20px',fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 48px rgba(192,38,211,0.65)',display:'flex',alignItems:'center',gap:'12px',letterSpacing:'-0.3px'}}>
+          {/* PRIMARY CTA → register */}
+          <button onClick={goRegister}
+            style={{...S.ctaBtn,padding:'20px 52px',fontSize:'20px',letterSpacing:'-0.3px'}}>
             🎛️ Comenzar gratis
           </button>
           <a href="#como-funciona" style={{background:'transparent',border:'1px solid rgba(192,38,211,0.3)',color:'#9B7EC8',padding:'16px 32px',borderRadius:'980px',fontSize:'16px',fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:'none',display:'flex',alignItems:'center'}}>
@@ -114,7 +126,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
           </div>
           <div style={{padding:'20px',display:'grid',gridTemplateColumns:'repeat(9,1fr)',gap:'6px'}}>
             {PRESETS.map(p=>(
-              <div key={p.id} style={{background:`${p.color}18`,border:`1px solid ${p.color}44`,borderRadius:'8px',padding:'8px 4px',textAlign:'center',cursor:'pointer'}} onClick={()=>setShowChat(true)}>
+              <div key={p.id} style={{background:`${p.color}18`,border:`1px solid ${p.color}44`,borderRadius:'8px',padding:'8px 4px',textAlign:'center',cursor:'pointer'}} onClick={goRegister}>
                 <div style={{height:'20px',display:'flex',alignItems:'flex-end',gap:'1px',marginBottom:'5px'}}>
                   {p.wavePattern.slice(0,6).map((h,i)=><div key={i} style={{flex:1,height:`${h*100}%`,background:p.color,borderRadius:'1px'}}></div>)}
                 </div>
@@ -124,12 +136,12 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
           </div>
           <div style={{padding:'12px 20px',background:'rgba(8,4,16,0.5)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
             <span style={{fontSize:'11px',color:'#9B7EC8'}}>✦ Gospel activo · -20 LUFS · Safe ✓</span>
-            <button onClick={()=>setShowChat(true)} style={{background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'7px 16px',borderRadius:'980px',fontSize:'11px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Usar gratis →</button>
+            <button onClick={goRegister} style={{background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'7px 16px',borderRadius:'980px',fontSize:'11px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Usar gratis →</button>
           </div>
         </div>
       </div>
 
-      {/* STATS */}
+      {/* ───── STATS ───── */}
       <div ref={statsRef} style={{background:'rgba(26,16,40,0.6)',borderTop:'1px solid rgba(192,38,211,0.1)',borderBottom:'1px solid rgba(192,38,211,0.1)',padding:'40px 20px'}}>
         <div style={{maxWidth:'1100px',margin:'0 auto',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'32px'}}>
           {STATS.map((s,i)=>(
@@ -142,7 +154,68 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         </div>
       </div>
 
-      {/* CÓMO FUNCIONA */}
+      {/* ───── PRICING — justo debajo del hero ───── */}
+      <div style={{padding:'80px 20px',background:'linear-gradient(135deg,rgba(26,12,46,0.97),rgba(36,18,58,0.95))'}}>
+        <div style={{maxWidth:'900px',margin:'0 auto'}}>
+          <div style={{textAlign:'center',marginBottom:'48px'}}>
+            <h2 style={{...S.sectionTitle}}>Simple, sin sorpresas. <span style={S.grad}>Un solo precio.</span></h2>
+            <p style={{...S.sectionSub,marginBottom:0}}>Empieza gratis, paga solo cuando quieras más.</p>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'24px',alignItems:'start'}}>
+
+            {/* FREE */}
+            <div style={{background:'rgba(26,16,40,0.8)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'24px',padding:'32px',textAlign:'center'}}>
+              <div style={{fontSize:'13px',fontWeight:700,letterSpacing:'1px',color:'#9B7EC8',textTransform:'uppercase',marginBottom:'12px'}}>Gratis</div>
+              <div style={{fontSize:'48px',fontWeight:900,color:'#F8F0FF',lineHeight:1,marginBottom:'6px'}}>$0</div>
+              <div style={{fontSize:'13px',color:'rgba(155,126,200,0.6)',marginBottom:'28px'}}>para siempre</div>
+              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'28px',textAlign:'left'}}>
+                {['✓ 1 mezcla completa gratis','✓ WAV 24-bit + MP3','✓ Todos los presets de género','✓ IA EQ preview (sin exportar)'].map(f=>(
+                  <div key={f} style={{fontSize:'13px',color:'rgba(248,240,255,0.7)',display:'flex',alignItems:'center',gap:'8px'}}>{f}</div>
+                ))}
+              </div>
+              <button onClick={goRegister}
+                style={{width:'100%',background:'transparent',border:'1px solid rgba(192,38,211,0.35)',color:'#C026D3',padding:'14px',borderRadius:'14px',fontSize:'14px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                Crear cuenta gratis
+              </button>
+            </div>
+
+            {/* PRO — destacado */}
+            <div style={{background:'linear-gradient(135deg,rgba(36,18,58,0.98),rgba(20,10,36,0.98))',border:'2px solid #C026D3',borderRadius:'24px',padding:'32px',textAlign:'center',position:'relative',boxShadow:'0 0 48px rgba(192,38,211,0.25)'}}>
+              <div style={{position:'absolute',top:'-14px',left:'50%',transform:'translateX(-50%)',background:'linear-gradient(135deg,#EC4899,#C026D3)',borderRadius:'980px',padding:'4px 18px',fontSize:'11px',fontWeight:800,color:'#fff',whiteSpace:'nowrap'}}>
+                ✦ MÁS POPULAR
+              </div>
+              <div style={{fontSize:'13px',fontWeight:700,letterSpacing:'1px',color:'#EC4899',textTransform:'uppercase',marginBottom:'12px'}}>Ilimitado</div>
+              <div style={{fontSize:'48px',fontWeight:900,color:'#F8F0FF',lineHeight:1,marginBottom:'4px'}}>$3.99</div>
+              <div style={{fontSize:'13px',color:'rgba(155,126,200,0.6)',marginBottom:'28px'}}>pago único · acceso permanente</div>
+              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'28px',textAlign:'left'}}>
+                {PRICING_FEATURES.map(f=>(
+                  <div key={f} style={{fontSize:'13px',color:'rgba(248,240,255,0.85)',display:'flex',alignItems:'flex-start',gap:'8px'}}>{f}</div>
+                ))}
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+                <button onClick={goRegister}
+                  style={{width:'100%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'15px',fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 24px rgba(192,38,211,0.4)'}}>
+                  🎛️ Empezar — $3.99
+                </button>
+                <div style={{display:'flex',gap:'8px',justifyContent:'center'}}>
+                  <div style={{background:'#0070BA',borderRadius:'8px',padding:'5px 12px',fontSize:'11px',fontWeight:700,color:'#fff',display:'flex',alignItems:'center',gap:'5px'}}>
+                    <span>P</span> PayPal
+                  </div>
+                  <div style={{background:'linear-gradient(135deg,#009EE3,#00B1EA)',borderRadius:'8px',padding:'5px 12px',fontSize:'11px',fontWeight:700,color:'#fff'}}>
+                    💳 Mercado Pago
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{textAlign:'center',marginTop:'24px',fontSize:'12px',color:'rgba(155,126,200,0.4)'}}>
+            Sin suscripción mensual · Pago único · Acceso permanente · SSL seguro
+          </div>
+        </div>
+      </div>
+
+      {/* ───── CÓMO FUNCIONA ───── */}
       <div id="como-funciona" style={{padding:'80px 20px',background:'rgba(15,10,26,0.7)'}}>
         <div style={{maxWidth:'1100px',margin:'0 auto'}}>
           <div style={{textAlign:'center',marginBottom:'48px'}}>
@@ -154,7 +227,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'20px'}}>
             {[
-              {num:'1',icon:'🎵',color:'#EC4899',title:'Sube tus stems',sub:'WAV · MP3 · FLAC · hasta 12 pistas',desc:'La IA detecta cada instrumento — voz, batería, bajo, guitarra, piano — y los organiza automáticamente para mezclar.',badge:'Auto-detección IA'},
+              {num:'1',icon:'🎵',color:'#EC4899',title:'Regístrate y sube tus stems',sub:'WAV · MP3 · FLAC · hasta 12 pistas',desc:'Crea tu cuenta gratis. La IA detecta cada instrumento — voz, batería, bajo, guitarra, piano — y los organiza automáticamente.',badge:'Auto-detección IA'},
               {num:'2',icon:'🎛️',color:'#C026D3',title:'Mezcla con IA',sub:'EQ · Compresor · Reverb · -20 LUFS',desc:'9 presets de género calibrados profesionalmente. Ajusta faders, mute por pista y edición manual de dB en tiempo real.',badge:'9 presets de género'},
               {num:'3',icon:'🎚️',color:'#7C3AED',title:'IA EQ por dispositivo',sub:'Car · iPhone · Headphones · Studio · +7 más',desc:'Escucha tu mezcla tal como sonaría en cada dispositivo. Descarga con el EQ aplicado a -20 LUFS WAV 24-bit.',badge:'IA EQ 12 bandas'},
             ].map((step,i)=>(
@@ -173,16 +246,16 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
             ))}
           </div>
           <div style={{textAlign:'center',marginTop:'48px'}}>
-            <button onClick={()=>setShowChat(true)}
-              style={{background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',border:'none',color:'#fff',padding:'18px 48px',borderRadius:'980px',fontSize:'17px',fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 36px rgba(192,38,211,0.5)'}}>
+            <button onClick={goRegister}
+              style={{...S.ctaBtn,padding:'18px 48px',fontSize:'17px'}}>
               🎛️ Empezar gratis ahora
             </button>
-            <div style={{marginTop:'12px',fontSize:'12px',color:'rgba(248,240,255,0.3)'}}>1 mezcla gratis · $3.99 ilimitadas · PayPal & Mercado Pago</div>
+            <div style={{marginTop:'12px',fontSize:'12px',color:'rgba(248,240,255,0.3)'}}>1 mezcla gratis al registrarte · $3.99 ilimitadas · PayPal & Mercado Pago</div>
           </div>
         </div>
       </div>
 
-      {/* IA EQ DEMO — interactive preview */}
+      {/* ───── IA EQ DEMO ───── */}
       <div style={{background:'rgba(15,10,26,0.8)',borderTop:'1px solid rgba(192,38,211,0.1)',padding:'80px 20px'}}>
         <div style={{maxWidth:'900px',margin:'0 auto'}}>
           <div style={{textAlign:'center',marginBottom:'36px'}}>
@@ -190,7 +263,6 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
             <p style={{...S.sectionSub,marginBottom:'0'}}>12 bandas · presets por dispositivo · se exporta con tu mezcla a -20 LUFS</p>
           </div>
           <div style={{background:'rgba(13,8,22,0.95)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'20px',padding:'24px',overflow:'hidden'}}>
-            {/* Preset chips */}
             <div style={{display:'flex',flexWrap:'wrap',gap:'7px',marginBottom:'20px'}}>
               {IAEQ_PRESETS_DEMO.map(p=>(
                 <button key={p.id} onClick={()=>setDemoPreset(p)}
@@ -203,22 +275,18 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
                 </button>
               ))}
             </div>
-            {/* Faders display (read-only visual) */}
             <div style={{display:'flex',gap:'4px',alignItems:'flex-end',overflowX:'auto',padding:'4px 0 10px'}}>
               {IAEQ_PRESETS_DEMO[0].bands.map((_,i)=>{
                 const val = demoPreset.bands[i] ?? 0;
                 const pct = Math.round(((val+12)/24)*100);
                 return(
                   <div key={i} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',flex:1,minWidth:'36px'}}>
-                    <span style={{fontSize:'9px',color:val>0?'#4ade80':val<0?'#EC4899':'rgba(155,126,200,0.4)',fontFamily:'monospace'}}>{val>0?'+':''}{ val}</span>
+                    <span style={{fontSize:'9px',color:val>0?'#4ade80':val<0?'#EC4899':'rgba(155,126,200,0.4)',fontFamily:'monospace'}}>{val>0?'+':''}{val}</span>
                     <div style={{width:'100%',height:'72px',background:'rgba(8,4,16,0.8)',borderRadius:'4px',border:'1px solid rgba(192,38,211,0.12)',position:'relative',overflow:'hidden'}}>
-                      {/* Center line */}
                       <div style={{position:'absolute',top:'50%',left:0,right:0,height:'1px',background:'rgba(192,38,211,0.2)'}}></div>
-                      {/* Fill bar */}
                       <div style={{position:'absolute',background:val>0?'linear-gradient(to top,#C026D3,#EC4899)':'linear-gradient(to bottom,#EC4899,#7C3AED)',borderRadius:'3px',left:'20%',right:'20%',
                         ...(val>=0?{bottom:'50%',height:`${Math.abs(val)/12*50}%`}:{top:'50%',height:`${Math.abs(val)/12*50}%`}),
                         transition:'height 0.25s ease,top 0.25s ease,bottom 0.25s ease'}}></div>
-                      {/* Thumb */}
                       <div style={{position:'absolute',left:'50%',transform:'translate(-50%,-50%)',top:`${100-pct}%`,width:'10px',height:'10px',borderRadius:'50%',background:val===0?'rgba(155,126,200,0.5)':val>0?'#C026D3':'#EC4899',border:'2px solid rgba(255,255,255,0.2)',transition:'top 0.25s ease'}}></div>
                     </div>
                     <span style={{fontSize:'8px',color:'rgba(155,126,200,0.5)',textAlign:'center'}}>{EQ_LABELS[i]}</span>
@@ -226,14 +294,13 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
                 );
               })}
             </div>
-            {/* Band groups */}
             <div style={{display:'flex',gap:'5px',marginTop:'4px',flexWrap:'wrap'}}>
               {[{l:'Preamp',flex:'0 0 auto'},{l:'Bass: 30Hz–170Hz',flex:'1'},{l:'Mid: 310Hz–3kHz',flex:'1'},{l:'High: 6kHz–16kHz',flex:'1'}].map(({l,flex})=>(
                 <div key={l} style={{background:'rgba(192,38,211,0.06)',border:'1px solid rgba(192,38,211,0.12)',borderRadius:'6px',padding:'3px 10px',fontSize:'9px',fontWeight:700,color:'rgba(155,126,200,0.6)',flex,textAlign:'center',whiteSpace:'nowrap'}}>{l}</div>
               ))}
             </div>
             <div style={{textAlign:'center',marginTop:'20px'}}>
-              <button onClick={()=>setShowChat(true)}
+              <button onClick={goRegister}
                 style={{background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'14px 32px',borderRadius:'980px',fontSize:'14px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 24px rgba(192,38,211,0.4)'}}>
                 🎚️ Usar IA EQ gratis →
               </button>
@@ -242,7 +309,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         </div>
       </div>
 
-      {/* PRESETS */}
+      {/* ───── PRESETS ───── */}
       <div style={{background:'rgba(15,10,26,0.5)',padding:'80px 20px'}}>
         <div style={{maxWidth:'1100px',margin:'0 auto'}}>
           <div style={{textAlign:'center',marginBottom:'48px'}}>
@@ -251,7 +318,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'14px'}}>
             {PRESETS.map(p=>(
-              <div key={p.id} onClick={()=>setShowChat(true)} style={{background:`linear-gradient(135deg,${p.color}18,${p.color}08)`,border:`1px solid ${p.color}33`,borderRadius:'14px',padding:'18px',cursor:'pointer',transition:'transform 0.15s',display:'flex',flexDirection:'column',gap:'10px'}}
+              <div key={p.id} onClick={goRegister} style={{background:`linear-gradient(135deg,${p.color}18,${p.color}08)`,border:`1px solid ${p.color}33`,borderRadius:'14px',padding:'18px',cursor:'pointer',transition:'transform 0.15s',display:'flex',flexDirection:'column',gap:'10px'}}
                 onMouseEnter={e=>(e.currentTarget.style.transform='scale(1.03)')}
                 onMouseLeave={e=>(e.currentTarget.style.transform='scale(1)')}>
                 <div style={{height:'28px',display:'flex',alignItems:'flex-end',gap:'2px'}}>
@@ -271,7 +338,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         </div>
       </div>
 
-      {/* TESTIMONIALS */}
+      {/* ───── TESTIMONIALS ───── */}
       <div style={{...S.section}}>
         <div style={{textAlign:'center',marginBottom:'48px'}}>
           <h2 style={S.sectionTitle}>Lo que dicen los <span style={S.grad}>músicos reales</span></h2>
@@ -295,7 +362,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         </div>
       </div>
 
-      {/* BLOG */}
+      {/* ───── BLOG ───── */}
       <div style={{background:'rgba(15,10,26,0.5)',padding:'80px 20px'}}>
         <div style={{maxWidth:'1100px',margin:'0 auto'}}>
           <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',marginBottom:'40px',flexWrap:'wrap',gap:'16px'}}>
@@ -323,7 +390,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         </div>
       </div>
 
-      {/* FAQ */}
+      {/* ───── FAQ ───── */}
       <div style={{...S.section}}>
         <div style={{textAlign:'center',marginBottom:'48px'}}>
           <h2 style={S.sectionTitle}>¿Por qué mezclar con <span style={S.grad}>Inteligencia Artificial?</span></h2>
@@ -347,7 +414,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         </div>
       </div>
 
-      {/* CTA FINAL */}
+      {/* ───── CTA FINAL ───── */}
       <div style={{background:'linear-gradient(135deg,rgba(36,22,54,0.9),rgba(124,58,237,0.15))',borderTop:'1px solid rgba(192,38,211,0.2)',padding:'100px 20px',textAlign:'center'}}>
         <h2 style={{fontSize:'clamp(28px,5vw,52px)',fontWeight:900,letterSpacing:'-1px',marginBottom:'16px',lineHeight:1.1}}>
           Tu próxima mezcla,<br/><span style={S.grad}>lista en 3 minutos</span>
@@ -355,13 +422,13 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         <p style={{fontSize:'17px',color:'rgba(248,240,255,0.6)',marginBottom:'36px',maxWidth:'500px',margin:'0 auto 36px'}}>
           Únete a más de 47,000 músicos que ya mezclan con IA profesional.<br/>1 mezcla gratis · $3.99 ilimitadas.
         </p>
-        <button onClick={()=>setShowChat(true)}
-          style={{background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',border:'none',color:'#fff',padding:'18px 48px',borderRadius:'980px',fontSize:'18px',fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 40px rgba(192,38,211,0.6)'}}>
+        <button onClick={goRegister}
+          style={{...S.ctaBtn,padding:'18px 48px',fontSize:'18px'}}>
           🎛️ Empezar gratis ahora
         </button>
       </div>
 
-      {/* FOOTER */}
+      {/* ───── FOOTER ───── */}
       <div style={{background:'rgba(8,4,16,0.9)',borderTop:'1px solid rgba(192,38,211,0.1)',padding:'40px 20px'}}>
         <div style={{maxWidth:'1100px',margin:'0 auto',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'20px'}}>
           <div>
@@ -376,6 +443,8 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
           <div style={{fontSize:'12px',color:'rgba(248,240,255,0.3)'}}>© 2026 MixingMusic.AI</div>
         </div>
       </div>
+
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
     </div>
   );
 }

@@ -127,7 +127,10 @@ export default function ProjectDashboard() {
     const expProject = selectedProject || 'export';
     return <ExportScreen user={expUser} projectId={expProject} exportData={expData}
       exportProgress={expData ? 100 : 0} exportStep={expData ? '¡Listo!' : 'Preparando...'}
-      onBack={() => setCurrentScreen('mixer')} onCreditsUpdate={handleCreditsUpdate} />;
+      onBack={() => setCurrentScreen('mixer')}
+      onNewMix={() => setCurrentScreen('newProject')}
+      onGoHome={() => setCurrentScreen('dashboard')}
+      onCreditsUpdate={handleCreditsUpdate} />;
   }
 
   // PANTALLA: Dashboard principal

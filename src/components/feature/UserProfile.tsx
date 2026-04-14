@@ -177,7 +177,7 @@ export default function UserProfile({ user, isOpen, onClose, onLogout }: UserPro
 
           <div className="py-2 border-t border-slate-600">
             <button
-              onClick={onLogout}
+              onClick={handleLogout}
               className="w-full flex items-center space-x-3 px-4 py-3 text-left text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
             >
               <i className="ri-logout-box-line w-5 h-5 flex items-center justify-center"></i>

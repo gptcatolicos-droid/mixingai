@@ -79,7 +79,7 @@ interface MixEditorProps {
 // PAYWALL MODAL — registration required, real payments
 // =============================================
 function PaywallModal({ onClose, onSuccess }: { onClose:()=>void; onSuccess:()=>void }) {
-  const [step, setStep] = useState<'choose'|'needsReg'|'processing'|'done'>('choose');
+  const [step, setStep] = useState<'choose'|'processing'|'done'>('choose');
   const [method, setMethod] = useState<'paypal'|'mp'|null>(null);
   const [mpError, setMpError] = useState('');
 
@@ -100,8 +100,6 @@ function PaywallModal({ onClose, onSuccess }: { onClose:()=>void; onSuccess:()=>
 
   const pay = async (m: 'paypal'|'mp') => {
     const u = getUser();
-    // Must be registered to pay
-    if (!u || !u.email) { setStep('needsReg'); return; }
     setMethod(m); setStep('processing'); setMpError('');
 
     if (m === 'paypal') {
@@ -116,7 +114,7 @@ function PaywallModal({ onClose, onSuccess }: { onClose:()=>void; onSuccess:()=>
         const res = await fetch(`${supaUrl}/functions/v1/create-mercadopago-subscription`, {
           method: 'POST',
           headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${supaKey}` },
-          body: JSON.stringify({ userId: u.id || u.email, userEmail: u.email }),
+          body: JSON.stringify({ userId: u?.id || u?.email || 'guest', userEmail: u?.email || 'guest@mixingmusic.ai' }),
         });
         const data = await res.json();
         if (data?.error) throw new Error(data.error);
@@ -139,7 +137,6 @@ function PaywallModal({ onClose, onSuccess }: { onClose:()=>void; onSuccess:()=>
     btnPP: {width:'100%',background:'#0070BA',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'15px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginBottom:'10px',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'},
     btnMP: {width:'100%',background:'linear-gradient(135deg,#009EE3,#00B1EA)',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'15px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'},
     btnOk: {width:'100%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'15px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'},
-    btnReg: {width:'100%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'15px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginBottom:'10px'},
   };
 
   return (
@@ -164,27 +161,8 @@ function PaywallModal({ onClose, onSuccess }: { onClose:()=>void; onSuccess:()=>
             <span style={{fontSize:'18px'}}>💳</span>
             Pagar con Mercado Pago
           </button>
-          <p style={{marginTop:'14px',fontSize:'11px',color:'rgba(155,126,200,0.5)'}}>
-            Debes estar registrado para pagar ·{' '}
-            <a href="/auth/register" style={{color:'#C026D3',fontWeight:600}}>Crear cuenta gratis</a>
-          </p>
-          <button onClick={onClose} style={{marginTop:'10px',background:'none',border:'none',color:'rgba(155,126,200,0.4)',fontSize:'12px',cursor:'pointer',fontFamily:'inherit'}}>
+          <button onClick={onClose} style={{marginTop:'14px',background:'none',border:'none',color:'rgba(155,126,200,0.4)',fontSize:'12px',cursor:'pointer',fontFamily:'inherit'}}>
             Cancelar
-          </button>
-        </>}
-
-        {/* NEEDS REGISTRATION */}
-        {step==='needsReg' && <>
-          <div style={{fontSize:'36px',marginBottom:'14px'}}>🔐</div>
-          <h2 style={{fontSize:'20px',fontWeight:800,color:'#F8F0FF',marginBottom:'8px'}}>Crea tu cuenta gratis</h2>
-          <p style={{fontSize:'13px',color:'rgba(155,126,200,0.8)',marginBottom:'24px',lineHeight:1.6}}>
-            Necesitas registrarte para activar mezclas ilimitadas. Es gratis y toma 30 segundos.
-          </p>
-          <button style={S.btnReg} onClick={()=>{ window.location.href='/auth/register'; }}>
-            Crear cuenta gratis →
-          </button>
-          <button style={{...S.btnOk,background:'transparent',border:'1px solid rgba(192,38,211,0.25)',color:'#9B7EC8'}} onClick={()=>setStep('choose')}>
-            ← Volver
           </button>
         </>}
 

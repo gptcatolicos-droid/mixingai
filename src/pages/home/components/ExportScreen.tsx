@@ -7,7 +7,10 @@ interface ExportScreenProps {
   user: User; projectId: string;
   exportData: { audioBuffer:AudioBuffer; audioUrl:string; waveformPeaks:Float32Array; finalLufs:number; mp3Url?:string; wavUrl?:string; presetName?:string; iaEqPreset?:string; } | null;
   exportProgress: number; exportStep: string;
-  onBack: () => void; onCreditsUpdate: (n:number) => void;
+  onBack: () => void;
+  onNewMix?: () => void;   // "Nueva mezcla" → va al chat/upload
+  onGoHome?: () => void;   // "Volver al inicio" → va al dashboard/home
+  onCreditsUpdate: (n:number) => void;
 }
 
 const fmt = (s:number) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
@@ -23,7 +26,7 @@ const S = {
   progressTrack: {background:'#241636',borderRadius:'8px',height:'6px',overflow:'hidden' as const},
 };
 
-export default function ExportScreen({ user, exportData, exportProgress, exportStep, onBack, onCreditsUpdate }: ExportScreenProps) {
+export default function ExportScreen({ user, exportData, exportProgress, exportStep, onBack, onNewMix, onGoHome, onCreditsUpdate }: ExportScreenProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [curTime, setCurTime] = useState(0);
   const [pausedTime, setPausedTime] = useState(0);
@@ -43,6 +46,18 @@ export default function ExportScreen({ user, exportData, exportProgress, exportS
   const gainNodeRef = useRef<GainNode|null>(null);
   const lufsHistRef = useRef<number[]>([]);
   const lufsFrameRef = useRef(0);
+  const [downloadDone, setDownloadDone] = useState(false);
+
+  // Check if user is pro (unlimited)
+  const UNLIMITED_EMAILS = ['danipalacio@gmail.com'];
+  const isPro = (() => {
+    try {
+      const s = localStorage.getItem('audioMixerUser');
+      if (!s) return false;
+      const u = JSON.parse(s);
+      return UNLIMITED_EMAILS.includes(u.email) || u.is_pro || u.plan === 'unlimited';
+    } catch { return false; }
+  })();
 
   useEffect(()=>{
     if(exportData&&!audioCtx) setAudioCtx(new AudioContext());
@@ -136,6 +151,7 @@ export default function ExportScreen({ user, exportData, exportProgress, exportS
       const blob=await createAudioBlob(exportData.audioBuffer,format);
       clearInterval(pi); setDlProgress(100); await new Promise(r=>setTimeout(r,400));
       const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`mezcla-mixingmusic.${format}`; a.click(); URL.revokeObjectURL(url);
+      setDownloadDone(true);
     } catch(e){console.error(e);}
     setIsDownloading(false); setDlProgress(0); setDlFormat(null);
   };
@@ -232,6 +248,27 @@ export default function ExportScreen({ user, exportData, exportProgress, exportS
                 <i className="ri-download-2-line"></i>Descargar .WAV 24bit
               </button>
             </div>
+
+            {/* Post-download CTAs for pro users */}
+            {downloadDone && isPro && (
+              <div style={{background:'linear-gradient(135deg,rgba(26,12,46,0.95),rgba(36,18,58,0.95))',border:'1px solid rgba(192,38,211,0.3)',borderRadius:'16px',padding:'20px',marginBottom:'12px',textAlign:'center'}}>
+                <div style={{fontSize:'20px',marginBottom:'8px'}}>🎉</div>
+                <div style={{fontSize:'15px',fontWeight:700,color:'#F8F0FF',marginBottom:'4px'}}>¡Mezcla descargada!</div>
+                <div style={{fontSize:'12px',color:'rgba(155,126,200,0.7)',marginBottom:'16px'}}>Tienes mezclas ilimitadas. ¿Qué hacemos ahora?</div>
+                <div style={{display:'flex',gap:'10px',justifyContent:'center',flexWrap:'wrap'}}>
+                  <button
+                    onClick={()=>{ stopAll(); (onNewMix ?? onBack)(); }}
+                    style={{background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'12px 24px',borderRadius:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 0 20px rgba(192,38,211,0.4)',display:'flex',alignItems:'center',gap:'8px'}}>
+                    🎛️ Nueva mezcla
+                  </button>
+                  <button
+                    onClick={()=>{ stopAll(); (onGoHome ?? onBack)(); }}
+                    style={{background:'transparent',border:'1px solid rgba(192,38,211,0.3)',color:'#9B7EC8',padding:'12px 24px',borderRadius:'12px',fontSize:'14px',fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:'8px'}}>
+                    🏠 Volver al inicio
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Output gain */}
             <div style={{background:'rgba(15,10,26,0.6)',border:'1px solid rgba(192,38,211,0.12)',borderRadius:'12px',padding:'12px 16px',display:'flex',alignItems:'center',gap:'14px'}}>
