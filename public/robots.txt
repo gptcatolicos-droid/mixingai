@@ -1,0 +1,27 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /admin/dashboard
+Disallow: /api/
+Disallow: /auth/verify
+
+# Allow Google to crawl everything else
+User-agent: Googlebot
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+
+# Allow Bingbot
+User-agent: Bingbot
+Allow: /
+Disallow: /admin
+
+# Sitemap
+Sitemap: https://mixingmusic.ai/sitemap.xml
+
+# Crawl-delay for heavy bots
+User-agent: AhrefsBot
+Crawl-delay: 10
+User-agent: SemrushBot
+Crawl-delay: 10
