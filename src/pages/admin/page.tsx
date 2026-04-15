@@ -48,13 +48,53 @@ export default function AdminDashboard() {
     if (b) setBlocked(parseInt(b));
   }, []);
 
-  // ── Load users from Supabase auth.users via REST ──────────
+  // ── Load users ───────────────────────────────────────────
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      // Read from public users table — anon key can access this
-      const res = await fetch(
+      const serviceKey = (import.meta as any).env?.VITE_SUPABASE_SERVICE_KEY;
+
+      // ── Strategy 1: Use service role key → auth.users (all users) ──
+      if (serviceKey && serviceKey !== 'your_service_role_key_here') {
+        const res = await fetch(
+          `${SUPABASE_URL}/auth/v1/admin/users?per_page=500&page=1`,
+          {
+            headers: {
+              'apikey': serviceKey,
+              'Authorization': `Bearer ${serviceKey}`,
+            },
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const rawUsers = Array.isArray(data) ? data : (data.users || []);
+          const mapped: AdminUser[] = rawUsers.map((u: any) => {
+            const meta = u.user_metadata || {};
+            const appMeta = u.app_metadata || {};
+            const isPro = !!(meta.is_pro || meta.plan === 'unlimited' || appMeta.is_pro || appMeta.plan === 'unlimited');
+            return {
+              id: u.id,
+              email: u.email || '—',
+              firstName: meta.first_name || u.email?.split('@')[0] || '—',
+              lastName: meta.last_name || '',
+              country: meta.country || '—',
+              createdAt: u.created_at || '',
+              lastLogin: u.last_sign_in_at || '',
+              confirmed: !!u.email_confirmed_at,
+              plan: isPro ? 'unlimited' : 'free',
+              is_pro: isPro,
+            };
+          });
+          mapped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          setUsers(mapped);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // ── Strategy 2: Fallback → public users table (anon key) ──
+      const res2 = await fetch(
         `${SUPABASE_URL}/rest/v1/users?select=*&order=created_at.desc&limit=500`,
         {
           headers: {
@@ -64,28 +104,30 @@ export default function AdminDashboard() {
         }
       );
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err?.message || err?.hint || `Error ${res.status} leyendo tabla users`);
+      if (res2.ok) {
+        const rows: any[] = await res2.json();
+        if (rows.length === 0 && !serviceKey) {
+          setError('⚠ Se necesita configurar VITE_SUPABASE_SERVICE_KEY en Render para ver todos los usuarios. Ve a Supabase → Project Settings → API → service_role y agrégalo en Render → Environment Variables.');
+        }
+        const mapped: AdminUser[] = rows.map(u => ({
+          id: u.id,
+          email: u.email || '—',
+          firstName: u.first_name || u.email?.split('@')[0] || '—',
+          lastName: u.last_name || '',
+          country: u.country || '—',
+          createdAt: u.created_at || '',
+          lastLogin: u.last_login || u.updated_at || '',
+          confirmed: !!u.email_verified,
+          plan: (u.is_pro || u.plan === 'unlimited') ? 'unlimited' : 'free',
+          is_pro: !!(u.is_pro || u.plan === 'unlimited'),
+        }));
+        setUsers(mapped);
+      } else {
+        const err = await res2.json();
+        throw new Error(err?.message || err?.hint || `Error ${res2.status}`);
       }
-
-      const rows: any[] = await res.json();
-      const mapped: AdminUser[] = rows.map(u => ({
-        id: u.id,
-        email: u.email || '—',
-        firstName: u.first_name || u.email?.split('@')[0] || '—',
-        lastName: u.last_name || '',
-        country: u.country || '—',
-        createdAt: u.created_at || '',
-        lastLogin: u.last_login || u.updated_at || '',
-        confirmed: !!u.email_verified,
-        plan: (u.is_pro || u.plan === 'unlimited') ? 'unlimited' : 'free',
-        is_pro: !!(u.is_pro || u.plan === 'unlimited'),
-      }));
-
-      setUsers(mapped);
     } catch (e: any) {
-      setError(e.message || 'Error cargando usuarios');
+      setError('Error: ' + (e.message || 'No se pudo conectar con Supabase'));
     } finally {
       setLoading(false);
     }
@@ -97,24 +139,41 @@ export default function AdminDashboard() {
 
   // ── Grant/Revoke pro via Supabase Auth Admin API ──────────
   const updateUserPro = async (userId: string, isPro: boolean) => {
+    const serviceKey = (import.meta as any).env?.VITE_SUPABASE_SERVICE_KEY;
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
+      // Try updating auth.users metadata with service key
+      if (serviceKey && serviceKey !== 'your_service_role_key_here') {
+        const r1 = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': serviceKey,
+            'Authorization': `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            user_metadata: { is_pro: isPro, plan: isPro ? 'unlimited' : 'free' },
+            app_metadata: { is_pro: isPro, plan: isPro ? 'unlimited' : 'free' },
+          }),
+        });
+        if (!r1.ok) throw new Error('Error en auth.users');
+      }
+      // Always update users table too
+      await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': serviceKey || SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${serviceKey || SUPABASE_ANON_KEY}`,
           'Prefer': 'return=minimal',
         },
         body: JSON.stringify({ is_pro: isPro, plan: isPro ? 'unlimited' : 'free' }),
       });
-      if (!res.ok) throw new Error('Error actualizando usuario');
       setUsers(prev => prev.map(u => u.id === userId
         ? { ...u, is_pro: isPro, plan: isPro ? 'unlimited' : 'free' }
         : u
       ));
     } catch (e: any) {
-      alert('Error: ' + e.message);
+      alert('Error actualizando usuario: ' + e.message);
     }
   };
 
