@@ -54,7 +54,7 @@ const RegisterPage: React.FC = () => {
       });
       const signupData = await signupRes.json();
 
-      // ── 2. Email ya registrado → intentar login directamente ──
+      // ── 2. Email ya registrado ────────────────────────────────
       const alreadyMsg = signupData?.msg || signupData?.error_description || signupData?.message || '';
       const alreadyExists = !signupRes.ok && (
         alreadyMsg.toLowerCase().includes('already registered') ||
@@ -62,45 +62,60 @@ const RegisterPage: React.FC = () => {
         alreadyMsg.toLowerCase().includes('already exists') ||
         alreadyMsg.toLowerCase().includes('user already')
       );
+      if (alreadyExists) { setError('Este email ya está registrado.'); setLoading(false); return; }
+      if (!signupRes.ok) { setError(alreadyMsg || 'Error al crear la cuenta. Inténtalo de nuevo.'); setLoading(false); return; }
 
-      if (alreadyExists) {
-        setError('Este email ya está registrado.');
-        setLoading(false);
+      // ── 3. Insert into users table (so admin panel can see them) ──
+      const userId = signupData.user?.id || `usr_${Date.now()}`;
+      const accessToken = signupData.access_token;
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/users`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({
+            id: userId,
+            first_name: firstName,
+            last_name: lastName,
+            email,
+            country,
+            credits: 0,
+            plan: 'free',
+            is_pro: false,
+            provider: 'email',
+            username: `${firstName.toLowerCase().replace(/\s/g,'_')}_${lastName.toLowerCase().replace(/\s/g,'_')}`,
+            email_verified: !!signupData.user?.email_confirmed_at,
+            created_at: new Date().toISOString(),
+          }),
+        });
+      } catch (dbErr) {
+        // Non-critical — user still registered in auth.users
+        console.warn('Could not insert into users table:', dbErr);
+      }
+
+      // ── 4. Signup OK con session ──────────────────────────────
+      if (accessToken && signupData.user) {
+        saveAndGo(signupData.user.id, signupData.user.email, accessToken);
         return;
       }
 
-      if (!signupRes.ok) {
-        setError(alreadyMsg || 'Error al crear la cuenta. Inténtalo de nuevo.');
-        setLoading(false);
-        return;
-      }
-
-      // ── 3. Signup OK — usar session del signup si viene ──────
-      // Cuando "Confirm email" está OFF en Supabase, signup devuelve access_token directamente
-      if (signupData.access_token && signupData.user) {
-        saveAndGo(signupData.user.id, signupData.user.email, signupData.access_token);
-        return;
-      }
-
-      // ── 4. "Confirm email" está ON → Supabase no da session ──
-      // Intentamos login de todas formas
+      // ── 5. Confirm email ON → intentar login ─────────────────
       const loginRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ email, password }),
       });
       const loginData = await loginRes.json();
-
       if (loginRes.ok && loginData.access_token) {
-        // Login OK (confirmación desactivada en dashboard de Supabase)
         saveAndGo(loginData.user.id, loginData.user.email, loginData.access_token);
         return;
       }
 
-      // ── 5. Login falló por "email not confirmed" ──────────────
-      // Usamos el ID del signup y dejamos entrar de todas formas
-      // El usuario ya existe en Supabase, solo falta que confirme
-      const userId = signupData.user?.id || `usr_${Date.now()}`;
+      // ── 6. Fallback — entra de todas formas ──────────────────
       saveAndGo(userId, email);
 
     } catch (err: any) {

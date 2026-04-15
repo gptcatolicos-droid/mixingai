@@ -1,320 +1,352 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
 
-// ─── Types ───────────────────────────────────────────────────
-interface AdminUser {
-  id: string; email: string; firstName: string; lastName: string;
-  country: string; createdAt: string; totalMixes: number;
-  plan: 'free' | 'unlimited'; is_pro: boolean;
-}
-interface Stats { totalUsers:number; totalMixes:number; revenue:number; activeUsers:number; }
-
-// ─── Admin credentials (hardened) ───────────────────────────
-// Password: mixing2024!  → SHA-256 first 32 chars for fallback
+const SUPABASE_URL = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_URL ?? '';
+const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_ANON_KEY ?? '';
 const ADMIN_PW = 'mixing2024!';
 
-// ─── Helpers ─────────────────────────────────────────────────
-const formatDate = (d: string) => new Date(d).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});
+interface AdminUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  country: string;
+  createdAt: string;
+  lastLogin: string;
+  confirmed: boolean;
+  plan: 'free' | 'unlimited';
+  is_pro: boolean;
+}
 
-// Seed data with danipalacio as unlimited
-const SEED_USERS: AdminUser[] = [
-  {id:'u1',email:'danipalacio@gmail.com',firstName:'Dani',lastName:'Palacio',country:'Colombia',createdAt:'2024-01-01T00:00:00Z',totalMixes:47,plan:'unlimited',is_pro:true},
-  {id:'u2',email:'carlos@example.com',firstName:'Carlos',lastName:'Rodriguez',country:'México',createdAt:'2024-02-10T00:00:00Z',totalMixes:12,plan:'free',is_pro:false},
-  {id:'u3',email:'maria@example.com',firstName:'María',lastName:'González',country:'Colombia',createdAt:'2024-03-15T00:00:00Z',totalMixes:28,plan:'unlimited',is_pro:true},
-  {id:'u4',email:'luis@example.com',firstName:'Luis',lastName:'Martinez',country:'Argentina',createdAt:'2024-04-01T00:00:00Z',totalMixes:5,plan:'free',is_pro:false},
-  {id:'u5',email:'ana@example.com',firstName:'Ana',lastName:'Silva',country:'Chile',createdAt:'2024-04-10T00:00:00Z',totalMixes:19,plan:'unlimited',is_pro:true},
-];
+const fmt = (d: string) => d ? new Date(d).toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
 
 export default function AdminDashboard() {
-  const navigate = useNavigate();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [password, setPassword] = useState('');
   const [attempts, setAttempts] = useState(0);
-  const [blockedUntil, setBlockedUntil] = useState<number|null>(null);
-  const [activeTab, setActiveTab] = useState<'overview'|'users'|'settings'>('overview');
-  const [users, setUsers] = useState<AdminUser[]>(SEED_USERS);
+  const [blocked, setBlocked] = useState<number|null>(null);
+  const [tab, setTab] = useState<'overview'|'users'>('users');
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [grantEmail, setGrantEmail] = useState('');
-  const [grantType, setGrantType] = useState<'unlimited'|'free'>('unlimited');
   const [grantMsg, setGrantMsg] = useState('');
-  const [newPw, setNewPw] = useState('');
-  const [pwMsg, setPwMsg] = useState('');
-  const [stats] = useState<Stats>({totalUsers:1312,totalMixes:51247,revenue:15489.50,activeUsers:89});
+  const [cursor, setCursor] = useState(0);
+  const PER = 50;
 
-  // Verify session on mount
+  // ── Session ───────────────────────────────────────────────
   useEffect(() => {
-    const session = localStorage.getItem('mixingai_admin_session');
-    if (session) {
+    const s = localStorage.getItem('mixingai_admin_session');
+    if (s) {
       try {
-        const s = JSON.parse(session);
-        if (Date.now() - s.ts < 3600000) setIsAuthorized(true);
+        const parsed = JSON.parse(s);
+        if (Date.now() - parsed.ts < 4 * 3600000) { setIsAuthorized(true); }
         else localStorage.removeItem('mixingai_admin_session');
       } catch { localStorage.removeItem('mixingai_admin_session'); }
     }
-    const block = localStorage.getItem('mixingai_admin_block');
-    if (block) setBlockedUntil(parseInt(block));
+    const b = localStorage.getItem('mixingai_admin_block');
+    if (b) setBlocked(parseInt(b));
   }, []);
 
-  const handleAuth = async () => {
-    if (blockedUntil && Date.now() < blockedUntil) {
-      alert(`Bloqueado. Espera ${Math.ceil((blockedUntil-Date.now())/60000)} minutos.`);
-      return;
+  // ── Load users from Supabase auth.users via REST ──────────
+  const loadUsers = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      // Read from public users table — anon key can access this
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/users?select=*&order=created_at.desc&limit=500`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err?.message || err?.hint || `Error ${res.status} leyendo tabla users`);
+      }
+
+      const rows: any[] = await res.json();
+      const mapped: AdminUser[] = rows.map(u => ({
+        id: u.id,
+        email: u.email || '—',
+        firstName: u.first_name || u.email?.split('@')[0] || '—',
+        lastName: u.last_name || '',
+        country: u.country || '—',
+        createdAt: u.created_at || '',
+        lastLogin: u.last_login || u.updated_at || '',
+        confirmed: !!u.email_verified,
+        plan: (u.is_pro || u.plan === 'unlimited') ? 'unlimited' : 'free',
+        is_pro: !!(u.is_pro || u.plan === 'unlimited'),
+      }));
+
+      setUsers(mapped);
+    } catch (e: any) {
+      setError(e.message || 'Error cargando usuarios');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthorized) loadUsers();
+  }, [isAuthorized, loadUsers]);
+
+  // ── Grant/Revoke pro via Supabase Auth Admin API ──────────
+  const updateUserPro = async (userId: string, isPro: boolean) => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ is_pro: isPro, plan: isPro ? 'unlimited' : 'free' }),
+      });
+      if (!res.ok) throw new Error('Error actualizando usuario');
+      setUsers(prev => prev.map(u => u.id === userId
+        ? { ...u, is_pro: isPro, plan: isPro ? 'unlimited' : 'free' }
+        : u
+      ));
+    } catch (e: any) {
+      alert('Error: ' + e.message);
+    }
+  };
+
+  // ── Grant pro by email ────────────────────────────────────
+  const grantByEmail = async () => {
+    const email = grantEmail.trim().toLowerCase();
+    if (!email) return;
+    const user = users.find(u => u.email.toLowerCase() === email);
+    if (!user) { setGrantMsg('❌ Email no encontrado en Supabase'); setTimeout(() => setGrantMsg(''), 4000); return; }
+    await updateUserPro(user.id, true);
+    setGrantMsg(`✓ ${email} → Mezclas ilimitadas activadas`);
+    setGrantEmail('');
+    setTimeout(() => setGrantMsg(''), 4000);
+  };
+
+  // ── Auth ──────────────────────────────────────────────────
+  const handleAuth = () => {
+    if (blocked && Date.now() < blocked) {
+      alert(`Bloqueado ${Math.ceil((blocked - Date.now()) / 60000)} min más`); return;
     }
     if (password !== ADMIN_PW) {
-      const newAttempts = attempts + 1;
-      setAttempts(newAttempts);
-      if (newAttempts >= 5) {
+      const n = attempts + 1; setAttempts(n); setPassword('');
+      if (n >= 5) {
         const until = Date.now() + 30 * 60 * 1000;
-        setBlockedUntil(until);
-        localStorage.setItem('mixingai_admin_block', String(until));
-        alert('Demasiados intentos. Bloqueado 30 minutos.');
-      } else {
-        alert(`Contraseña incorrecta. Intentos restantes: ${5 - newAttempts}`);
-      }
-      setPassword('');
+        setBlocked(until); localStorage.setItem('mixingai_admin_block', String(until));
+        alert('5 intentos fallidos. Bloqueado 30 minutos.');
+      } else alert(`Contraseña incorrecta. ${5 - n} intentos restantes.`);
       return;
     }
-    setIsAuthorized(true);
-    setAttempts(0);
-    localStorage.setItem('mixingai_admin_session', JSON.stringify({ts:Date.now()}));
+    setIsAuthorized(true); setAttempts(0);
+    localStorage.setItem('mixingai_admin_session', JSON.stringify({ ts: Date.now() }));
   };
 
-  const grantPermission = () => {
-    const email = grantEmail.trim().toLowerCase();
-    if (!email) { setGrantMsg('Ingresa un email.'); return; }
-    setUsers(prev => {
-      const exists = prev.find(u => u.email === email);
-      if (exists) {
-        return prev.map(u => u.email===email ? {...u, plan:grantType, is_pro:grantType==='unlimited'} : u);
-      } else {
-        // Add minimal entry
-        const nu: AdminUser = {id:`u${Date.now()}`,email,firstName:email.split('@')[0],lastName:'',country:'—',createdAt:new Date().toISOString(),totalMixes:0,plan:grantType,is_pro:grantType==='unlimited'};
-        return [...prev, nu];
-      }
-    });
-    setGrantMsg(`✓ ${email} → ${grantType==='unlimited'?'Mezclas ilimitadas':'1 mezcla gratis'}`);
-    setGrantEmail('');
-    setTimeout(()=>setGrantMsg(''),4000);
+  const S = {
+    page: { minHeight:'100vh', background:'#0d0a14', color:'#F8F0FF', fontFamily:"'Outfit',system-ui,sans-serif" } as React.CSSProperties,
+    card: { background:'rgba(26,16,40,0.85)', border:'1px solid rgba(192,38,211,0.15)', borderRadius:'16px', padding:'20px' } as React.CSSProperties,
+    input: { background:'rgba(8,4,16,0.7)', border:'1px solid rgba(192,38,211,0.25)', borderRadius:'10px', padding:'10px 14px', color:'#F8F0FF', fontSize:'13px', fontFamily:'inherit', outline:'none', width:'100%', boxSizing:'border-box' as const },
+    btn: (c = '#C026D3') => ({ background:`linear-gradient(135deg,${c},${c}bb)`, border:'none', color:'#fff', padding:'9px 18px', borderRadius:'10px', fontSize:'12px', fontWeight:700, cursor:'pointer', fontFamily:'inherit' }),
+    ghost: { background:'transparent', border:'1px solid rgba(192,38,211,0.25)', color:'#9B7EC8', padding:'8px 16px', borderRadius:'10px', fontSize:'12px', cursor:'pointer', fontFamily:'inherit' } as React.CSSProperties,
+    tab: (a: boolean) => ({ padding:'8px 18px', borderRadius:'10px', border:`1px solid ${a?'#C026D3':'rgba(192,38,211,0.15)'}`, background:a?'rgba(192,38,211,0.15)':'transparent', color:a?'#EC4899':'#9B7EC8', fontSize:'13px', fontWeight:700, cursor:'pointer', fontFamily:'inherit' }),
   };
 
-  const revokePermission = (id: string) => {
-    setUsers(prev => prev.map(u => u.id===id ? {...u,plan:'free',is_pro:false} : u));
-  };
-  const makeUnlimited = (id: string) => {
-    setUsers(prev => prev.map(u => u.id===id ? {...u,plan:'unlimited',is_pro:true} : u));
-  };
-  const makeFreeOne = (id: string) => {
-    setUsers(prev => prev.map(u => u.id===id ? {...u,plan:'free',is_pro:false} : u));
-  };
-
-  const filteredUsers = users.filter(u =>
+  const filtered = users.filter(u =>
     u.email.toLowerCase().includes(search.toLowerCase()) ||
     u.firstName.toLowerCase().includes(search.toLowerCase()) ||
     u.country.toLowerCase().includes(search.toLowerCase())
   );
+  const proCount = users.filter(u => u.is_pro).length;
+  const confirmedCount = users.filter(u => u.confirmed).length;
 
-  const S = {
-    page: {minHeight:'100vh',background:'#0d0a14',color:'#F8F0FF',fontFamily:"'Outfit',system-ui,sans-serif"},
-    card: {background:'rgba(26,16,40,0.85)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'20px'},
-    label: {fontSize:'10px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'8px',display:'block'},
-    input: {background:'rgba(8,4,16,0.7)',border:'1px solid rgba(192,38,211,0.25)',borderRadius:'10px',padding:'10px 14px',color:'#F8F0FF',fontSize:'13px',fontFamily:'inherit',outline:'none',width:'100%'},
-    btn: (color='#C026D3') => ({background:`linear-gradient(135deg,${color},${color}bb)`,border:'none',color:'#fff',padding:'9px 18px',borderRadius:'10px',fontSize:'12px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}),
-    ghostBtn: {background:'transparent',border:'1px solid rgba(192,38,211,0.25)',color:'#9B7EC8',padding:'8px 16px',borderRadius:'10px',fontSize:'12px',cursor:'pointer',fontFamily:'inherit'},
-    tab: (active:boolean) => ({padding:'8px 18px',borderRadius:'10px',border:`1px solid ${active?'#C026D3':'rgba(192,38,211,0.15)'}`,background:active?'rgba(192,38,211,0.15)':'transparent',color:active?'#EC4899':'#9B7EC8',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.15s'}),
-  };
-
-  // ─── Login screen ───────────────────────────────────────────
+  // ── Login ─────────────────────────────────────────────────
   if (!isAuthorized) return (
-    <div style={{...S.page,display:'flex',alignItems:'center',justifyContent:'center'}}>
-      <div style={{...S.card,maxWidth:'360px',width:'100%',textAlign:'center',padding:'40px 28px'}}>
-        <div style={{width:'60px',height:'60px',background:'linear-gradient(135deg,#EC4899,#C026D3)',borderRadius:'16px',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px',fontSize:'28px',boxShadow:'0 0 28px rgba(192,38,211,0.4)'}}>
-          <i className="ri-admin-fill" style={{color:'#fff'}}></i>
-        </div>
-        <h2 style={{fontSize:'20px',fontWeight:800,color:'#F8F0FF',marginBottom:'6px'}}>Panel Administrador</h2>
-        <p style={{fontSize:'12px',color:'rgba(155,126,200,0.7)',marginBottom:'24px'}}>mixingmusic.ai · acceso restringido</p>
-        <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
-          onKeyDown={e=>e.key==='Enter'&&handleAuth()}
-          placeholder="Contraseña" style={{...S.input,marginBottom:'12px',textAlign:'center'}}/>
-        <button onClick={handleAuth} style={{...S.btn(),width:'100%',padding:'12px',fontSize:'14px'}}>Ingresar</button>
-        {attempts>0&&<p style={{fontSize:'11px',color:'#f87171',marginTop:'10px'}}>{5-attempts} intentos restantes</p>}
+    <div style={{ ...S.page, display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div style={{ ...S.card, maxWidth:'360px', width:'100%', textAlign:'center', padding:'40px 28px' }}>
+        <div style={{ width:'60px', height:'60px', background:'linear-gradient(135deg,#EC4899,#C026D3)', borderRadius:'16px', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px', fontSize:'24px', boxShadow:'0 0 28px rgba(192,38,211,0.4)' }}>⚙️</div>
+        <h2 style={{ fontSize:'20px', fontWeight:800, marginBottom:'6px' }}>Panel Administrador</h2>
+        <p style={{ fontSize:'12px', color:'rgba(155,126,200,0.6)', marginBottom:'24px' }}>mixingmusic.ai · acceso restringido</p>
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleAuth()}
+          placeholder="Contraseña" style={{ ...S.input, marginBottom:'12px', textAlign:'center' }} />
+        <button onClick={handleAuth} style={{ ...S.btn(), width:'100%', padding:'12px', fontSize:'14px' }}>Ingresar</button>
+        {attempts > 0 && <p style={{ fontSize:'11px', color:'#f87171', marginTop:'10px' }}>{5 - attempts} intentos restantes</p>}
       </div>
     </div>
   );
 
-  // ─── Main admin UI ──────────────────────────────────────────
+  // ── Main ──────────────────────────────────────────────────
   return (
     <div style={S.page}>
-      {/* Top bar */}
-      <div style={{background:'rgba(13,8,22,0.98)',borderBottom:'1px solid rgba(192,38,211,0.15)',padding:'0 20px',height:'56px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:100}}>
-        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-          <div style={{width:'32px',height:'32px',background:'linear-gradient(135deg,#EC4899,#C026D3)',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'}}>⚙</div>
-          <span style={{fontSize:'14px',fontWeight:800,color:'#F8F0FF'}}>Admin Panel</span>
-          <span style={{fontSize:'11px',color:'rgba(155,126,200,0.5)'}}>mixingmusic.ai</span>
+      {/* Header */}
+      <div style={{ background:'rgba(13,8,22,0.98)', borderBottom:'1px solid rgba(192,38,211,0.15)', padding:'0 20px', height:'56px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:100 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+          <div style={{ width:'32px', height:'32px', background:'linear-gradient(135deg,#EC4899,#C026D3)', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center' }}>⚙</div>
+          <span style={{ fontSize:'14px', fontWeight:800 }}>Admin Panel</span>
+          <span style={{ fontSize:'11px', color:'rgba(155,126,200,0.4)' }}>mixingmusic.ai</span>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-          <span style={{fontSize:'11px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'8px',padding:'3px 10px',color:'#4ade80'}}>admin</span>
-          <button onClick={()=>{localStorage.removeItem('mixingai_admin_session');setIsAuthorized(false);}} style={S.ghostBtn}>Cerrar sesión</button>
+        <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
+          <button onClick={loadUsers} style={S.ghost} title="Recargar">🔄 Recargar</button>
+          <button onClick={() => { localStorage.removeItem('mixingai_admin_session'); setIsAuthorized(false); }} style={S.ghost}>Salir</button>
         </div>
       </div>
 
-      <div style={{maxWidth:'1100px',margin:'0 auto',padding:'24px 16px'}}>
+      <div style={{ maxWidth:'1200px', margin:'0 auto', padding:'24px 16px' }}>
+
         {/* Tabs */}
-        <div style={{display:'flex',gap:'8px',marginBottom:'24px'}}>
-          {(['overview','users','settings'] as const).map(t=>(
-            <button key={t} onClick={()=>setActiveTab(t)} style={S.tab(activeTab===t)}>
-              {t==='overview'?'📊 Overview':t==='users'?'👥 Usuarios':'⚙ Configuración'}
-            </button>
-          ))}
+        <div style={{ display:'flex', gap:'8px', marginBottom:'24px' }}>
+          <button onClick={() => setTab('overview')} style={S.tab(tab==='overview')}>📊 Overview</button>
+          <button onClick={() => setTab('users')} style={S.tab(tab==='users')}>
+            👥 Usuarios {users.length > 0 && <span style={{ background:'rgba(192,38,211,0.3)', borderRadius:'20px', padding:'1px 8px', marginLeft:'6px', fontSize:'11px' }}>{users.length}</span>}
+          </button>
         </div>
 
         {/* OVERVIEW */}
-        {activeTab==='overview'&&(
-          <div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'12px',marginBottom:'24px'}}>
-              {[
-                {label:'Usuarios totales',val:stats.totalUsers.toLocaleString(),color:'#C026D3',icon:'👥'},
-                {label:'Mezclas completadas',val:stats.totalMixes.toLocaleString(),color:'#EC4899',icon:'🎛️'},
-                {label:'Ingresos USD',val:`$${stats.revenue.toLocaleString()}`,color:'#F59E0B',icon:'💰'},
-                {label:'Usuarios activos (hoy)',val:stats.activeUsers,color:'#4ade80',icon:'🟢'},
-              ].map(s=>(
-                <div key={s.label} style={{...S.card,textAlign:'center'}}>
-                  <div style={{fontSize:'28px',marginBottom:'8px'}}>{s.icon}</div>
-                  <div style={{fontSize:'26px',fontWeight:800,color:s.color,fontFamily:'monospace'}}>{s.val}</div>
-                  <div style={{fontSize:'11px',color:'rgba(155,126,200,0.7)',marginTop:'4px'}}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-            {/* Quick grant */}
-            <div style={{...S.card,borderColor:'rgba(192,38,211,0.3)'}}>
-              <span style={S.label}>Dar permisos rápidos</span>
-              <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'flex-end'}}>
-                <div style={{flex:'1',minWidth:'200px'}}>
-                  <input value={grantEmail} onChange={e=>setGrantEmail(e.target.value)}
-                    placeholder="email@usuario.com" style={S.input}/>
-                </div>
-                <select value={grantType} onChange={e=>setGrantType(e.target.value as any)}
-                  style={{...S.input,width:'auto',flex:'0 0 auto'}}>
-                  <option value="unlimited">Mezclas ilimitadas</option>
-                  <option value="free">1 mezcla gratis</option>
-                </select>
-                <button onClick={grantPermission} style={S.btn('#4ade80')}>Aplicar</button>
+        {tab === 'overview' && (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:'12px' }}>
+            {[
+              { label:'Total usuarios', val: loading ? '...' : users.length.toLocaleString(), color:'#C026D3', icon:'👥' },
+              { label:'Emails confirmados', val: loading ? '...' : confirmedCount.toLocaleString(), color:'#4ade80', icon:'✅' },
+              { label:'Plan Ilimitado', val: loading ? '...' : proCount.toLocaleString(), color:'#EC4899', icon:'∞' },
+              { label:'Plan Gratis', val: loading ? '...' : (users.length - proCount).toLocaleString(), color:'#9B7EC8', icon:'🆓' },
+            ].map(s => (
+              <div key={s.label} style={{ ...S.card, textAlign:'center' }}>
+                <div style={{ fontSize:'28px', marginBottom:'6px' }}>{s.icon}</div>
+                <div style={{ fontSize:'28px', fontWeight:800, color:s.color }}>{s.val}</div>
+                <div style={{ fontSize:'11px', color:'rgba(155,126,200,0.6)', marginTop:'4px' }}>{s.label}</div>
               </div>
-              {grantMsg&&<p style={{fontSize:'12px',color:'#4ade80',marginTop:'8px'}}>{grantMsg}</p>}
+            ))}
+
+            {/* Grant permissions */}
+            <div style={{ ...S.card, gridColumn:'1 / -1' }}>
+              <div style={{ fontSize:'12px', fontWeight:700, color:'#9B7EC8', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'14px' }}>
+                Dar acceso ilimitado por email
+              </div>
+              <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
+                <input value={grantEmail} onChange={e => setGrantEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && grantByEmail()}
+                  placeholder="email@ejemplo.com" style={{ ...S.input, maxWidth:'320px' }} />
+                <button onClick={grantByEmail} style={S.btn()}>∞ Dar Ilimitado</button>
+              </div>
+              {grantMsg && <p style={{ fontSize:'12px', color:'#4ade80', marginTop:'8px' }}>{grantMsg}</p>}
             </div>
           </div>
         )}
 
         {/* USERS */}
-        {activeTab==='users'&&(
-          <div>
-            <div style={{display:'flex',gap:'10px',marginBottom:'16px',flexWrap:'wrap'}}>
-              <input value={search} onChange={e=>setSearch(e.target.value)}
-                placeholder="Buscar por email, nombre o país..." style={{...S.input,flex:1,minWidth:'200px'}}/>
-              <span style={{fontSize:'12px',color:'rgba(155,126,200,0.6)',alignSelf:'center'}}>{filteredUsers.length} de {users.length} usuarios</span>
-            </div>
-            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-              {filteredUsers.map(u=>(
-                <div key={u.id} style={{...S.card,display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap',borderColor:u.is_pro?'rgba(74,222,128,0.2)':'rgba(192,38,211,0.1)'}}>
-                  <div style={{width:'40px',height:'40px',borderRadius:'50%',background:u.is_pro?'linear-gradient(135deg,#4ade80,#22c55e)':'linear-gradient(135deg,#EC4899,#C026D3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'14px',fontWeight:700,flexShrink:0}}>
-                    {u.firstName[0]}{u.lastName?.[0]||''}
-                  </div>
-                  <div style={{flex:1,minWidth:'180px'}}>
-                    <div style={{fontSize:'13px',fontWeight:700,color:'#F8F0FF'}}>{u.firstName} {u.lastName}</div>
-                    <div style={{fontSize:'11px',color:'rgba(155,126,200,0.7)'}}>{u.email}</div>
-                    <div style={{fontSize:'10px',color:'rgba(155,126,200,0.5)'}}>{u.country} · {u.totalMixes} mezclas · {formatDate(u.createdAt)}</div>
-                  </div>
-                  <span style={{padding:'4px 12px',borderRadius:'980px',fontSize:'11px',fontWeight:700,
-                    background:u.is_pro?'rgba(74,222,128,0.12)':'rgba(255,255,255,0.06)',
-                    border:`1px solid ${u.is_pro?'rgba(74,222,128,0.3)':'rgba(255,255,255,0.1)'}`,
-                    color:u.is_pro?'#4ade80':'rgba(155,126,200,0.7)'}}>
-                    {u.is_pro?'∞ Ilimitado':'Free'}
-                  </span>
-                  <div style={{display:'flex',gap:'6px',flexShrink:0}}>
-                    <button onClick={()=>makeUnlimited(u.id)} title="Dar ilimitadas"
-                      style={{...S.btn('#4ade80'),padding:'6px 12px',fontSize:'11px',opacity:u.is_pro?0.4:1}}>∞ Ilimitadas</button>
-                    <button onClick={()=>makeFreeOne(u.id)} title="Dar 1 gratis"
-                      style={{...S.btn('#F59E0B'),padding:'6px 12px',fontSize:'11px'}}>1 Gratis</button>
-                    <button onClick={()=>revokePermission(u.id)} title="Revocar"
-                      style={{...S.btn('#ef4444'),padding:'6px 12px',fontSize:'11px',opacity:!u.is_pro?0.4:1}}>Revocar</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* SETTINGS */}
-        {activeTab==='settings'&&(
-          <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
-            <div style={{...S.card,borderColor:'rgba(245,158,11,0.2)'}}>
-              <span style={S.label}>Credenciales de acceso admin</span>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'12px'}}>
-                <div style={{background:'rgba(8,4,16,0.5)',borderRadius:'8px',padding:'10px',border:'1px solid rgba(192,38,211,0.1)'}}>
-                  <div style={{fontSize:'10px',color:'rgba(155,126,200,0.6)',marginBottom:'4px'}}>URL admin</div>
-                  <div style={{fontSize:'12px',color:'#EC4899',fontFamily:'monospace'}}>mixingmusic.ai/admin</div>
-                </div>
-                <div style={{background:'rgba(8,4,16,0.5)',borderRadius:'8px',padding:'10px',border:'1px solid rgba(192,38,211,0.1)'}}>
-                  <div style={{fontSize:'10px',color:'rgba(155,126,200,0.6)',marginBottom:'4px'}}>Password actual</div>
-                  <div style={{fontSize:'12px',color:'#EC4899',fontFamily:'monospace'}}>mixing2024!</div>
-                </div>
-              </div>
-              <div style={{display:'flex',gap:'8px',alignItems:'flex-end'}}>
-                <div style={{flex:1}}>
-                  <label style={S.label}>Cambiar password</label>
-                  <input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)}
-                    placeholder="Nuevo password" style={S.input}/>
-                </div>
-                <button onClick={()=>{if(newPw.length>=8){setPwMsg('✓ Password actualizado (reinicia el server para aplicar)');setNewPw('');}else setPwMsg('Mínimo 8 caracteres');setTimeout(()=>setPwMsg(''),4000);}}
-                  style={S.btn()}>Guardar</button>
-              </div>
-              {pwMsg&&<p style={{fontSize:'11px',color:'#4ade80',marginTop:'6px'}}>{pwMsg}</p>}
+        {tab === 'users' && (
+          <div style={S.card}>
+            {/* Search + stats */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px', gap:'12px', flexWrap:'wrap' }}>
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar por email, nombre o país..."
+                style={{ ...S.input, maxWidth:'400px' }} />
+              <span style={{ fontSize:'12px', color:'rgba(155,126,200,0.6)', whiteSpace:'nowrap' }}>
+                {loading ? 'Cargando...' : `${filtered.length} de ${users.length} usuarios`}
+              </span>
             </div>
 
-            <div style={{...S.card}}>
-              <span style={S.label}>Integración de pagos</span>
-              <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-                {[
-                  {label:'MercadoPago — Public Key',val:'APP_USR-13129ced-ad54-4ed2-b5dc-0ae59e62f9cd',color:'#009EE3'},
-                  {label:'MercadoPago — Client ID',val:'5118046163102020',color:'#009EE3'},
-                  {label:'MercadoPago — Access Token',val:'APP_USR-5118046163102020-031919-5f2a78ca...3237382783',color:'#4ade80'},
-                  {label:'PayPal — Link de pago',val:'paypal.com/ncp/payment/HDU4UAXJCNVXW',color:'#0070BA'},
-                  {label:'PayPal — Confirmación redirect',val:'mixingmusic.ai/payment-confirmation',color:'#0070BA'},
-                ].map(r=>(
-                  <div key={r.label} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'rgba(8,4,16,0.5)',borderRadius:'8px',border:'1px solid rgba(192,38,211,0.08)'}}>
-                    <span style={{fontSize:'10px',color:'rgba(155,126,200,0.6)',minWidth:'220px'}}>{r.label}</span>
-                    <span style={{fontSize:'11px',color:r.color,fontFamily:'monospace',wordBreak:'break-all'}}>{r.val}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={{...S.card,borderColor:'rgba(74,222,128,0.15)'}}>
-              <span style={S.label}>Usuarios con acceso especial</span>
-              <div style={{background:'rgba(8,4,16,0.5)',borderRadius:'8px',padding:'10px 14px',border:'1px solid rgba(74,222,128,0.15)'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                  <span style={{fontSize:'18px'}}>∞</span>
-                  <div>
-                    <div style={{fontSize:'13px',fontWeight:700,color:'#4ade80'}}>danipalacio@gmail.com</div>
-                    <div style={{fontSize:'11px',color:'rgba(155,126,200,0.6)'}}>Mezclas ilimitadas — acceso permanente</div>
-                  </div>
+            {/* Error */}
+            {error && (
+              <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:'10px', padding:'12px 16px', marginBottom:'16px', fontSize:'13px', color:'#fca5a5' }}>
+                ⚠ {error}
+                <div style={{ fontSize:'11px', color:'rgba(155,126,200,0.5)', marginTop:'4px' }}>
+                  Nota: Para leer auth.users necesitas configurar el Service Role Key en Supabase Edge Functions.
+                  Alternativamente, los usuarios aparecen en Authentication → Users en el dashboard de Supabase.
                 </div>
               </div>
-            </div>
+            )}
 
-            <div style={{...S.card}}>
-              <span style={S.label}>Security headers activos</span>
-              <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
-                {['Content-Security-Policy','X-Frame-Options: DENY','X-Content-Type-Options: nosniff','Referrer-Policy: strict-origin','CORS: mixingmusic.ai only','Rate limit: via Supabase Edge Functions'].map(h=>(
-                  <div key={h} style={{display:'flex',alignItems:'center',gap:'8px',padding:'5px 10px',background:'rgba(8,4,16,0.5)',borderRadius:'6px',border:'1px solid rgba(74,222,128,0.08)'}}>
-                    <span style={{fontSize:'10px',color:'#4ade80'}}>✓</span>
-                    <span style={{fontSize:'11px',fontFamily:'monospace',color:'rgba(155,126,200,0.8)'}}>{h}</span>
-                  </div>
-                ))}
+            {/* Loading */}
+            {loading && (
+              <div style={{ textAlign:'center', padding:'48px', color:'rgba(155,126,200,0.5)' }}>
+                <div style={{ width:'32px', height:'32px', border:'3px solid rgba(192,38,211,0.2)', borderTopColor:'#C026D3', borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto 12px' }}></div>
+                Cargando usuarios de Supabase...
               </div>
-            </div>
+            )}
+
+            {/* Users table */}
+            {!loading && filtered.length === 0 && !error && (
+              <div style={{ textAlign:'center', padding:'48px', color:'rgba(155,126,200,0.4)', fontSize:'14px' }}>
+                No se encontraron usuarios
+              </div>
+            )}
+
+            {!loading && filtered.length > 0 && (
+              <div style={{ overflowX:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom:'1px solid rgba(192,38,211,0.15)' }}>
+                      {['Usuario','País','Plan','Email confirmado','Registro','Último login','Acciones'].map(h => (
+                        <th key={h} style={{ padding:'8px 12px', textAlign:'left', fontSize:'10px', fontWeight:700, color:'rgba(155,126,200,0.6)', letterSpacing:'0.8px', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(u => (
+                      <tr key={u.id} style={{ borderBottom:'1px solid rgba(192,38,211,0.07)', transition:'background 0.1s' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,38,211,0.04)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <td style={{ padding:'10px 12px' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+                            <div style={{ width:'32px', height:'32px', borderRadius:'50%', background:'linear-gradient(135deg,#EC4899,#C026D3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', fontWeight:700, flexShrink:0 }}>
+                              {(u.firstName || u.email)[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight:600, color:'#F8F0FF' }}>{u.firstName} {u.lastName}</div>
+                              <div style={{ fontSize:'11px', color:'rgba(155,126,200,0.6)' }}>{u.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding:'10px 12px', color:'rgba(155,126,200,0.7)' }}>{u.country}</td>
+                        <td style={{ padding:'10px 12px' }}>
+                          <span style={{
+                            padding:'3px 10px', borderRadius:'20px', fontSize:'11px', fontWeight:700,
+                            background: u.is_pro ? 'rgba(192,38,211,0.15)' : 'rgba(155,126,200,0.08)',
+                            border: `1px solid ${u.is_pro ? 'rgba(192,38,211,0.35)' : 'rgba(155,126,200,0.15)'}`,
+                            color: u.is_pro ? '#EC4899' : '#9B7EC8',
+                          }}>
+                            {u.is_pro ? '∞ Ilimitado' : 'Gratis'}
+                          </span>
+                        </td>
+                        <td style={{ padding:'10px 12px' }}>
+                          <span style={{ color: u.confirmed ? '#4ade80' : '#FBBF24', fontSize:'12px' }}>
+                            {u.confirmed ? '✓ Sí' : '⏳ No'}
+                          </span>
+                        </td>
+                        <td style={{ padding:'10px 12px', color:'rgba(155,126,200,0.6)', fontSize:'11px', whiteSpace:'nowrap' }}>{fmt(u.createdAt)}</td>
+                        <td style={{ padding:'10px 12px', color:'rgba(155,126,200,0.6)', fontSize:'11px', whiteSpace:'nowrap' }}>{fmt(u.lastLogin)}</td>
+                        <td style={{ padding:'10px 12px' }}>
+                          <div style={{ display:'flex', gap:'6px' }}>
+                            {!u.is_pro ? (
+                              <button onClick={() => updateUserPro(u.id, true)}
+                                style={{ ...S.btn(), padding:'5px 10px', fontSize:'11px' }}>
+                                ∞ Dar Pro
+                              </button>
+                            ) : (
+                              <button onClick={() => updateUserPro(u.id, false)}
+                                style={{ ...S.btn('#6b7280'), padding:'5px 10px', fontSize:'11px' }}>
+                                Revocar
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }

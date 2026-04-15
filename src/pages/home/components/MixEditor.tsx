@@ -103,35 +103,61 @@ function PaywallModal({ onClose, onSuccess }: { onClose:()=>void; onSuccess:()=>
     setMethod(m); setStep('processing'); setMpError('');
 
     if (m === 'paypal') {
-      // Redirect to PayPal — payment-confirmation page handles the result
       window.location.href = 'https://www.paypal.com/ncp/payment/HDU4UAXJCNVXW';
-    } else {
-      // MercadoPago via Supabase Edge Function
-      try {
-        const supaUrl = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_URL;
-        const supaKey = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_ANON_KEY;
-        if (!supaUrl || !supaKey) throw new Error('Config missing');
-        const res = await fetch(`${supaUrl}/functions/v1/create-mercadopago-subscription`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supaKey}`,
-            'apikey': supaKey,
+      return;
+    }
+
+    // ── MercadoPago — llamada directa a la API (sin Edge Function) ──
+    try {
+      const MP_TOKEN = (import.meta as any).env?.VITE_MP_ACCESS_TOKEN;
+      if (!MP_TOKEN) throw new Error('MercadoPago no configurado. Contacta support@mixingmusic.ai');
+
+      const userEmail = u?.email || 'cliente@mixingmusic.ai';
+      const userId    = u?.id    || u?.email || 'guest';
+
+      const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MP_TOKEN}`,
+        },
+        body: JSON.stringify({
+          items: [{
+            id: 'unlimited_mixes',
+            title: 'MixingMusic.AI — Mezclas Ilimitadas',
+            description: 'Acceso ilimitado al mezclador IA + IA EQ 12 bandas',
+            quantity: 1,
+            unit_price: 3.99,
+            currency_id: 'USD',
+          }],
+          payer: { email: userEmail },
+          external_reference: userId,
+          back_urls: {
+            success: `${window.location.origin}/payment-confirmation?status=success&provider=mp`,
+            failure: `${window.location.origin}/payment-confirmation?status=failed&provider=mp`,
+            pending: `${window.location.origin}/payment-confirmation?status=pending&provider=mp`,
           },
-          body: JSON.stringify({ userId: u?.id || u?.email || 'guest', userEmail: u?.email || 'guest@mixingmusic.ai' }),
-        });
-        const data = await res.json();
-        if (data?.error) throw new Error(data.error);
-        const mpUrl = data?.init_point || data?.sandbox_init_point;
-        if (mpUrl) {
-          window.location.href = mpUrl;
-        } else {
-          throw new Error('No se recibió URL de pago');
-        }
-      } catch (e: any) {
-        setMpError(e.message || 'Error al conectar con Mercado Pago');
-        setStep('choose');
+          auto_return: 'approved',
+          statement_descriptor: 'MIXINGMUSIC',
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        const errMsg = data?.message || data?.error || JSON.stringify(data);
+        throw new Error(errMsg);
       }
+
+      const mpUrl = data?.init_point || data?.sandbox_init_point;
+      if (mpUrl) {
+        window.location.href = mpUrl;
+      } else {
+        throw new Error('MercadoPago no devolvió URL de pago');
+      }
+    } catch (e: any) {
+      setMpError(e.message || 'Error al conectar con Mercado Pago');
+      setStep('choose');
     }
   };
 
