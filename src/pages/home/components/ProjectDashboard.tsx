@@ -164,7 +164,9 @@ export default function ProjectDashboard() {
               <h1 style={{fontSize:'28px',fontWeight:600,letterSpacing:'-0.5px',color:'#F8F0FF',marginBottom:'4px'}}>
                 Hola, {user.firstName}
               </h1>
-              <p style={{color:'#9B7EC8',fontSize:'14px'}}>Mezclas ilimitadas · Completamente gratis</p>
+              <p style={{color:'#9B7EC8',fontSize:'14px'}}>
+                {(user.is_pro || user.plan === 'unlimited') ? 'Mezclas ilimitadas · Plan Pro activo ∞' : 'Plan Gratis · 1 mezcla incluida'}
+              </p>
             </div>
 
             {/* Upload Area */}

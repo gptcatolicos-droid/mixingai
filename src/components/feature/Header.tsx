@@ -66,10 +66,17 @@ export default function Header({ user, onLogout, onCreditsUpdate }: HeaderProps)
           <div style={{display:'flex',alignItems:'center',gap:'10px'}} className="hide-mobile">
             {user ? (
               <>
-                <div style={S.unlimitedBadge}>
-                  <i className="ri-infinity-line"></i>
-                  <span>ILIMITADO</span>
-                </div>
+                {(user.is_pro || user.plan === 'unlimited') ? (
+                  <div style={S.unlimitedBadge}>
+                    <i className="ri-infinity-line"></i>
+                    <span>ILIMITADO</span>
+                  </div>
+                ) : (
+                  <div style={{...S.creditsBadge,background:'rgba(74,222,128,0.08)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',fontSize:'12px'}}>
+                    <i className="ri-music-line"></i>
+                    <span>Plan Gratis</span>
+                  </div>
+                )}
                 <div style={{position:'relative'}}>
                   <button style={S.userBtn} onClick={() => setShowUserProfile(!showUserProfile)}>
                     <div style={S.avatar}>{user.firstName.charAt(0).toUpperCase()}</div>
@@ -107,7 +114,7 @@ export default function Header({ user, onLogout, onCreditsUpdate }: HeaderProps)
                   <div style={S.avatar}>{user.firstName.charAt(0).toUpperCase()}</div>
                   <div>
                     <div style={{fontSize:'14px',fontWeight:600,color:'#F8F0FF'}}>{user.firstName} {user.lastName}</div>
-                    <div style={{fontSize:'12px',color:'#9B7EC8'}}>Mezclas Ilimitadas ∞</div>
+                    <div style={{fontSize:'12px',color:'#9B7EC8'}}>{(user.is_pro || user.plan === 'unlimited') ? 'Mezclas Ilimitadas ∞' : 'Plan Gratis · 1 mezcla'}</div>
                   </div>
                 </div>
                 <button onClick={() => { navigate('/'); setMobileOpen(false); }} style={{...S.navBtn,textAlign:'left',width:'100%',padding:'10px 14px'}}>Inicio</button>

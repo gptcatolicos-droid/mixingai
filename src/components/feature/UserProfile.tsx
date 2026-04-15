@@ -111,32 +111,36 @@ export default function UserProfile({ user, isOpen, onClose, onLogout }: UserPro
             </div>
           </div>
 
-          {/* Credits Section */}
+          {/* Plan Section */}
           <div className="py-4 border-b border-slate-700/50">
             <div className="bg-slate-900/50 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-white flex items-center">
-                  <i className="ri-coin-line text-cyan-400 mr-2 w-4 h-4 flex items-center justify-center"></i>
-                  Available Credits
-                </h4>
-                <span className={`text-2xl font-bold ${getCreditColor(user.credits || 0)}`}>
-                  {(user.credits || 0).toLocaleString()}
-                </span>
-              </div>
-              <div className="space-y-2 text-xs text-slate-400">
-                <div className="flex justify-between">
-                  <span>Next recharge:</span>
-                  <span className="text-emerald-400 font-semibold">{getNextRecharge()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Basic mix (1-5 stems):</span>
-                  <span className="text-cyan-400">100 credits</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Advanced mix (6+ stems):</span>
-                  <span className="text-magenta-400">∞ ilimitadas</span>
-                </div>
-              </div>
+              {(user.is_pro || user.plan === 'unlimited') ? (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-white flex items-center">
+                      <i className="ri-infinity-line text-purple-400 mr-2"></i>
+                      Plan Ilimitado
+                    </h4>
+                    <span className="text-sm font-bold text-purple-400 bg-purple-400/10 px-3 py-1 rounded-full">∞ Activo</span>
+                  </div>
+                  <p className="text-xs text-slate-400">Mezclas ilimitadas · IA EQ · WAV 24-bit · -10 LUFS</p>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-white flex items-center">
+                      <i className="ri-music-line text-emerald-400 mr-2"></i>
+                      Plan Gratis
+                    </h4>
+                    <span className="text-sm font-bold text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full">1 mezcla</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-3">Incluye 1 mezcla completa gratis · WAV 24-bit</p>
+                  <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-lg p-3">
+                    <p className="text-xs text-purple-300 font-medium mb-1">✦ Mezclas Ilimitadas — $3.99</p>
+                    <p className="text-xs text-slate-400">Pago único · PayPal o Mercado Pago</p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

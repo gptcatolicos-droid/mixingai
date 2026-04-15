@@ -594,16 +594,20 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         const u = JSON.parse(stored);
         // Hardcoded unlimited users
         if (UNLIMITED_EMAILS.includes(u.email)) return { allowed:true, isPro:true };
-        // Admin grant
+        // Admin / paid plan
         if (u.is_pro || u.plan === 'unlimited') return { allowed:true, isPro:true };
+        // Registered free user — check if they already used their 1 free mix
+        // Key: we track free mix per user email, NOT per device fingerprint
+        const usedKey = `mixingai_used_free_${u.email}`;
+        const usedFree = localStorage.getItem(usedKey) === '1';
+        if (usedFree) return { allowed:false, isPro:false, reason:'freeDone', email: u.email };
+        return { allowed:true, isPro:false, email: u.email };
       }
-      // Guest: check if free mix already used (localStorage + device fingerprint)
+      // Guest (not registered) — check device fingerprint
       const fp = getDeviceFingerprint();
-      const usedFreeLocal = localStorage.getItem('mixingai_used_free') === '1';
-      const usedFreeDevice = localStorage.getItem(`mixingai_fp_${fp}`) === '1';
-      const usedFree = usedFreeLocal || usedFreeDevice;
-
-      if (usedFree) return { allowed:false, isPro:false, reason:'freeDone', fp };
+      const usedFreeGuest = localStorage.getItem('mixingai_used_free') === '1' ||
+                            localStorage.getItem(`mixingai_fp_${fp}`) === '1';
+      if (usedFreeGuest) return { allowed:false, isPro:false, reason:'freeDone', fp };
       return { allowed:true, isPro:false, fp };
     } catch { return { allowed:true, isPro:false }; }
   };
@@ -612,10 +616,13 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     const access = getAccessInfo();
     if (!access.allowed) { setShowPaywall(true); return; }
     if (!access.isPro) {
-      // Mark free mix as used via localStorage + device fingerprint
-      localStorage.setItem('mixingai_used_free', '1');
-      if ((access as any).fp) {
-        localStorage.setItem(`mixingai_fp_${(access as any).fp}`, '1');
+      // Mark free mix as used — per user email if registered, per device if guest
+      const a = access as any;
+      if (a.email) {
+        localStorage.setItem(`mixingai_used_free_${a.email}`, '1');
+      } else {
+        localStorage.setItem('mixingai_used_free', '1');
+        if (a.fp) localStorage.setItem(`mixingai_fp_${a.fp}`, '1');
       }
     }
     handleExportMix();

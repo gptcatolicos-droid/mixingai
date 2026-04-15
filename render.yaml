@@ -10,9 +10,6 @@ services:
         destination: /index.html
     headers:
       - path: /*
-        name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.mercadopago.com https://www.paypal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mercadopago.com https://www.paypal.com https://mixingmusic.ai; frame-src https://www.paypal.com https://sdk.mercadopago.com; object-src 'none'; base-uri 'self'; form-action 'self' https://www.paypal.com https://sdk.mercadopago.com"
-      - path: /*
         name: X-Frame-Options
         value: DENY
       - path: /*
@@ -33,3 +30,6 @@ services:
       - path: /*
         name: Cross-Origin-Opener-Policy
         value: same-origin-allow-popups
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://sdk.mercadopago.com https://www.paypal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mercadopago.com https://www.paypal.com https://www.sandbox.paypal.com https://mixingmusic.ai https://api.ipify.org https://www.googletagmanager.com https://www.google-analytics.com; frame-src https://www.paypal.com https://sdk.mercadopago.com; object-src 'none'; base-uri 'self'; form-action 'self' https://www.paypal.com https://sdk.mercadopago.com"
