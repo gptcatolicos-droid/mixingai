@@ -113,7 +113,11 @@ function PaywallModal({ onClose, onSuccess }: { onClose:()=>void; onSuccess:()=>
         if (!supaUrl || !supaKey) throw new Error('Config missing');
         const res = await fetch(`${supaUrl}/functions/v1/create-mercadopago-subscription`, {
           method: 'POST',
-          headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${supaKey}` },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supaKey}`,
+            'apikey': supaKey,
+          },
           body: JSON.stringify({ userId: u?.id || u?.email || 'guest', userEmail: u?.email || 'guest@mixingmusic.ai' }),
         });
         const data = await res.json();
