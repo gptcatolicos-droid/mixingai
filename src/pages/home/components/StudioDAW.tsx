@@ -1,504 +1,587 @@
-/**
- * StudioDAW.tsx
- * DAW con el visual de Claude Design + motor de audio real del MixEditor
- * Timeline con clips y waveforms reales, inspector, presets, EQ, LUFS, exportar
- */
 import { useState, useRef, useEffect } from 'react';
 import FlowNav from '@/components/flow/FlowNav';
 import { MixPreset, PRESETS } from './PresetScreen';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
 interface User { id:string; firstName:string; lastName:string; email:string; country:string; credits:number; provider?:string; createdAt:string; is_pro?:boolean; plan?:string; }
-interface Stem { id:string; name:string; file:File; buffer:AudioBuffer; gainNode:GainNode; panNode:StereoPannerNode; analyserNode:AnalyserNode; eqLow:BiquadFilterNode; eqMid:BiquadFilterNode; eqHigh:BiquadFilterNode; sourceNode?:AudioBufferSourceNode; volume:number; pan:number; muted:boolean; solo:boolean; fftData:Uint8Array; waveformPeaks:Float32Array; instrument:string; icon:string; color:string; }
-interface StudioDAWProps { projectId:string; user:User; uploadedFiles:File[]; onBack:()=>void; onCreditsUpdate:(n:number)=>void; onExport:(d:any)=>void; initialPreset?:MixPreset; reverbOn?:boolean; delayOn?:boolean; stereoOn?:boolean; onNavigate?:(id:string)=>void; }
+interface Stem { id:string; name:string; file:File; buffer:AudioBuffer; gainNode:GainNode; panNode:StereoPannerNode; analyserNode:AnalyserNode; eqLow:BiquadFilterNode; eqMid:BiquadFilterNode; eqHigh:BiquadFilterNode; sourceNode?:AudioBufferSourceNode; volume:number; pan:number; muted:boolean; solo:boolean; waveformPeaks:Float32Array; instrument:string; icon:string; color:string; }
+interface Props { projectId:string; user:User; uploadedFiles:File[]; onBack:()=>void; onCreditsUpdate:(n:number)=>void; onExport:(d:any)=>void; initialPreset?:MixPreset; reverbOn?:boolean; delayOn?:boolean; stereoOn?:boolean; onNavigate?:(id:string)=>void; }
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-const T = { bg:'#0a0612', bgDeep:'#0F0A1A', surface:'rgba(26,16,40,0.62)', surface2:'rgba(35,20,55,0.5)', surfaceSolid:'#1a1028', text:'#F8F0FF', text2:'#b8a8d0', text3:'#7a6a90', pink:'#ec4899', fuchsia:'#C026D3', violet:'#a259ff', amber:'#fbbf24', green:'#10b981', red:'#ef4444', border:'rgba(192,38,211,0.18)', borderStrong:'rgba(192,38,211,0.45)' };
-const STEM_COLORS = ['#ec4899','#10b981','#f97316','#3b82f6','#fbbf24','#a259ff','#94a3b8','#14b8a6','#f472b6','#4ade80','#fb923c','#60a5fa'];
-const TRACK_H = 58;
-const IAEQ_PRESETS = [
-  { id:'default', name:'Default', bands:[0,0,0,0,0,0,0,0,0,0,0,0] },
-  { id:'car', name:'Car', bands:[0,3,4,2,1,0,-1,0,1,2,2,1] },
-  { id:'iphone', name:'iPhone', bands:[0,-2,-1,0,1,2,2,1,0,-1,-2,-3] },
-  { id:'headphones', name:'Headphones', bands:[0,2,3,1,0,-1,0,1,2,3,3,2] },
-  { id:'tv', name:'TV', bands:[0,-4,-3,-1,0,2,3,2,1,0,-1,-2] },
-  { id:'bt', name:'Bluetooth', bands:[0,4,5,3,1,-1,-2,-1,0,1,1,0] },
-  { id:'studio', name:'Studio Monitors', bands:[0,0,0,0,0,0,0,0,0,0,0,0] },
+const T = { bgDeep:'#0F0A1A', surface:'rgba(26,16,40,0.8)', surface2:'rgba(35,20,55,0.6)', surfaceSolid:'#12091e', text:'#F8F0FF', text2:'#b8a8d0', text3:'#7a6a90', pink:'#ec4899', fuchsia:'#C026D3', violet:'#a259ff', amber:'#fbbf24', green:'#10b981', border:'rgba(192,38,211,0.2)', borderStrong:'rgba(192,38,211,0.5)' };
+const COLORS = ['#ec4899','#10b981','#f97316','#3b82f6','#fbbf24','#a259ff','#14b8a6','#f472b6','#4ade80','#fb923c','#60a5fa','#c084fc'];
+const TH = 56;
+const IAEQ = [
+  {id:'default',name:'Default',bands:[0,0,0,0,0,0,0,0,0,0,0,0]},
+  {id:'car',name:'Car',bands:[0,3,4,2,1,0,-1,0,1,2,2,1]},
+  {id:'iphone',name:'iPhone',bands:[0,-2,-1,0,1,2,2,1,0,-1,-2,-3]},
+  {id:'macbook',name:'MacBook',bands:[0,-3,-2,0,1,2,2,1,-1,-2,-3,-4]},
+  {id:'headphones',name:'Headphones',bands:[0,2,3,1,0,-1,0,1,2,3,3,2]},
+  {id:'tv',name:'TV',bands:[0,-4,-3,-1,0,2,3,2,1,0,-1,-2]},
+  {id:'theater',name:'Home Theater',bands:[0,5,4,3,1,0,-1,0,1,3,2,1]},
+  {id:'bt',name:'Bluetooth',bands:[0,4,5,3,1,-1,-2,-1,0,1,1,0]},
+  {id:'studio',name:'Studio Monitors',bands:[0,0,0,0,0,0,0,0,0,0,0,0]},
+  {id:'gaming',name:'Gaming Headset',bands:[0,3,2,1,0,0,1,2,3,4,3,2]},
+  {id:'tablet',name:'Tablet',bands:[0,-2,-2,0,1,2,2,1,0,-1,-2,-3]},
 ];
 
-function detectInstrument(filename:string):{instrument:string;icon:string} {
-  const n=filename.toLowerCase().replace(/[_\-\.]/g,' ');
-  if(/voz|voc|vocal|lead|singer|coro|choir|bgv|backing/.test(n)) return{instrument:'Voz',icon:'🎤'};
-  if(/kick|bombo|drum|perc|beat|snare|hihat/.test(n)) return{instrument:'Batería',icon:'🥁'};
-  if(/bass|bajo|808|sub/.test(n)) return{instrument:'Bajo',icon:'🎸'};
-  if(/guitar|guitarra|gtr/.test(n)) return{instrument:'Guitarra',icon:'🎸'};
-  if(/piano|keys|keyboard|synth|pad|organ/.test(n)) return{instrument:'Teclado',icon:'🎹'};
+function detectInfo(n:string){
+  const s=n.toLowerCase().replace(/[_\-\.]/g,' ');
+  if(/voz|voc|vocal|lead|singer|coro|choir|bgv|backing/.test(s))return{instrument:'Voz',icon:'🎤'};
+  if(/kick|bombo|drum|perc|beat|snare|hihat/.test(s))return{instrument:'Batería',icon:'🥁'};
+  if(/bass|bajo|808|sub/.test(s))return{instrument:'Bajo',icon:'🎸'};
+  if(/guitar|guitarra|gtr/.test(s))return{instrument:'Guitarra',icon:'🎸'};
+  if(/piano|keys|keyboard|synth|pad|organ/.test(s))return{instrument:'Teclado',icon:'🎹'};
   return{instrument:'Pista',icon:'🎵'};
 }
 
-function generatePeaks(buffer:AudioBuffer,count:number):Float32Array {
-  const data=buffer.getChannelData(0);
-  const peaks=new Float32Array(count);
-  const step=Math.floor(data.length/count);
-  for(let i=0;i<count;i++){let max=0;for(let j=0;j<step;j++){const v=Math.abs(data[i*step+j]||0);if(v>max)max=v;}peaks[i]=max;}
-  return peaks;
+function peaks(buf:AudioBuffer,n:number):Float32Array{
+  const d=buf.getChannelData(0),r=new Float32Array(n),s=Math.floor(d.length/n);
+  for(let i=0;i<n;i++){let m=0;for(let j=0;j<s;j++){const v=Math.abs(d[i*s+j]||0);if(v>m)m=v;}r[i]=m;}
+  return r;
 }
 
 function fmt(s:number){return`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;}
 
-// ─── Clip Waveform Canvas ─────────────────────────────────────────────────────
-function ClipWave({peaks,color,width,height,muted}:{peaks:Float32Array;color:string;width:number;height:number;muted:boolean}) {
+// Waveform canvas inside clip
+function WaveClip({p,color,w,h,muted}:{p:Float32Array;color:string;w:number;h:number;muted:boolean}){
   const ref=useRef<HTMLCanvasElement>(null);
   useEffect(()=>{
     const c=ref.current;if(!c)return;
     const dpr=window.devicePixelRatio||1;
-    c.width=width*dpr;c.height=height*dpr;
+    c.width=w*dpr;c.height=h*dpr;
     const ctx=c.getContext('2d');if(!ctx)return;
-    ctx.scale(dpr,dpr);ctx.clearRect(0,0,width,height);
-    const cy=height/2;
-    ctx.strokeStyle=muted?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.8)';
-    ctx.lineWidth=1;ctx.beginPath();
-    for(let i=0;i<peaks.length;i++){
-      const x=(i/(peaks.length-1))*width;
-      const a=peaks[i]*(height/2-2);
+    ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);
+    ctx.strokeStyle='rgba(255,255,255,'+(muted?0.2:0.85)+')';
+    ctx.lineWidth=0.8;ctx.beginPath();
+    const cy=h/2;
+    for(let i=0;i<p.length;i++){
+      const x=(i/(p.length-1))*w,a=p[i]*(cy-1);
       ctx.moveTo(x,cy-a);ctx.lineTo(x,cy+a);
     }
     ctx.stroke();
-  },[peaks,color,width,height,muted]);
-  return <canvas ref={ref} style={{width,height,display:'block',opacity:muted?0.3:1}}/>;
+  },[p,w,h,muted]);
+  return <canvas ref={ref} style={{width:w,height:h,display:'block'}}/>;
 }
 
-// ─── Mini Slider ─────────────────────────────────────────────────────────────
-function SliderRow({label,value,min,max,step,color,onChange}:{label:string;value:number;min:number;max:number;step:number;color:string;onChange:(v:number)=>void}) {
+// Slider row in inspector
+function SRow({label,value,min,max,step,color,unit='dB',onChange}:{label:string;value:number;min:number;max:number;step:number;color:string;unit?:string;onChange:(v:number)=>void}){
   return(
     <div style={{marginBottom:10}}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
         <span style={{fontSize:10,color:T.text2}}>{label}</span>
-        <span style={{fontSize:10,color,fontFamily:'monospace',fontWeight:600}}>{value>0?'+':''}{value} dB</span>
+        <span style={{fontSize:10,color,fontFamily:'monospace',fontWeight:600}}>{value>0&&unit==='dB'?'+':''}{value}{unit}</span>
       </div>
-      <div style={{position:'relative',height:16,display:'flex',alignItems:'center'}}>
-        <div style={{position:'absolute',left:0,right:0,height:4,background:'rgba(192,38,211,0.15)',borderRadius:2}}>
+      <div style={{position:'relative',height:14,display:'flex',alignItems:'center'}}>
+        <div style={{position:'absolute',left:0,right:0,height:3,background:'rgba(255,255,255,0.06)',borderRadius:2}}>
           <div style={{height:'100%',background:color,borderRadius:2,width:`${((value-min)/(max-min))*100}%`}}/>
         </div>
-        <input type="range" min={min} max={max} step={step} value={value} onChange={e=>onChange(+e.target.value)} style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%'}}/>
+        <input type="range" min={min} max={max} step={step} value={value}
+          onChange={e=>onChange(+e.target.value)}
+          style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%'}}/>
       </div>
     </div>
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-export default function StudioDAW({projectId,user,uploadedFiles,onBack,onCreditsUpdate,onExport,initialPreset=PRESETS[0],reverbOn=false,delayOn=false,stereoOn=false,onNavigate}:StudioDAWProps) {
+export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],reverbOn=false,delayOn=false,stereoOn=false,onBack,onCreditsUpdate,onExport,onNavigate}:Props){
   const [stems,setStems]=useState<Stem[]>([]);
-  const [isPlaying,setIsPlaying]=useState(false);
+  const [playing,setPlaying]=useState(false);
   const [currentTime,setCurrentTime]=useState(0);
   const [duration,setDuration]=useState(0);
-  const [isLoading,setIsLoading]=useState(uploadedFiles.length>0);
-  const [loadingProgress,setLoadingProgress]=useState(0);
-  const [isExporting,setIsExporting]=useState(false);
+  const [loading,setLoading]=useState(uploadedFiles.length>0);
+  const [loadPct,setLoadPct]=useState(0);
+  const [exporting,setExporting]=useState(false);
   const [bassGain,setBassGain]=useState(initialPreset.bass??0);
   const [midGain,setMidGain]=useState(initialPreset.mid??0);
   const [highGain,setHighGain]=useState(initialPreset.high??0);
-  const [reverbActive,setReverbActive]=useState(reverbOn);
-  const [delayActive,setDelayActive]=useState(delayOn);
-  const [widenerActive,setWidenerActive]=useState(stereoOn);
-  const [activePreset,setActivePreset]=useState<MixPreset>(initialPreset);
-  const [iaEqPreset,setIaEqPreset]=useState(IAEQ_PRESETS[0]);
-  const [momentaryLufs,setMomentaryLufs]=useState(-60.0);
-  const [integratedLufs,setIntegratedLufs]=useState(-60.0);
-  const [selectedStemId,setSelectedStemId]=useState<string|null>(null);
-  const [tab,setTab]=useState<'mix'|'gen'|'stems'>('mix');
+  const [revActive,setRevActive]=useState(reverbOn);
+  const [delActive,setDelActive]=useState(delayOn);
+  const [widActive,setWidActive]=useState(stereoOn);
+  const [preset,setPreset]=useState<MixPreset>(initialPreset);
   const [showPresets,setShowPresets]=useState(false);
+  const [iaEq,setIaEq]=useState(IAEQ[0]);
+  const [momLufs,setMomLufs]=useState(-60.0);
+  const [intLufs,setIntLufs]=useState(-60.0);
+  const [selId,setSelId]=useState<string|null>(null);
+  const [tab,setTab]=useState<'mix'|'gen'|'stems'>('mix');
   const [allFiles,setAllFiles]=useState<File[]>(uploadedFiles);
+  const [recActive,setRecActive]=useState(false);
+  const [mediaRec,setMediaRec]=useState<MediaRecorder|null>(null);
 
-  const audioCtxRef=useRef<AudioContext|null>(null);
-  const masterGainRef=useRef<GainNode|null>(null);
-  const mixAnalyserRef=useRef<AnalyserNode|null>(null);
-  const bassFilterRef=useRef<BiquadFilterNode|null>(null);
-  const midFilterRef=useRef<BiquadFilterNode|null>(null);
-  const highFilterRef=useRef<BiquadFilterNode|null>(null);
-  const reverbGainRef=useRef<GainNode|null>(null);
-  const dryGainRef=useRef<GainNode|null>(null);
-  const delayGainRef=useRef<GainNode|null>(null);
-  const pausedTimeRef=useRef(0);
+  // Audio refs
+  const ctxRef=useRef<AudioContext|null>(null);
+  const masterRef=useRef<GainNode|null>(null);
+  const analyserRef=useRef<AnalyserNode|null>(null);
+  const bassRef=useRef<BiquadFilterNode|null>(null);
+  const midRef=useRef<BiquadFilterNode|null>(null);
+  const highRef=useRef<BiquadFilterNode|null>(null);
+  const dryRef=useRef<GainNode|null>(null);
+  const revRef=useRef<GainNode|null>(null);
+  const delRef=useRef<GainNode|null>(null);
+  const pauseRef=useRef(0);
   const timerRef=useRef<number>();
-  const fftCanvasRef=useRef<HTMLCanvasElement>(null);
-  const timelineCanvasRef=useRef<HTMLCanvasElement>(null);
-  const iaEqNodesRef=useRef<(BiquadFilterNode|GainNode)[]>([]);
-  const lufsHistRef=useRef<number[]>([]);
+  const fftRef=useRef<HTMLCanvasElement>(null);
+  const lufsHist=useRef<number[]>([]);
+  const iaNodes=useRef<(BiquadFilterNode|GainNode)[]>([]);
+  const rafRef=useRef<number>();
 
   useEffect(()=>{setAllFiles(uploadedFiles);},[uploadedFiles]);
   useEffect(()=>{if(allFiles.length>0)initAudio();},[allFiles]);
+  useEffect(()=>()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);},[]);
 
   const initAudio=async()=>{
-    setIsLoading(true);setLoadingProgress(10);
+    setLoading(true);setLoadPct(5);
     try{
-      if(audioCtxRef.current&&audioCtxRef.current.state!=='closed') await audioCtxRef.current.close();
+      if(ctxRef.current&&ctxRef.current.state!=='closed')await ctxRef.current.close();
       const ctx=new(window.AudioContext||(window as any).webkitAudioContext)();
-      audioCtxRef.current=ctx;
-      // Master chain
-      const masterGain=ctx.createGain();masterGain.gain.value=1;masterGainRef.current=masterGain;
-      const mixAnalyser=ctx.createAnalyser();mixAnalyser.fftSize=2048;mixAnalyser.smoothingTimeConstant=0.8;mixAnalyserRef.current=mixAnalyser;
-      const bassFilter=ctx.createBiquadFilter();bassFilter.type='lowshelf';bassFilter.frequency.value=200;bassFilter.gain.value=bassGain;bassFilterRef.current=bassFilter;
-      const midFilter=ctx.createBiquadFilter();midFilter.type='peaking';midFilter.frequency.value=1000;midFilter.Q.value=1;midFilter.gain.value=midGain;midFilterRef.current=midFilter;
-      const highFilter=ctx.createBiquadFilter();highFilter.type='highshelf';highFilter.frequency.value=5000;highFilter.gain.value=highGain;highFilterRef.current=highFilter;
-      // IA EQ chain
-      const iaEqOutput=buildIAEQChain(ctx,highFilter);
-      // Reverb/Delay
-      const dryGain=ctx.createGain();dryGain.gain.value=1;dryGainRef.current=dryGain;
-      const reverbGain=ctx.createGain();reverbGain.gain.value=reverbActive?0.3:0;reverbGainRef.current=reverbGain;
-      const delayNode=ctx.createDelay(2.0);delayNode.delayTime.value=0.25;
-      const delayGain=ctx.createGain();delayGain.gain.value=delayActive?0.2:0;delayGainRef.current=delayGain;
-      iaEqOutput.connect(dryGain);iaEqOutput.connect(delayNode);delayNode.connect(delayGain);
-      dryGain.connect(masterGain);reverbGain.connect(masterGain);delayGain.connect(masterGain);
-      masterGain.connect(mixAnalyser);mixAnalyser.connect(ctx.destination);
-      // Connect EQ chain
-      masterGain.connect(bassFilter);bassFilter.connect(midFilter);midFilter.connect(highFilter);
-      setLoadingProgress(30);
-      // Decode files
-      const stemsArr:Stem[]=[];
+      ctxRef.current=ctx;
+
+      // ── Correct signal chain ──
+      // stem gainNode → stem panNode → stem eqLow → eqMid → eqHigh → stem analyser → dryGain
+      // dryGain → bassFilter → midFilter → highFilter → masterGain → mixAnalyser → destination
+      // (reverb/delay taps from dryGain)
+
+      const master=ctx.createGain();master.gain.value=1;masterRef.current=master;
+      const analyser=ctx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=0.8;analyserRef.current=analyser;
+      master.connect(analyser);analyser.connect(ctx.destination);
+
+      const bass=ctx.createBiquadFilter();bass.type='lowshelf';bass.frequency.value=200;bass.gain.value=bassGain;bassRef.current=bass;
+      const mid=ctx.createBiquadFilter();mid.type='peaking';mid.frequency.value=1000;mid.Q.value=1;mid.gain.value=midGain;midRef.current=mid;
+      const high=ctx.createBiquadFilter();high.type='highshelf';high.frequency.value=5000;high.gain.value=highGain;highRef.current=high;
+
+      // IA EQ chain inserted between high and master
+      const iaOut=buildIA(ctx,high);
+
+      const dry=ctx.createGain();dry.gain.value=1;dryRef.current=dry;
+      iaOut.connect(dry);
+
+      // Reverb via convolver approximation (simple delay)
+      const revConv=ctx.createDelay(1.0);revConv.delayTime.value=0.06;
+      const rev=ctx.createGain();rev.gain.value=revActive?0.25:0;revRef.current=rev;
+      dry.connect(revConv);revConv.connect(rev);
+
+      // Delay
+      const delNode=ctx.createDelay(2.0);delNode.delayTime.value=0.25;
+      const del=ctx.createGain();del.gain.value=delActive?0.2:0;delRef.current=del;
+      dry.connect(delNode);delNode.connect(del);
+
+      // All mix into bass (EQ chain)
+      dry.connect(bass);rev.connect(bass);del.connect(bass);
+      bass.connect(mid);mid.connect(high);
+      // high → iaOut (already built) → dry (already)
+      // Wait — iaOut needs to come BEFORE dry. Let me fix:
+      // correct: stems → dry → bass → mid → high → iaEq → master → analyser → dest
+      // Rebuild:
+      dry.disconnect();rev.disconnect();del.disconnect();
+      bass.disconnect();mid.disconnect();high.disconnect();
+
+      // Correct chain: dry → bass → mid → high → iaOut2 → master → analyser → dest
+      dry.connect(bass);bass.connect(mid);mid.connect(high);
+      const iaOut2=buildIA(ctx,high);
+      iaOut2.connect(master);
+
+      // Rev/Del taps from dry (parallel)
+      dry.connect(revConv);revConv.connect(rev);rev.connect(master);
+      dry.connect(delNode);delNode.connect(del);del.connect(master);
+
+      setLoadPct(20);
+
+      // Decode stems
+      const arr:Stem[]=[];
       for(let i=0;i<allFiles.length;i++){
         const file=allFiles[i];
-        setLoadingProgress(30+Math.round((i/allFiles.length)*60));
+        setLoadPct(20+Math.round((i/allFiles.length)*70));
         try{
           const ab=await file.arrayBuffer();
-          const buffer=await ctx.decodeAudioData(ab);
-          const gainNode=ctx.createGain();gainNode.gain.value=1;
-          const panNode=ctx.createStereoPanner();panNode.pan.value=0;
-          const analyserNode=ctx.createAnalyser();analyserNode.fftSize=512;analyserNode.smoothingTimeConstant=0.7;
-          const eqLow=ctx.createBiquadFilter();eqLow.type='lowshelf';eqLow.frequency.value=200;eqLow.gain.value=0;
-          const eqMid=ctx.createBiquadFilter();eqMid.type='peaking';eqMid.frequency.value=1000;eqMid.Q.value=1;eqMid.gain.value=0;
-          const eqHigh=ctx.createBiquadFilter();eqHigh.type='highshelf';eqHigh.frequency.value=5000;eqHigh.gain.value=0;
-          gainNode.connect(panNode);panNode.connect(eqLow);eqLow.connect(eqMid);eqMid.connect(eqHigh);eqHigh.connect(analyserNode);analyserNode.connect(dryGain);
-          const {instrument,icon}=detectInstrument(file.name);
-          const peaks=generatePeaks(buffer,200);
-          stemsArr.push({id:`stem-${i}`,name:file.name.replace(/\.[^.]+$/,''),file,buffer,gainNode,panNode,analyserNode,eqLow,eqMid,eqHigh,volume:0,pan:0,muted:false,solo:false,fftData:new Uint8Array(analyserNode.frequencyBinCount),waveformPeaks:peaks,instrument,icon,color:STEM_COLORS[i%STEM_COLORS.length]});
-        }catch(e){console.error('Error decodificando',file.name,e);}
+          const buf=await ctx.decodeAudioData(ab);
+          const gain=ctx.createGain();gain.gain.value=1;
+          const pan=ctx.createStereoPanner();pan.pan.value=0;
+          const an=ctx.createAnalyser();an.fftSize=256;an.smoothingTimeConstant=0.7;
+          const el=ctx.createBiquadFilter();el.type='lowshelf';el.frequency.value=200;el.gain.value=0;
+          const em=ctx.createBiquadFilter();em.type='peaking';em.frequency.value=1000;em.Q.value=1;em.gain.value=0;
+          const eh=ctx.createBiquadFilter();eh.type='highshelf';eh.frequency.value=5000;eh.gain.value=0;
+          // stem chain
+          gain.connect(pan);pan.connect(el);el.connect(em);em.connect(eh);eh.connect(an);an.connect(dry);
+          const info=detectInfo(file.name);
+          arr.push({id:`s${i}`,name:file.name.replace(/\.[^.]+$/,''),file,buffer:buf,gainNode:gain,panNode:pan,analyserNode:an,eqLow:el,eqMid:em,eqHigh:eh,volume:0,pan:0,muted:false,solo:false,waveformPeaks:peaks(buf,300),instrument:info.instrument,icon:info.icon,color:COLORS[i%COLORS.length]});
+        }catch(e){console.error('decode err',file.name,e);}
       }
-      setStems(stemsArr);
-      setDuration(Math.max(...stemsArr.map(s=>s.buffer.duration),0));
-      if(stemsArr.length>0)setSelectedStemId(stemsArr[0].id);
-      setLoadingProgress(100);
-      setIsLoading(false);
+      setStems(arr);
+      setDuration(arr.length?Math.max(...arr.map(s=>s.buffer.duration)):0);
+      if(arr.length)setSelId(arr[0].id);
+      setLoadPct(100);setLoading(false);
       startFFT();
-    }catch(err){console.error('Audio init error',err);setIsLoading(false);}
+    }catch(e){console.error('initAudio',e);setLoading(false);}
   };
 
-  const buildIAEQChain=(ctx:AudioContext,input:AudioNode):AudioNode=>{
+  const buildIA=(ctx:AudioContext,input:AudioNode):AudioNode=>{
+    // Build fresh IA EQ nodes
     const nodes:(BiquadFilterNode|GainNode)[]=[];
-    const pg=ctx.createGain();pg.gain.value=1;nodes.push(pg);input.connect(pg);let prev:AudioNode=pg;
-    for(let i=1;i<12;i++){const f=ctx.createBiquadFilter();f.type=i===1?'lowshelf':i===11?'highshelf':'peaking';f.frequency.value=[30,60,170,310,600,1000,3000,6000,12000,14000,16000][i-1];f.Q.value=1;f.gain.value=0;nodes.push(f);prev.connect(f);prev=f;}
-    iaEqNodesRef.current=nodes;return prev;
+    const pg=ctx.createGain();pg.gain.value=1;nodes.push(pg);
+    input.connect(pg);let prev:AudioNode=pg;
+    const freqs=[30,60,170,310,600,1000,3000,6000,12000,14000,16000];
+    for(let i=0;i<freqs.length;i++){
+      const f=ctx.createBiquadFilter();
+      f.type=i===0?'lowshelf':i===10?'highshelf':'peaking';
+      f.frequency.value=freqs[i];f.Q.value=1;f.gain.value=iaEq.bands[i+1]??0;
+      nodes.push(f);prev.connect(f);prev=f;
+    }
+    iaNodes.current=nodes;return prev;
   };
 
   const startFFT=()=>{
     const tick=()=>{
-      const analyser=mixAnalyserRef.current;const canvas=fftCanvasRef.current;
-      if(analyser&&canvas){
-        const data=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(data);
-        // LUFS approximation
-        let sum=0;for(let i=0;i<data.length;i++)sum+=data[i]*data[i];
-        const rms=Math.sqrt(sum/data.length);const lufs=-60+rms*0.35;
-        setMomentaryLufs(Math.max(-60,Math.min(0,lufs)));
-        lufsHistRef.current.push(lufs);if(lufsHistRef.current.length>300)lufsHistRef.current.shift();
-        const avg=lufsHistRef.current.reduce((a,b)=>a+b,0)/lufsHistRef.current.length;
-        setIntegratedLufs(Math.max(-60,Math.min(0,avg)));
-        // Draw FFT
-        const dpr=window.devicePixelRatio||1;const w=canvas.offsetWidth,h=canvas.offsetHeight;
-        canvas.width=w*dpr;canvas.height=h*dpr;const ctx=canvas.getContext('2d');if(ctx){ctx.scale(dpr,dpr);
-          const grad=ctx.createLinearGradient(0,0,0,h);grad.addColorStop(0,'#ec4899');grad.addColorStop(0.5,'#C026D3');grad.addColorStop(1,'rgba(192,38,211,0.1)');
-          ctx.clearRect(0,0,w,h);ctx.fillStyle=grad;
-          for(let i=0;i<data.length&&i<w;i++){const bar=(data[i]/255)*h;ctx.fillRect(i*(w/data.length),h-bar,Math.max(1,w/data.length-1),bar);}
+      rafRef.current=requestAnimationFrame(tick);
+      const an=analyserRef.current;const c=fftRef.current;
+      if(an&&c){
+        const data=new Uint8Array(an.frequencyBinCount);an.getByteFrequencyData(data);
+        const dpr=window.devicePixelRatio||1,w=c.offsetWidth,h=c.offsetHeight;
+        if(w===0)return;
+        c.width=w*dpr;c.height=h*dpr;
+        const ctx=c.getContext('2d');if(!ctx)return;
+        ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);
+        const bw=w/data.length;
+        for(let i=0;i<data.length;i++){
+          const pct=data[i]/255;const bh=pct*h;
+          const g=ctx.createLinearGradient(0,h-bh,0,h);
+          g.addColorStop(0,'#ec4899');g.addColorStop(1,'rgba(192,38,211,0.2)');
+          ctx.fillStyle=g;ctx.fillRect(i*bw,h-bh,Math.max(1,bw-1),bh);
         }
+        let sum=0;for(let i=0;i<data.length;i++)sum+=data[i]*data[i];
+        const rms=Math.sqrt(sum/data.length);const lv=rms>0?-60+rms*0.4:-60;
+        setMomLufs(Math.max(-60,Math.min(0,lv)));
+        lufsHist.current.push(lv);if(lufsHist.current.length>300)lufsHist.current.shift();
+        const avg=lufsHist.current.reduce((a,b)=>a+b,0)/lufsHist.current.length;
+        setIntLufs(Math.max(-60,Math.min(0,avg)));
       }
-      requestAnimationFrame(tick);
-    };requestAnimationFrame(tick);
+    };tick();
   };
 
-  const handlePlayPause=async()=>{
-    const ctx=audioCtxRef.current;if(!ctx||stems.length===0)return;
+  const play=async()=>{
+    const ctx=ctxRef.current;if(!ctx||stems.length===0)return;
     if(ctx.state==='suspended')await ctx.resume();
-    if(isPlaying){
+    if(playing){
       stems.forEach(s=>{try{s.sourceNode?.stop();s.sourceNode?.disconnect();}catch(e){}});
-      setIsPlaying(false);pausedTimeRef.current=currentTime;
+      setPlaying(false);pauseRef.current=currentTime;
       if(timerRef.current)clearInterval(timerRef.current);
     }else{
-      const startTime=ctx.currentTime,offset=pausedTimeRef.current;
-      const updated=stems.map(s=>{
-        if(!s.muted){const src=ctx.createBufferSource();src.buffer=s.buffer;src.connect(s.gainNode);src.start(startTime,offset);return{...s,sourceNode:src};}
-        return s;
+      const t0=ctx.currentTime,off=pauseRef.current;
+      const upd=stems.map(s=>{
+        if(!s.muted){
+          const src=ctx.createBufferSource();src.buffer=s.buffer;
+          src.connect(s.gainNode);src.start(t0,off);
+          return{...s,sourceNode:src};
+        }return s;
       });
-      setStems(updated);setIsPlaying(true);
+      setStems(upd);setPlaying(true);
       timerRef.current=window.setInterval(()=>{
-        const elapsed=ctx.currentTime-startTime+offset;
-        setCurrentTime(Math.min(elapsed,duration));
-        if(elapsed>=duration)handleStop();
-      },100);
+        const el=ctx.currentTime-t0+off;
+        setCurrentTime(Math.min(el,duration));
+        if(el>=duration)stop();
+      },80);
     }
   };
 
-  const handleStop=()=>{
+  const stop=()=>{
     stems.forEach(s=>{try{s.sourceNode?.stop();s.sourceNode?.disconnect();}catch(e){}});
-    setStems(prev=>prev.map(s=>({...s,sourceNode:undefined})));
-    setIsPlaying(false);setCurrentTime(0);pausedTimeRef.current=0;
+    setStems(p=>p.map(s=>({...s,sourceNode:undefined})));
+    setPlaying(false);setCurrentTime(0);pauseRef.current=0;
     if(timerRef.current)clearInterval(timerRef.current);
   };
 
-  const toggleMute=(id:string)=>{
-    const ctx=audioCtxRef.current;
-    setStems(prev=>prev.map(s=>{
-      if(s.id===id){const muted=!s.muted;if(ctx)s.gainNode.gain.setTargetAtTime(muted?0:Math.pow(10,s.volume/20),ctx.currentTime,0.01);return{...s,muted};}
-      return s;
+  const mute=(id:string)=>{
+    const ctx=ctxRef.current;
+    setStems(p=>p.map(s=>{
+      if(s.id===id){const m=!s.muted;if(ctx)s.gainNode.gain.setTargetAtTime(m?0:Math.pow(10,s.volume/20),ctx.currentTime,0.01);return{...s,muted:m};}return s;
     }));
   };
-  const toggleSolo=(id:string)=>{
-    setStems(prev=>{
-      const anyActive=prev.some(s=>s.id===id?!s.solo:s.solo);
-      return prev.map(s=>{
-        const solo=s.id===id?!s.solo:anyActive?false:s.solo;
-        if(audioCtxRef.current)s.gainNode.gain.setTargetAtTime(solo||(anyActive&&!s.solo)?0:Math.pow(10,s.volume/20),audioCtxRef.current.currentTime,0.01);
-        return{...s,solo};
+  const solo=(id:string)=>{
+    setStems(p=>{
+      const any=p.some(s=>s.id===id?!s.solo:s.solo);
+      return p.map(s=>{
+        const sl=s.id===id?!s.solo:any?false:s.solo;
+        const ctx=ctxRef.current;
+        if(ctx)s.gainNode.gain.setTargetAtTime(!sl&&any?0:Math.pow(10,s.volume/20),ctx.currentTime,0.01);
+        return{...s,solo:sl};
       });
     });
   };
-  const updateStemVolume=(id:string,db:number)=>{
-    const ctx=audioCtxRef.current;
-    setStems(prev=>prev.map(s=>{if(s.id===id){if(ctx)s.gainNode.gain.setTargetAtTime(Math.pow(10,db/20),ctx.currentTime,0.01);return{...s,volume:db};}return s;}));
+  const setVol=(id:string,db:number)=>{
+    const ctx=ctxRef.current;
+    setStems(p=>p.map(s=>{if(s.id===id){if(ctx)s.gainNode.gain.setTargetAtTime(Math.pow(10,db/20),ctx.currentTime,0.01);return{...s,volume:db};}return s;}));
+  };
+  const setStemEQ=(id:string,band:'low'|'mid'|'high',val:number)=>{
+    const ctx=ctxRef.current;
+    setStems(p=>p.map(s=>{
+      if(s.id===id){
+        if(ctx){if(band==='low')s.eqLow.gain.setTargetAtTime(val,ctx.currentTime,0.05);else if(band==='mid')s.eqMid.gain.setTargetAtTime(val,ctx.currentTime,0.05);else s.eqHigh.gain.setTargetAtTime(val,ctx.currentTime,0.05);}
+        return{...s};
+      }return s;
+    }));
   };
   const applyPreset=(p:MixPreset)=>{
-    setActivePreset(p);setBassGain(p.bass);setMidGain(p.mid);setHighGain(p.high);
-    setReverbActive(p.reverbWet>0);setDelayActive(p.delayWet>0);setWidenerActive(p.stereoWidth>0.5);
-    const ctx=audioCtxRef.current;
-    if(bassFilterRef.current&&ctx)bassFilterRef.current.gain.setTargetAtTime(p.bass,ctx.currentTime,0.05);
-    if(midFilterRef.current&&ctx)midFilterRef.current.gain.setTargetAtTime(p.mid,ctx.currentTime,0.05);
-    if(highFilterRef.current&&ctx)highFilterRef.current.gain.setTargetAtTime(p.high,ctx.currentTime,0.05);
-    if(reverbGainRef.current&&ctx)reverbGainRef.current.gain.setTargetAtTime(p.reverbWet>0?p.reverbWet:0,ctx.currentTime,0.1);
-    if(delayGainRef.current&&ctx)delayGainRef.current.gain.setTargetAtTime(p.delayWet>0?p.delayWet:0,ctx.currentTime,0.1);
+    setPreset(p);setBassGain(p.bass);setMidGain(p.mid);setHighGain(p.high);
+    setRevActive(p.reverbWet>0);setDelActive(p.delayWet>0);setWidActive(p.stereoWidth>0.5);
+    const ctx=ctxRef.current;
+    if(bassRef.current&&ctx)bassRef.current.gain.setTargetAtTime(p.bass,ctx.currentTime,0.05);
+    if(midRef.current&&ctx)midRef.current.gain.setTargetAtTime(p.mid,ctx.currentTime,0.05);
+    if(highRef.current&&ctx)highRef.current.gain.setTargetAtTime(p.high,ctx.currentTime,0.05);
+    if(revRef.current&&ctx)revRef.current.gain.setTargetAtTime(p.reverbWet>0?0.25:0,ctx.currentTime,0.1);
+    if(delRef.current&&ctx)delRef.current.gain.setTargetAtTime(p.delayWet>0?0.2:0,ctx.currentTime,0.1);
     setShowPresets(false);
   };
-  const updateEQ=(band:'bass'|'mid'|'high',val:number)=>{
-    const ctx=audioCtxRef.current;
-    if(band==='bass'){setBassGain(val);if(bassFilterRef.current&&ctx)bassFilterRef.current.gain.setTargetAtTime(val,ctx.currentTime,0.05);}
-    else if(band==='mid'){setMidGain(val);if(midFilterRef.current&&ctx)midFilterRef.current.gain.setTargetAtTime(val,ctx.currentTime,0.05);}
-    else{setHighGain(val);if(highFilterRef.current&&ctx)highFilterRef.current.gain.setTargetAtTime(val,ctx.currentTime,0.05);}
+  const updEQ=(band:'bass'|'mid'|'high',v:number)=>{
+    const ctx=ctxRef.current;
+    if(band==='bass'){setBassGain(v);if(bassRef.current&&ctx)bassRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
+    else if(band==='mid'){setMidGain(v);if(midRef.current&&ctx)midRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
+    else{setHighGain(v);if(highRef.current&&ctx)highRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
+  };
+  const addFiles=(files:File[])=>{setAllFiles(p=>[...p,...files]);};
+
+  // Recording
+  const toggleRecord=async()=>{
+    if(recActive&&mediaRec){mediaRec.stop();setRecActive(false);return;}
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      const mr=new MediaRecorder(stream);const chunks:Blob[]=[];
+      mr.ondataavailable=e=>chunks.push(e.data);
+      mr.onstop=async()=>{
+        const blob=new Blob(chunks,{type:'audio/wav'});
+        const fname=`grabacion_${Date.now()}.wav`;
+        const file=new File([blob],fname,{type:'audio/wav'});
+        addFiles([file]);
+        stream.getTracks().forEach(t=>t.stop());
+      };
+      mr.start();setMediaRec(mr);setRecActive(true);
+    }catch(e){alert('No se pudo acceder al micrófono');}
   };
 
-  const handleExportClick=async()=>{
-    if(stems.length===0||isExporting)return;
-    setIsExporting(true);
+  const exportMix=async()=>{
+    if(stems.length===0||exporting)return;
+    setExporting(true);
     try{
-      const duration2=Math.max(...stems.map(s=>s.buffer.duration));
-      const offCtx=new OfflineAudioContext(2,Math.floor(44100*duration2),44100);
-      const master=offCtx.createGain();const dest=offCtx.destination;
-      const bass2=offCtx.createBiquadFilter();bass2.type='lowshelf';bass2.frequency.value=200;bass2.gain.value=bassGain;
-      const mid2=offCtx.createBiquadFilter();mid2.type='peaking';mid2.frequency.value=1000;mid2.Q.value=1;mid2.gain.value=midGain;
-      const high2=offCtx.createBiquadFilter();high2.type='highshelf';high2.frequency.value=5000;high2.gain.value=highGain;
-      master.connect(bass2);bass2.connect(mid2);mid2.connect(high2);high2.connect(dest);
+      const dur=Math.max(...stems.map(s=>s.buffer.duration));
+      const off=new OfflineAudioContext(2,Math.floor(44100*dur),44100);
+      const mg=off.createGain();mg.gain.value=1;
+      const ba=off.createBiquadFilter();ba.type='lowshelf';ba.frequency.value=200;ba.gain.value=bassGain;
+      const mi=off.createBiquadFilter();mi.type='peaking';mi.frequency.value=1000;mi.Q.value=1;mi.gain.value=midGain;
+      const hi=off.createBiquadFilter();hi.type='highshelf';hi.frequency.value=5000;hi.gain.value=highGain;
+      ba.connect(mi);mi.connect(hi);hi.connect(mg);mg.connect(off.destination);
       stems.filter(s=>!s.muted).forEach(s=>{
-        const src=offCtx.createBufferSource();src.buffer=s.buffer;
-        const g=offCtx.createGain();g.gain.value=Math.pow(10,s.volume/20);
-        src.connect(g);g.connect(master);src.start(0);
+        const src=off.createBufferSource();src.buffer=s.buffer;
+        const g=off.createGain();g.gain.value=Math.pow(10,s.volume/20);
+        src.connect(g);g.connect(ba);src.start(0);
       });
-      const rendered=await offCtx.startRendering();
-      const wav=audioBufferToWav(rendered);
+      const rendered=await off.startRendering();
+      const wav=toWav(rendered);
       const blob=new Blob([wav],{type:'audio/wav'});
       const url=URL.createObjectURL(blob);
-      const peaks=generatePeaks(rendered,800);
-      onExport({audioBuffer:rendered,audioUrl:url,waveformPeaks:peaks,finalLufs:integratedLufs,presetName:activePreset.name,iaEqPreset:iaEqPreset.name});
-    }catch(e){console.error('Export error',e);}
-    setIsExporting(false);
+      const pk=new Float32Array(800);
+      const ch=rendered.getChannelData(0);const st=Math.floor(ch.length/800);
+      for(let i=0;i<800;i++){let m=0;for(let j=0;j<st;j++){const v=Math.abs(ch[i*st+j]||0);if(v>m)m=v;}pk[i]=m;}
+      onExport({audioBuffer:rendered,audioUrl:url,waveformPeaks:pk,finalLufs:intLufs,presetName:preset.name});
+    }catch(e){console.error('export',e);}
+    setExporting(false);
   };
 
-  const handleAddFiles=(files:File[])=>{
-    setAllFiles(prev=>[...prev,...files]);
-  };
-
-  const selectedStem=stems.find(s=>s.id===selectedStemId)||stems[0];
+  const selStem=stems.find(s=>s.id===selId)||stems[0];
   const pct=duration>0?currentTime/duration:0;
+  const isPro=user?.is_pro||user?.plan==='unlimited';
 
-  // ─── LOADING ─────────────────────────────────────────────────────────────
-  if(isLoading) return(
-    <div style={{width:'100%',height:'100vh',background:T.bgDeep,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'-apple-system,BlinkMacSystemFont,system-ui,sans-serif',color:T.text}}>
+  if(loading)return(
+    <div style={{width:'100%',height:'100vh',background:T.bgDeep,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'system-ui',color:T.text}}>
       <div style={{textAlign:'center'}}>
-        <div style={{width:72,height:72,margin:'0 auto 20px',background:`linear-gradient(135deg,${T.fuchsia},${T.pink})`,borderRadius:20,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:`0 0 32px ${T.fuchsia}66`,fontSize:30}}>✦</div>
+        <div style={{width:72,height:72,margin:'0 auto 20px',background:`linear-gradient(135deg,${T.fuchsia},${T.pink})`,borderRadius:20,display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,boxShadow:`0 0 32px ${T.fuchsia}66`}}>✦</div>
         <div style={{fontSize:16,fontWeight:600,marginBottom:8}}>Cargando MixingStudio AI</div>
-        <div style={{fontSize:12,color:T.text3,marginBottom:20}}>Decodificando audio…</div>
-        <div style={{width:240,height:6,background:'rgba(192,38,211,0.15)',borderRadius:3,margin:'0 auto',overflow:'hidden'}}>
-          <div style={{height:'100%',background:`linear-gradient(90deg,${T.fuchsia},${T.pink})`,borderRadius:3,width:`${loadingProgress}%`,transition:'width 0.3s'}}/>
+        <div style={{fontSize:12,color:T.text3,marginBottom:20}}>Inicializando motor de audio…</div>
+        <div style={{width:260,height:5,background:'rgba(192,38,211,0.15)',borderRadius:3,margin:'0 auto',overflow:'hidden'}}>
+          <div style={{height:'100%',background:`linear-gradient(90deg,${T.fuchsia},${T.pink})`,borderRadius:3,width:`${loadPct}%`,transition:'width 0.3s'}}/>
         </div>
-        <div style={{fontSize:11,color:T.pink,marginTop:8,fontFamily:'monospace'}}>{loadingProgress}%</div>
+        <div style={{fontSize:11,color:T.pink,marginTop:8,fontFamily:'monospace'}}>{loadPct}%</div>
       </div>
     </div>
   );
 
-  // ─── MAIN DAW ─────────────────────────────────────────────────────────────
+  // ── LAYOUT ────────────────────────────────────────────────────────────────
   return(
-    <div style={{width:'100%',height:'100vh',background:`radial-gradient(ellipse at 90% -10%,rgba(192,38,211,0.18),transparent 50%),radial-gradient(ellipse at 0% 110%,rgba(162,89,255,0.14),transparent 50%),${T.bgDeep}`,fontFamily:'-apple-system,BlinkMacSystemFont,"DM Sans",system-ui,sans-serif',color:T.text,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+    <div style={{width:'100%',height:'100vh',background:`radial-gradient(ellipse at 80% -10%,rgba(192,38,211,0.15),transparent 50%),radial-gradient(ellipse at 0% 110%,rgba(162,89,255,0.12),transparent 50%),${T.bgDeep}`,fontFamily:'-apple-system,BlinkMacSystemFont,"DM Sans",system-ui,sans-serif',color:T.text,display:'flex',flexDirection:'column',overflow:'hidden'}}>
 
-      {/* FLOWNAV */}
-      <FlowNav active="studio" onNavigate={(id)=>{if(onNavigate)onNavigate(id);else onBack();}} user={user}/>
+      <FlowNav active="studio" onNavigate={id=>{if(onNavigate)onNavigate(id);else onBack();}} user={user}/>
 
-      {/* TITLE BAR */}
-      <div style={{padding:'10px 20px',display:'flex',alignItems:'center',gap:14,borderBottom:`0.5px solid ${T.border}`,background:'rgba(10,6,18,0.6)',flexShrink:0,flexWrap:'wrap'}}>
-        <span style={{width:10,height:10,background:T.fuchsia,borderRadius:2,boxShadow:`0 0 10px ${T.fuchsia}`}}/>
-        <span style={{fontSize:18,fontWeight:600,background:`linear-gradient(90deg,${T.pink},${T.violet})`,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>MixingStudio AI</span>
-        <span style={{fontSize:11,color:T.text3}}>{stems.length} stems · {fmt(duration)}</span>
-        {/* Preset badge */}
+      {/* TITLE + TRANSPORT */}
+      <div style={{padding:'8px 18px',display:'flex',alignItems:'center',gap:12,borderBottom:`0.5px solid ${T.border}`,background:'rgba(10,6,18,0.7)',flexShrink:0,flexWrap:'wrap'}}>
+        <div style={{width:8,height:8,background:T.fuchsia,borderRadius:2,boxShadow:`0 0 8px ${T.fuchsia}`}}/>
+        <span style={{fontSize:16,fontWeight:700,background:`linear-gradient(90deg,${T.pink},${T.violet})`,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>MixingStudio AI</span>
+        <span style={{fontSize:11,color:T.text3}}>{stems.length} tracks · {fmt(duration)}</span>
+
+        {/* Preset picker */}
         <div style={{position:'relative'}}>
-          <button onClick={()=>setShowPresets(!showPresets)} style={{padding:'4px 12px',borderRadius:980,background:`linear-gradient(135deg,${activePreset.color}22,${activePreset.color}11)`,border:`1.5px solid ${activePreset.color}`,color:activePreset.color,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✦ {activePreset.name} ▾</button>
+          <button onClick={()=>setShowPresets(!showPresets)} style={{padding:'4px 10px',borderRadius:980,background:`${preset.color}22`,border:`1.5px solid ${preset.color}`,color:preset.color,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
+            <span>✦</span>{preset.name}<span style={{fontSize:9}}>▾</span>
+          </button>
           {showPresets&&(
-            <div style={{position:'absolute',top:'100%',left:0,zIndex:200,marginTop:4,background:T.surfaceSolid,border:`1px solid ${T.borderStrong}`,borderRadius:12,padding:8,display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,minWidth:360,boxShadow:`0 8px 32px rgba(0,0,0,0.5)`}}>
+            <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,zIndex:300,background:T.surfaceSolid,border:`1px solid ${T.borderStrong}`,borderRadius:14,padding:10,display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,minWidth:380,boxShadow:'0 12px 40px rgba(0,0,0,0.7)'}}>
               {PRESETS.map(p=>(
-                <button key={p.id} onClick={()=>applyPreset(p)} style={{background:`${p.color}11`,border:`1px solid ${p.id===activePreset.id?p.color:p.color+'33'}`,borderRadius:8,padding:'8px 6px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
+                <button key={p.id} onClick={()=>applyPreset(p)} style={{background:p.id===preset.id?`${p.color}22`:'rgba(255,255,255,0.03)',border:`1px solid ${p.id===preset.id?p.color:p.color+'22'}`,borderRadius:8,padding:'8px 6px',cursor:'pointer',textAlign:'left',fontFamily:'inherit',transition:'all 0.1s'}}>
                   <div style={{height:16,display:'flex',alignItems:'flex-end',gap:'1px',marginBottom:4}}>
-                    {p.wavePattern.map((h,i)=><div key={i} style={{flex:1,height:`${h*100}%`,background:p.color,borderRadius:'1px 1px 0 0',opacity:0.8}}/>)}
+                    {p.wavePattern.map((h,i)=><div key={i} style={{flex:1,height:`${h*100}%`,background:p.color,borderRadius:'1px 1px 0 0',opacity:0.85}}/>)}
                   </div>
-                  <div style={{fontSize:11,fontWeight:700,color:T.text}}>{p.name}</div>
-                  <div style={{fontSize:9,color:p.color,marginTop:2}}>B:{p.bass>0?'+':''}{p.bass} R:{Math.round(p.reverbWet*100)}%</div>
+                  <div style={{fontSize:10,fontWeight:700,color:T.text}}>{p.name}</div>
+                  <div style={{fontSize:8,color:p.color,marginTop:1}}>B:{p.bass>0?'+':''}{p.bass} R:{Math.round(p.reverbWet*100)}%</div>
                 </button>
               ))}
             </div>
           )}
         </div>
+
         <div style={{flex:1}}/>
+
         {/* Transport */}
-        <div style={{display:'flex',gap:6,alignItems:'center'}}>
-          <button onClick={handleStop} disabled={!isPlaying} style={{width:28,height:28,borderRadius:7,background:'rgba(255,255,255,0.04)',border:`0.5px solid ${T.border}`,cursor:'pointer',color:T.text2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10}}>⏹</button>
-          <button onClick={handlePlayPause} disabled={stems.length===0} style={{width:32,height:32,borderRadius:8,background:stems.length===0?'rgba(255,255,255,0.04)':`linear-gradient(135deg,${T.fuchsia},${T.pink})`,border:'none',cursor:stems.length===0?'not-allowed':'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:stems.length>0?`0 0 16px ${T.fuchsia}66`:'none'}}>
-            {isPlaying?<span style={{fontSize:12,color:'#fff'}}>⏸</span>:<span style={{fontSize:14,color:'#fff'}}>▶</span>}
-          </button>
-          <span style={{fontFamily:'monospace',fontSize:13,color:T.text,padding:'4px 10px',background:'rgba(8,4,16,0.5)',borderRadius:6}}>{fmt(currentTime)} / {fmt(duration)}</span>
-        </div>
-        {/* Stems + Export */}
-        <label style={{height:30,padding:'0 12px',borderRadius:8,background:'rgba(255,255,255,0.04)',border:`0.5px solid ${T.border}`,color:T.text2,fontSize:11,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6}}>
-          <input type="file" multiple accept="audio/*" style={{display:'none'}} onChange={e=>{if(e.target.files)handleAddFiles(Array.from(e.target.files));e.target.value='';}}/>
+        <button onClick={stop} style={{width:28,height:28,borderRadius:7,background:'rgba(255,255,255,0.04)',border:`0.5px solid ${T.border}`,cursor:'pointer',color:T.text2,fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>⏹</button>
+        <button onClick={play} disabled={stems.length===0} style={{width:32,height:32,borderRadius:8,background:stems.length?`linear-gradient(135deg,${T.fuchsia},${T.pink})`:'rgba(255,255,255,0.04)',border:'none',cursor:stems.length?'pointer':'not-allowed',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:stems.length?`0 0 14px ${T.fuchsia}66`:'none'}}>
+          {playing?<span style={{fontSize:13,color:'#fff'}}>⏸</span>:<span style={{fontSize:15,color:'#fff'}}>▶</span>}
+        </button>
+        <span style={{fontFamily:'monospace',fontSize:12,color:T.text,padding:'4px 8px',background:'rgba(8,4,16,0.5)',borderRadius:6}}>{fmt(currentTime)}/{fmt(duration)}</span>
+
+        {/* Record */}
+        <button onClick={toggleRecord} style={{height:28,padding:'0 10px',borderRadius:7,background:recActive?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.04)',border:`0.5px solid ${recActive?'#ef4444':T.border}`,color:recActive?'#ef4444':T.text2,fontSize:11,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
+          <span style={{width:7,height:7,borderRadius:'50%',background:recActive?'#ef4444':T.text3,display:'inline-block',animation:recActive?'pulse 1s infinite':'none'}}/>
+          {recActive?'Detener':'Grabar'}
+        </button>
+
+        {/* Add stems */}
+        <label style={{height:28,padding:'0 10px',borderRadius:7,background:'rgba(255,255,255,0.04)',border:`0.5px solid ${T.border}`,color:T.text2,fontSize:11,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}>
+          <input type="file" multiple accept="audio/*" style={{display:'none'}} onChange={e=>{if(e.target.files)addFiles(Array.from(e.target.files));e.target.value='';}}/>
           ⬆ Stems ({stems.length}/12)
         </label>
-        <button onClick={handleExportClick} disabled={stems.length===0||isExporting} style={{height:34,padding:'0 18px',borderRadius:980,background:stems.length===0?'rgba(255,255,255,0.04)':`linear-gradient(135deg,${T.fuchsia},${T.pink})`,border:'none',color:'#fff',fontSize:12,fontWeight:600,cursor:stems.length===0?'not-allowed':'pointer',boxShadow:stems.length>0?`0 0 20px ${T.fuchsia}55`:'none',fontFamily:'inherit'}}>
-          {isExporting?'Exportando…':'⬇ Exportar Mezcla'}
+
+        {/* Export */}
+        <button onClick={exportMix} disabled={stems.length===0||exporting} style={{height:32,padding:'0 16px',borderRadius:980,background:stems.length?`linear-gradient(135deg,${T.fuchsia},${T.pink})`:'rgba(255,255,255,0.04)',border:'none',color:'#fff',fontSize:11,fontWeight:600,cursor:stems.length?'pointer':'not-allowed',fontFamily:'inherit',boxShadow:stems.length?`0 0 18px ${T.fuchsia}55`:'none'}}>
+          {exporting?'Exportando…':'⬇ Exportar Mezcla'}
         </button>
       </div>
 
-      {/* MAIN BODY */}
+      {/* BODY: LEFT INSPECTOR | TIMELINE | RIGHT MIX BUS */}
       <div style={{flex:1,display:'flex',minHeight:0,overflow:'hidden'}}>
 
-        {/* INSPECTOR */}
-        <div style={{width:220,flexShrink:0,background:'rgba(15,10,26,0.7)',borderRight:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-          <div style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`}}>
-            <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:6}}>Inspector</div>
-            {selectedStem?(
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{width:4,height:24,borderRadius:2,background:selectedStem.color,boxShadow:`0 0 8px ${selectedStem.color}`}}/>
-                <div>
-                  <div style={{fontSize:12,fontWeight:600,color:T.text,maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{selectedStem.name}</div>
-                  <div style={{fontSize:10,color:T.text3}}>{selectedStem.instrument}</div>
+        {/* ── LEFT: INSPECTOR (selected track) ── */}
+        <div style={{width:200,flexShrink:0,background:'rgba(12,7,22,0.9)',borderRight:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div style={{padding:'10px 12px',borderBottom:`0.5px solid ${T.border}`}}>
+            <div style={{fontSize:8,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:6}}>Inspector</div>
+            {selStem?(
+              <div style={{display:'flex',alignItems:'center',gap:7}}>
+                <span style={{width:3,height:24,borderRadius:2,background:selStem.color,boxShadow:`0 0 8px ${selStem.color}`}}/>
+                <div style={{minWidth:0}}>
+                  <div style={{fontSize:11,fontWeight:600,color:T.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:150}}>{selStem.name}</div>
+                  <div style={{fontSize:9,color:T.text3}}>{selStem.instrument}</div>
                 </div>
               </div>
-            ):<div style={{fontSize:11,color:T.text3}}>Selecciona un track</div>}
+            ):<div style={{fontSize:10,color:T.text3}}>Selecciona un track</div>}
           </div>
-          {selectedStem&&(
-            <div style={{flex:1,overflow:'auto',padding:'12px 14px'}}>
-              <SliderRow label="Volumen" value={selectedStem.volume} min={-24} max={6} step={1} color={selectedStem.color} onChange={v=>updateStemVolume(selectedStem.id,v)}/>
-              <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginTop:10,marginBottom:8}}>EQ — Stem</div>
-              <SliderRow label="Bass" value={selectedStem.eqLow.gain.value} min={-12} max={12} step={1} color={T.pink} onChange={v=>{const ctx=audioCtxRef.current;setStems(p=>p.map(s=>s.id===selectedStem.id?{...s}:s));if(ctx)selectedStem.eqLow.gain.setTargetAtTime(v,ctx.currentTime,0.05);}}/>
-              <SliderRow label="Mid" value={selectedStem.eqMid.gain.value} min={-12} max={12} step={1} color={T.fuchsia} onChange={v=>{const ctx=audioCtxRef.current;if(ctx)selectedStem.eqMid.gain.setTargetAtTime(v,ctx.currentTime,0.05);}}/>
-              <SliderRow label="High" value={selectedStem.eqHigh.gain.value} min={-12} max={12} step={1} color={T.violet} onChange={v=>{const ctx=audioCtxRef.current;if(ctx)selectedStem.eqHigh.gain.setTargetAtTime(v,ctx.currentTime,0.05);}}/>
-              {/* FX del stem */}
-              <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginTop:12,marginBottom:8}}>Efectos</div>
-              {[{l:'Reverb',a:reverbActive,t:()=>setReverbActive(!reverbActive)},{l:'Delay',a:delayActive,t:()=>setDelayActive(!delayActive)},{l:'Widener',a:widenerActive,t:()=>setWidenerActive(!widenerActive)}].map(fx=>(
-                <div key={fx.l} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                  <span style={{fontSize:11,color:T.text}}>{fx.l}</span>
-                  <div onClick={fx.t} style={{width:30,height:16,borderRadius:8,background:fx.a?T.fuchsia:'rgba(155,126,200,0.2)',position:'relative',cursor:'pointer',transition:'background 0.2s'}}>
-                    <div style={{width:12,height:12,borderRadius:'50%',background:'#fff',position:'absolute',top:2,left:fx.a?16:2,transition:'left 0.2s'}}/>
+          {selStem&&(
+            <div style={{flex:1,overflow:'auto',padding:'10px 12px'}}>
+              <SRow label="Volumen" value={selStem.volume} min={-24} max={6} step={1} color={selStem.color} onChange={v=>setVol(selStem.id,v)}/>
+              <div style={{fontSize:8,color:T.text3,letterSpacing:.5,textTransform:'uppercase',margin:'10px 0 8px'}}>EQ — Stem</div>
+              <SRow label="Bass" value={Math.round(selStem.eqLow.gain.value)} min={-12} max={12} step={1} color={T.pink} onChange={v=>setStemEQ(selStem.id,'low',v)}/>
+              <SRow label="Mid" value={Math.round(selStem.eqMid.gain.value)} min={-12} max={12} step={1} color={T.fuchsia} onChange={v=>setStemEQ(selStem.id,'mid',v)}/>
+              <SRow label="High" value={Math.round(selStem.eqHigh.gain.value)} min={-12} max={12} step={1} color={T.violet} onChange={v=>setStemEQ(selStem.id,'high',v)}/>
+              <div style={{fontSize:8,color:T.text3,letterSpacing:.5,textTransform:'uppercase',margin:'10px 0 8px'}}>Efectos del stem</div>
+              {[{l:'Reverb',a:revActive,fn:()=>setRevActive(!revActive)},{l:'Delay',a:delActive,fn:()=>setDelActive(!delActive)},{l:'Widener',a:widActive,fn:()=>setWidActive(!widActive)}].map(fx=>(
+                <div key={fx.l} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:7}}>
+                  <span style={{fontSize:10,color:T.text}}>{fx.l}</span>
+                  <div onClick={fx.fn} style={{width:28,height:14,borderRadius:7,background:fx.a?T.fuchsia:'rgba(155,126,200,0.2)',position:'relative',cursor:'pointer'}}>
+                    <div style={{width:10,height:10,borderRadius:'50%',background:'#fff',position:'absolute',top:2,left:fx.a?16:2,transition:'left 0.15s'}}/>
                   </div>
                 </div>
               ))}
-              <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginTop:12,marginBottom:6}}>Output</div>
-              <div style={{fontSize:11,color:T.text2,padding:'5px 8px',borderRadius:6,background:'rgba(255,255,255,0.03)'}}>Mix Bus → Master</div>
+              <div style={{fontSize:8,color:T.text3,letterSpacing:.5,textTransform:'uppercase',margin:'10px 0 6px'}}>Presets de género</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                {PRESETS.map(p=>(
+                  <button key={p.id} onClick={()=>applyPreset(p)} style={{padding:'3px 8px',borderRadius:980,background:`${p.color}15`,border:`0.5px solid ${p.color}44`,color:p.color,fontSize:9,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{p.name}</button>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
-        {/* TIMELINE */}
+        {/* ── CENTER: TIMELINE ── */}
         <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minHeight:0}}>
           {/* Toolbar */}
-          <div style={{height:28,padding:'0 12px',borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',gap:12,background:'rgba(10,6,18,0.4)',flexShrink:0,fontSize:10,color:T.text3,fontFamily:'monospace'}}>
-            <span>Snap 1/4</span><span style={{width:.5,height:10,background:T.border}}/>
-            <span>Zoom 100%</span><span style={{width:.5,height:10,background:T.border}}/>
-            <span>Grid Bars</span>
+          <div style={{height:26,padding:'0 10px',borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',gap:12,background:'rgba(8,4,16,0.5)',flexShrink:0,fontSize:9,color:T.text3,fontFamily:'monospace'}}>
+            <span>Snap 1/4</span><span style={{width:.5,height:8,background:T.border}}/>
+            <span>Zoom 100%</span><span style={{width:.5,height:8,background:T.border}}/>
             <div style={{flex:1}}/>
-            <span style={{color:T.green}}>● Spotify -14 ✓</span>
-            <span style={{width:.5,height:10,background:T.border}}/>
-            <span>YouTube -10 ✓</span>
+            <span style={{color:T.green,display:'flex',alignItems:'center',gap:4}}><span style={{width:4,height:4,borderRadius:'50%',background:T.green,display:'inline-block'}}/>Spotify -14 ✓</span>
           </div>
+
           <div style={{flex:1,display:'flex',minHeight:0,overflow:'hidden'}}>
             {/* Track headers */}
-            <div style={{width:190,flexShrink:0,borderRight:`0.5px solid ${T.border}`,background:'rgba(15,10,26,0.85)',display:'flex',flexDirection:'column'}}>
-              <div style={{height:22,padding:'0 12px',display:'flex',alignItems:'center',fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',borderBottom:`0.5px solid ${T.border}`,flexShrink:0}}>Tracks</div>
+            <div style={{width:185,flexShrink:0,borderRight:`0.5px solid ${T.border}`,background:'rgba(12,7,22,0.8)',display:'flex',flexDirection:'column'}}>
+              <div style={{height:20,padding:'0 10px',display:'flex',alignItems:'center',fontSize:8,color:T.text3,letterSpacing:.4,textTransform:'uppercase',borderBottom:`0.5px solid ${T.border}`,flexShrink:0}}>Tracks</div>
               <div style={{flex:1,overflowY:'auto'}}>
-                {stems.length===0?(
+                {stems.length===0&&(
                   <div style={{padding:20,textAlign:'center'}}>
-                    <div style={{fontSize:28,marginBottom:12}}>🎵</div>
-                    <div style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:6}}>Sube stems para empezar</div>
-                    <div style={{fontSize:10,color:T.text3}}>o usa las opciones del menú</div>
+                    <div style={{fontSize:28,marginBottom:10}}>🎵</div>
+                    <div style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:5}}>Sube stems para empezar</div>
+                    <div style={{fontSize:10,color:T.text3}}>O usa las opciones del menú superior</div>
                   </div>
-                ):stems.map(s=>(
-                  <div key={s.id} onClick={()=>setSelectedStemId(s.id)} style={{height:TRACK_H,padding:'6px 10px',borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',gap:7,background:selectedStemId===s.id?'rgba(192,38,211,0.06)':'transparent',cursor:'pointer'}}>
-                    <span style={{width:3,height:30,borderRadius:2,background:s.color,boxShadow:`0 0 8px ${s.color}66`,flexShrink:0}}/>
+                )}
+                {stems.map(s=>(
+                  <div key={s.id} onClick={()=>setSelId(s.id)} style={{height:TH,padding:'5px 9px',borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',gap:6,background:selId===s.id?'rgba(192,38,211,0.08)':'transparent',cursor:'pointer'}}>
+                    <span style={{width:3,height:28,borderRadius:2,background:s.color,flexShrink:0}}/>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:11,fontWeight:500,color:T.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:4}}>
-                        <span style={{fontSize:12}}>{s.icon}</span>{s.name}
+                      <div style={{fontSize:10,fontWeight:500,color:T.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:3}}>
+                        <span style={{fontSize:11}}>{s.icon}</span>{s.name}
                       </div>
-                      <div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}>
-                        <div style={{flex:1,height:3,background:'rgba(255,255,255,0.06)',borderRadius:2}}>
-                          <div style={{height:'100%',background:s.color,borderRadius:2,width:`${Math.max(0,Math.min(100,(s.volume+24)/30*100))}%`}}/>
-                        </div>
-                        <span style={{fontSize:9,color:T.text3,fontFamily:'monospace',width:28,textAlign:'right'}}>{s.volume>0?'+':''}{s.volume}dB</span>
+                      {/* Volume mini slider */}
+                      <div style={{display:'flex',alignItems:'center',gap:4,marginTop:3}}>
+                        <input type="range" min={-24} max={6} step={1} value={s.volume}
+                          onChange={e=>{e.stopPropagation();setVol(s.id,+e.target.value);}}
+                          onClick={e=>e.stopPropagation()}
+                          style={{flex:1,accentColor:s.color,height:3,cursor:'pointer'}}/>
+                        <span style={{fontSize:8,color:T.text3,fontFamily:'monospace',width:22,textAlign:'right'}}>{s.volume>0?'+':''}{s.volume}</span>
                       </div>
                     </div>
-                    <button onClick={e=>{e.stopPropagation();toggleMute(s.id);}} style={{width:18,height:18,borderRadius:4,background:s.muted?T.amber:'transparent',color:s.muted?'#000':T.text3,border:`0.5px solid ${s.muted?T.amber:T.border}`,fontSize:9,fontWeight:600,cursor:'pointer',flexShrink:0}}>M</button>
-                    <button onClick={e=>{e.stopPropagation();toggleSolo(s.id);}} style={{width:18,height:18,borderRadius:4,background:s.solo?T.pink:'transparent',color:s.solo?'#fff':T.text3,border:`0.5px solid ${s.solo?T.pink:T.border}`,fontSize:9,fontWeight:600,cursor:'pointer',flexShrink:0}}>S</button>
+                    <button onClick={e=>{e.stopPropagation();mute(s.id);}} style={{width:16,height:16,borderRadius:3,background:s.muted?T.amber:'transparent',color:s.muted?'#000':T.text3,border:`0.5px solid ${s.muted?T.amber:T.border}`,fontSize:8,fontWeight:700,cursor:'pointer',flexShrink:0}}>M</button>
+                    <button onClick={e=>{e.stopPropagation();solo(s.id);}} style={{width:16,height:16,borderRadius:3,background:s.solo?T.pink:'transparent',color:s.solo?'#fff':T.text3,border:`0.5px solid ${s.solo?T.pink:T.border}`,fontSize:8,fontWeight:700,cursor:'pointer',flexShrink:0}}>S</button>
                   </div>
                 ))}
-                {/* Add track row */}
-                <label style={{height:TRACK_H,padding:'6px 10px',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',borderBottom:`0.5px solid ${T.border}`}}>
-                  <input type="file" multiple accept="audio/*" style={{display:'none'}} onChange={e=>{if(e.target.files)handleAddFiles(Array.from(e.target.files));e.target.value='';}}/>
-                  <div style={{width:'100%',height:'100%',border:`1px dashed ${T.borderStrong}`,borderRadius:8,background:'rgba(192,38,211,0.04)',display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:11,color:T.pink,fontWeight:500}}>
-                    <span>✦</span> Nueva pista
+                {/* Add track */}
+                <label style={{height:TH,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',borderBottom:`0.5px solid ${T.border}`}}>
+                  <input type="file" multiple accept="audio/*" style={{display:'none'}} onChange={e=>{if(e.target.files)addFiles(Array.from(e.target.files));e.target.value='';}}/>
+                  <div style={{border:`1px dashed ${T.borderStrong}`,borderRadius:7,padding:'6px 12px',fontSize:10,color:T.pink,fontWeight:500,display:'flex',alignItems:'center',gap:5}}>
+                    ✦ Nueva pista
                   </div>
                 </label>
               </div>
             </div>
 
-            {/* Timeline scroll */}
-            <div style={{flex:1,overflow:'auto',position:'relative',background:'rgba(10,6,18,0.4)'}}>
+            {/* Timeline clips */}
+            <div style={{flex:1,overflow:'auto',position:'relative',background:'rgba(8,4,12,0.5)'}}>
               {/* Ruler */}
-              <div style={{height:22,position:'sticky',top:0,zIndex:2,background:'rgba(15,10,26,0.95)',borderBottom:`0.5px solid ${T.border}`,backdropFilter:'blur(6px)',display:'flex',alignItems:'center',padding:'0 0 0 8px'}}>
-                {Array.from({length:20}).map((_,i)=>(
-                  <div key={i} style={{width:60,fontSize:9,color:i%4===0?T.text3:'rgba(122,106,144,0.3)',fontFamily:'monospace',flexShrink:0,borderLeft:`0.5px solid ${i%4===0?T.border:'transparent'}`,paddingLeft:4}}>{i%4===0?`${i+1}`:''}</div>
+              <div style={{height:20,position:'sticky',top:0,zIndex:3,background:'rgba(12,7,22,0.98)',borderBottom:`0.5px solid ${T.border}`,backdropFilter:'blur(4px)',display:'flex',alignItems:'center',padding:'0 0 0 6px'}}>
+                {Array.from({length:32}).map((_,i)=>(
+                  <div key={i} style={{width:50,fontSize:8,color:i%4===0?T.text3:'rgba(122,106,144,0.25)',fontFamily:'monospace',flexShrink:0,borderLeft:`0.5px solid ${i%4===0?T.border:'transparent'}`,paddingLeft:3}}>
+                    {i%4===0?`${i+1}`:''}
+                  </div>
                 ))}
               </div>
-              {/* Track content */}
-              <div style={{position:'relative',minWidth:'100%',minHeight:stems.length*TRACK_H}}>
-                {stems.map((s,i)=>(
-                  <div key={s.id} style={{height:TRACK_H,borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'rgba(255,255,255,0.008)':'transparent',position:'relative',display:'flex',alignItems:'center',padding:'4px 8px'}}>
-                    <div style={{borderRadius:5,overflow:'hidden',background:`${s.color}cc`,border:`0.5px solid ${s.color}`,width:'98%',height:TRACK_H-12}}>
-                      <div style={{position:'absolute',top:8,left:16,fontSize:9,fontWeight:600,color:'#fff',zIndex:1,whiteSpace:'nowrap'}}>{s.name}</div>
-                      <ClipWave peaks={s.waveformPeaks} color={s.color} width={800} height={TRACK_H-12} muted={s.muted}/>
+              {/* Clips */}
+              <div style={{position:'relative',minWidth:'max-content',minHeight:stems.length*TH+TH}}>
+                {stems.map((s,i)=>{
+                  const clipW=duration>0?Math.round((s.buffer.duration/duration)*1500):1400;
+                  return(
+                    <div key={s.id} style={{height:TH,borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'rgba(255,255,255,0.006)':'transparent',position:'relative',display:'flex',alignItems:'center',padding:'3px 6px'}}>
+                      <div style={{borderRadius:5,overflow:'hidden',background:`${s.color}bb`,border:`0.5px solid ${s.color}`,width:clipW,height:TH-8,position:'relative',cursor:'pointer',opacity:s.muted?0.35:1}}>
+                        <div style={{position:'absolute',top:3,left:8,fontSize:8,fontWeight:600,color:'#fff',zIndex:1,whiteSpace:'nowrap',textShadow:'0 1px 2px rgba(0,0,0,0.5)'}}>{s.icon} {s.name}</div>
+                        <WaveClip p={s.waveformPeaks} color={s.color} w={clipW} h={TH-8} muted={s.muted}/>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {/* Add IA row */}
-                {stems.length>0&&(
-                  <div style={{height:TRACK_H,borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',padding:'0 8px'}}>
-                    <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 16px',border:`1px dashed ${T.borderStrong}`,borderRadius:8,color:T.pink,fontSize:11,fontWeight:500,background:'rgba(192,38,211,0.05)',cursor:'pointer'}} onClick={()=>onNavigate?onNavigate('create'):null}>
-                      <span>✦</span> Genera instrumentos con IA · haz clic en "Crear con IA"
-                    </div>
-                  </div>
-                )}
+                  );
+                })}
                 {/* Playhead */}
                 {duration>0&&(
-                  <div style={{position:'absolute',top:0,bottom:0,left:`${pct*100}%`,width:2,background:T.pink,pointerEvents:'none',boxShadow:`0 0 10px ${T.pink}`,zIndex:5}}>
-                    <div style={{position:'absolute',top:0,left:-6,width:14,height:8,background:T.pink,clipPath:'polygon(0 0,100% 0,50% 100%)'}}/>
+                  <div style={{position:'absolute',top:0,bottom:0,left:`${pct*1500}px`,width:2,background:T.pink,pointerEvents:'none',boxShadow:`0 0 8px ${T.pink}`,zIndex:5}}>
+                    <div style={{position:'absolute',top:0,left:-5,width:12,height:7,background:T.pink,clipPath:'polygon(0 0,100% 0,50% 100%)'}}/>
                   </div>
                 )}
               </div>
@@ -506,98 +589,130 @@ export default function StudioDAW({projectId,user,uploadedFiles,onBack,onCredits
           </div>
         </div>
 
-        {/* AI PANEL */}
-        <div style={{width:300,flexShrink:0,background:'rgba(15,10,26,0.7)',borderLeft:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-          <div style={{display:'flex',padding:5,gap:4,borderBottom:`0.5px solid ${T.border}`,flexShrink:0}}>
+        {/* ── RIGHT: MIX BUS + CONTROLS ── */}
+        <div style={{width:280,flexShrink:0,background:'rgba(12,7,22,0.9)',borderLeft:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          {/* Tabs */}
+          <div style={{display:'flex',padding:5,gap:3,borderBottom:`0.5px solid ${T.border}`,flexShrink:0}}>
             {(['mix','gen','stems'] as const).map(t=>(
-              <button key={t} onClick={()=>setTab(t)} style={{flex:1,height:28,borderRadius:6,background:tab===t?'rgba(192,38,211,0.15)':'transparent',color:tab===t?T.pink:T.text2,border:tab===t?`0.5px solid ${T.borderStrong}`:'0.5px solid transparent',fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>
-                {t==='mix'?'Mix':t==='gen'?'Generar':'Stems'}
+              <button key={t} onClick={()=>setTab(t)} style={{flex:1,height:26,borderRadius:5,background:tab===t?'rgba(192,38,211,0.18)':'transparent',color:tab===t?T.pink:T.text2,border:tab===t?`0.5px solid ${T.borderStrong}`:'0.5px solid transparent',fontSize:10,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>
+                {t==='mix'?'Mix Bus':t==='gen'?'Generar':'Stems'}
               </button>
             ))}
           </div>
+
           <div style={{flex:1,overflow:'auto'}}>
             {tab==='mix'&&(
-              <div style={{padding:14,display:'flex',flexDirection:'column',gap:12}}>
-                {/* Mix bus EQ */}
-                <div style={{background:T.surface,borderRadius:10,padding:12}}>
-                  <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:10}}>EQ Master</div>
-                  <SliderRow label="Bass" value={bassGain} min={-12} max={12} step={1} color={T.pink} onChange={v=>updateEQ('bass',v)}/>
-                  <SliderRow label="Mid" value={midGain} min={-12} max={12} step={1} color={T.fuchsia} onChange={v=>updateEQ('mid',v)}/>
-                  <SliderRow label="High" value={highGain} min={-12} max={12} step={1} color={T.violet} onChange={v=>updateEQ('high',v)}/>
-                </div>
-                {/* Compresión */}
-                <div style={{background:T.surface,borderRadius:10,padding:12}}>
-                  <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:8}}>Compresión</div>
-                  <div style={{fontSize:14,fontWeight:700,color:T.text,textTransform:'capitalize'}}>{activePreset.compression||'medium'}</div>
-                  <div style={{fontSize:10,color:T.text3,marginTop:3}}>{activePreset.compression==='none'?'Sin compresión':activePreset.compression==='low'?'Thr: -24dB · 2:1':activePreset.compression==='medium'?'Thr: -18dB · 4:1':activePreset.compression==='high'?'Thr: -14dB · 6:1':'Thr: -10dB · 10:1'}</div>
-                  <div style={{height:5,background:'rgba(192,38,211,0.15)',borderRadius:3,marginTop:8,overflow:'hidden'}}>
-                    <div style={{height:'100%',background:`linear-gradient(90deg,${T.green},${T.amber},${T.pink})`,width:activePreset.compression==='none'?'5%':activePreset.compression==='low'?'20%':activePreset.compression==='medium'?'40%':activePreset.compression==='high'?'60%':'80%'}}/>
+              <div style={{padding:12,display:'flex',flexDirection:'column',gap:10}}>
+
+                {/* LUFS — VU Meter */}
+                <div style={{background:T.surface,borderRadius:10,padding:12,border:`0.5px solid ${T.border}`}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                    <span style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase'}}>LUFS — VU Meter</span>
+                    <span style={{fontSize:9,fontWeight:700,padding:'2px 7px',borderRadius:980,background:momLufs>-14?'rgba(239,68,68,0.12)':momLufs<-30?'rgba(255,255,255,0.06)':'rgba(74,222,128,0.1)',color:momLufs>-14?T.red:momLufs<-30?T.text3:T.green,border:`0.5px solid ${momLufs>-14?T.red:momLufs<-30?T.border:T.green}33`}}>
+                      {momLufs>-14?'⚠ Loud':momLufs<-30?'↓ Soft':'✓ Safe'}
+                    </span>
                   </div>
-                </div>
-                {/* LUFS */}
-                <div style={{background:T.surface,borderRadius:10,padding:12}}>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}>
-                    <span style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase'}}>LUFS</span>
-                    <span style={{fontSize:9,fontWeight:700,padding:'2px 8px',borderRadius:980,background:'rgba(74,222,128,0.1)',color:T.green,border:`0.5px solid rgba(74,222,128,0.3)`}}>{momentaryLufs>-14?'⚠ Loud':momentaryLufs<-30?'↓ Soft':'✓ Safe'}</span>
+                  {/* VU bars */}
+                  <div style={{display:'flex',gap:3,height:48,alignItems:'flex-end',marginBottom:8}}>
+                    {Array.from({length:20}).map((_,i)=>{
+                      const thresh=-60+i*3;const lit=momLufs>thresh;
+                      const c=thresh>-9?T.red:thresh>-18?T.amber:T.green;
+                      return <div key={i} style={{flex:1,height:`${(i/20)*100+20}%`,borderRadius:'1px 1px 0 0',background:lit?c:'rgba(255,255,255,0.05)',transition:'background 0.05s'}}/>;
+                    })}
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
-                    {[{l:'MOM',v:momentaryLufs},{l:'INT',v:integratedLufs}].map(m=>(
-                      <div key={m.l} style={{background:'rgba(8,4,16,0.6)',borderRadius:8,padding:'8px',textAlign:'center',border:`0.5px solid ${T.border}`}}>
-                        <div style={{fontFamily:'monospace',fontSize:16,fontWeight:500,background:`linear-gradient(90deg,${T.pink},${T.violet})`,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{m.v.toFixed(1)}</div>
-                        <div style={{fontSize:9,color:T.text3,textTransform:'uppercase',letterSpacing:.5}}>{m.l}</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    {[{l:'MOM',v:momLufs},{l:'INT',v:intLufs}].map(m=>(
+                      <div key={m.l} style={{background:'rgba(8,4,16,0.6)',borderRadius:7,padding:'7px',textAlign:'center',border:`0.5px solid ${T.border}`}}>
+                        <div style={{fontFamily:'monospace',fontSize:15,fontWeight:600,color:T.pink}}>{m.v.toFixed(1)}</div>
+                        <div style={{fontSize:8,color:T.text3,textTransform:'uppercase',letterSpacing:.4}}>{m.l}</div>
                       </div>
                     ))}
                   </div>
-                  <div style={{display:'flex',justifyContent:'space-between',fontSize:10}}><span style={{color:T.text3}}>Spotify</span><span style={{color:T.green}}>-14 LUFS</span></div>
-                  <div style={{display:'flex',justifyContent:'space-between',fontSize:10,marginTop:2}}><span style={{color:T.text3}}>YouTube</span><span style={{color:T.text3}}>-14 LUFS</span></div>
+                  <div style={{marginTop:7,display:'flex',justifyContent:'space-between',fontSize:9}}><span style={{color:T.text3}}>Spotify</span><span style={{color:T.green}}>-14 LUFS</span></div>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:9}}><span style={{color:T.text3}}>YouTube</span><span style={{color:T.text3}}>-14 LUFS</span></div>
                 </div>
-                {/* IA EQ */}
-                <div style={{background:T.surface,borderRadius:10,padding:12}}>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-                    <span style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase'}}>IA EQ</span>
-                    <span style={{fontSize:9,color:T.green,display:'flex',alignItems:'center',gap:4}}><span style={{width:4,height:4,borderRadius:'50%',background:T.green,display:'inline-block'}}/>Live</span>
+
+                {/* EQ Master */}
+                <div style={{background:T.surface,borderRadius:10,padding:12,border:`0.5px solid ${T.border}`}}>
+                  <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:10}}>EQ Master</div>
+                  <SRow label="Bass" value={bassGain} min={-12} max={12} step={1} color={T.pink} onChange={v=>updEQ('bass',v)}/>
+                  <SRow label="Mid" value={midGain} min={-12} max={12} step={1} color={T.fuchsia} onChange={v=>updEQ('mid',v)}/>
+                  <SRow label="High" value={highGain} min={-12} max={12} step={1} color={T.violet} onChange={v=>updEQ('high',v)}/>
+                </div>
+
+                {/* Compresión */}
+                <div style={{background:T.surface,borderRadius:10,padding:12,border:`0.5px solid ${T.border}`}}>
+                  <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:7}}>Compresión</div>
+                  <div style={{fontSize:14,fontWeight:700,color:T.text,textTransform:'capitalize'}}>{preset.compression||'medium'}</div>
+                  <div style={{fontSize:10,color:T.text3,marginTop:2}}>{preset.compression==='none'?'Sin compresión':preset.compression==='low'?'Thr: -24dB · 2:1':preset.compression==='medium'?'Thr: -18dB · 4:1':preset.compression==='high'?'Thr: -14dB · 6:1':'Thr: -10dB · 10:1'}</div>
+                  <div style={{height:4,background:'rgba(192,38,211,0.12)',borderRadius:2,marginTop:7,overflow:'hidden'}}>
+                    <div style={{height:'100%',background:`linear-gradient(90deg,${T.green},${T.amber},${T.pink})`,width:preset.compression==='none'?'5%':preset.compression==='low'?'25%':preset.compression==='medium'?'45%':preset.compression==='high'?'65%':'85%'}}/>
                   </div>
-                  <select value={iaEqPreset.id} onChange={e=>{const p=IAEQ_PRESETS.find(x=>x.id===e.target.value);if(p)setIaEqPreset(p);}} style={{width:'100%',padding:'6px 8px',borderRadius:7,background:'rgba(192,38,211,0.1)',color:T.pink,fontSize:11,fontWeight:500,border:`0.5px solid ${T.borderStrong}`,cursor:'pointer',fontFamily:'inherit'}}>
-                    {IAEQ_PRESETS.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
                 </div>
+
+                {/* FX */}
+                <div style={{background:T.surface,borderRadius:10,padding:12,border:`0.5px solid ${T.border}`}}>
+                  <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:9}}>Efectos Master</div>
+                  {[{l:'Reverb',v:`${Math.round(preset.reverbWet*100)}%`,sub:'Espacio',a:revActive,fn:()=>setRevActive(!revActive)},{l:'Delay',v:`${Math.round(preset.delayWet*100)}%`,sub:'1/4 beat',a:delActive,fn:()=>setDelActive(!delActive)},{l:'Widener',v:`${Math.round(preset.stereoWidth*100)}%`,sub:'Estéreo',a:widActive,fn:()=>setWidActive(!widActive)}].map(fx=>(
+                    <div key={fx.l} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                      <div><div style={{fontSize:11,color:T.text}}>{fx.l}</div><div style={{fontSize:9,color:T.text3}}>{fx.v} · {fx.sub}</div></div>
+                      <div onClick={fx.fn} style={{width:30,height:16,borderRadius:8,background:fx.a?T.fuchsia:'rgba(155,126,200,0.15)',position:'relative',cursor:'pointer',transition:'background 0.2s'}}>
+                        <div style={{width:12,height:12,borderRadius:'50%',background:'#fff',position:'absolute',top:2,left:fx.a?16:2,transition:'left 0.2s'}}/>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* IA EQ */}
+                <div style={{background:T.surface,borderRadius:10,padding:12,border:`0.5px solid ${T.border}`}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                    <span style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase'}}>IA EQ — Optimizar para</span>
+                    <span style={{fontSize:8,color:T.green,display:'flex',alignItems:'center',gap:3}}><span style={{width:4,height:4,borderRadius:'50%',background:T.green,display:'inline-block'}}/>Live</span>
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                    {IAEQ.map(p=>(
+                      <button key={p.id} onClick={()=>setIaEq(p)} style={{padding:'4px 9px',borderRadius:980,background:iaEq.id===p.id?`linear-gradient(135deg,${T.fuchsia},${T.pink})`:'rgba(255,255,255,0.04)',border:`0.5px solid ${iaEq.id===p.id?T.borderStrong:T.border}`,color:iaEq.id===p.id?'#fff':T.text2,fontSize:9,fontWeight:iaEq.id===p.id?600:400,cursor:'pointer',fontFamily:'inherit',boxShadow:iaEq.id===p.id?`0 0 10px ${T.fuchsia}44`:undefined}}>
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* FFT */}
-                <div style={{background:T.surface,borderRadius:10,padding:12}}>
+                <div style={{background:T.surface,borderRadius:10,padding:12,border:`0.5px solid ${T.border}`}}>
                   <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:6}}>Analizador FFT</div>
-                  <canvas ref={fftCanvasRef} style={{width:'100%',height:60,borderRadius:6,background:'rgba(8,4,16,0.6)'}}/>
+                  <canvas ref={fftRef} style={{width:'100%',height:56,borderRadius:6,background:'rgba(8,4,16,0.8)',display:'block'}}/>
                 </div>
               </div>
             )}
+
             {tab==='gen'&&(
               <div style={{padding:14,display:'flex',flexDirection:'column',gap:10}}>
-                <div style={{fontSize:11,color:T.text2,lineHeight:1.5}}>Genera instrumentos con IA y agrégalos como pistas al DAW.</div>
-                <button onClick={()=>onNavigate?onNavigate('create'):null} style={{width:'100%',height:40,borderRadius:10,background:`linear-gradient(135deg,${T.fuchsia},${T.pink})`,border:'none',color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:`0 0 20px ${T.fuchsia}55`}}>
-                  ✦ Crear canción completa con IA
-                </button>
-                <div style={{fontSize:10,color:T.text3,textAlign:'center'}}>Se generará y abrirá en este DAW</div>
-                <div style={{height:.5,background:T.border,margin:'4px 0'}}/>
-                <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:4}}>Separar stems de una canción</div>
-                <button onClick={()=>onNavigate?onNavigate('separate'):null} style={{width:'100%',height:36,borderRadius:8,background:'rgba(124,58,237,0.15)',border:`0.5px solid rgba(124,58,237,0.4)`,color:'#a259ff',fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>
-                  ✂ Separar stems con Demucs
+                <div style={{fontSize:11,color:T.text2,lineHeight:1.5}}>Genera y agrega pistas directamente al DAW.</div>
+                <button onClick={()=>onNavigate?onNavigate('create'):null} style={{width:'100%',height:38,borderRadius:9,background:`linear-gradient(135deg,${T.fuchsia},${T.pink})`,border:'none',color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:`0 0 18px ${T.fuchsia}55`}}>✦ Crear canción completa</button>
+                <button onClick={()=>onNavigate?onNavigate('separate'):null} style={{width:'100%',height:36,borderRadius:8,background:'rgba(124,58,237,0.12)',border:`0.5px solid rgba(124,58,237,0.4)`,color:T.violet,fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>✂ Separar stems con Demucs</button>
+                <button onClick={toggleRecord} style={{width:'100%',height:36,borderRadius:8,background:recActive?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.04)',border:`0.5px solid ${recActive?'#ef4444':T.border}`,color:recActive?'#ef4444':T.text2,fontSize:11,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                  <span style={{width:7,height:7,borderRadius:'50%',background:recActive?'#ef4444':T.text3,display:'inline-block'}}/>
+                  {recActive?'Detener grabación':'🎤 Grabar desde micrófono'}
                 </button>
               </div>
             )}
+
             {tab==='stems'&&(
-              <div style={{padding:14,display:'flex',flexDirection:'column',gap:8}}>
-                <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:4}}>Stems cargados ({stems.length})</div>
+              <div style={{padding:12,display:'flex',flexDirection:'column',gap:7}}>
+                <div style={{fontSize:8,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:3}}>Stems cargados ({stems.length}/12)</div>
                 {stems.map(s=>(
-                  <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',background:T.surface,borderRadius:8,border:`0.5px solid ${s.color}22`}}>
-                    <span style={{fontSize:14}}>{s.icon}</span>
+                  <div key={s.id} onClick={()=>setSelId(s.id)} style={{display:'flex',alignItems:'center',gap:7,padding:'7px 9px',background:selId===s.id?`${s.color}12`:T.surface,borderRadius:8,border:`0.5px solid ${selId===s.id?s.color+'55':T.border}`,cursor:'pointer'}}>
+                    <span style={{fontSize:13}}>{s.icon}</span>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:11,fontWeight:500,color:T.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name}</div>
-                      <div style={{fontSize:9,color:T.text3}}>{fmt(s.buffer.duration)} · {s.instrument}</div>
+                      <div style={{fontSize:10,fontWeight:500,color:T.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name}</div>
+                      <div style={{fontSize:8,color:T.text3}}>{fmt(s.buffer.duration)} · {s.instrument}</div>
                     </div>
-                    <span style={{fontSize:9,fontWeight:600,color:s.muted?T.amber:s.solo?T.pink:T.text3}}>{s.muted?'M':s.solo?'S':'—'}</span>
+                    <span style={{fontSize:8,color:s.muted?T.amber:s.solo?T.pink:T.text3,fontWeight:700}}>{s.muted?'M':s.solo?'S':'—'}</span>
                   </div>
                 ))}
-                <label style={{width:'100%',height:36,borderRadius:8,background:'rgba(192,38,211,0.06)',border:`1px dashed ${T.borderStrong}`,color:T.pink,fontSize:11,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
-                  <input type="file" multiple accept="audio/*" style={{display:'none'}} onChange={e=>{if(e.target.files)handleAddFiles(Array.from(e.target.files));e.target.value='';}}/>
-                  ⬆ Agregar más stems
+                <label style={{width:'100%',height:34,borderRadius:8,background:'rgba(192,38,211,0.06)',border:`1px dashed ${T.borderStrong}`,color:T.pink,fontSize:10,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:5,marginTop:4}}>
+                  <input type="file" multiple accept="audio/*" style={{display:'none'}} onChange={e=>{if(e.target.files)addFiles(Array.from(e.target.files));e.target.value='';}}/>⬆ Agregar más
                 </label>
               </div>
             )}
@@ -605,72 +720,56 @@ export default function StudioDAW({projectId,user,uploadedFiles,onBack,onCredits
         </div>
       </div>
 
-      {/* MASTER STRIP */}
-      <div style={{height:80,flexShrink:0,borderTop:`0.5px solid ${T.border}`,background:'rgba(15,10,26,0.85)',display:'grid',gridTemplateColumns:'180px 1fr 180px 180px 180px',overflow:'hidden'}}>
-        {/* Mix bus label */}
-        <div style={{padding:'10px 14px',borderRight:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',justifyContent:'center',gap:5}}>
-          <div style={{fontSize:10,fontWeight:600,color:T.text,letterSpacing:.5}}>MIX BUS</div>
-          <div style={{height:4,background:'rgba(255,255,255,0.06)',borderRadius:2}}>
-            <div style={{height:'100%',background:`linear-gradient(90deg,${T.fuchsia},${T.pink})`,borderRadius:2,width:'70%'}}/>
+      {/* MASTER STRIP — bottom */}
+      <div style={{height:68,flexShrink:0,borderTop:`0.5px solid ${T.border}`,background:'rgba(12,7,22,0.9)',display:'grid',gridTemplateColumns:'160px 1fr auto auto auto auto',alignItems:'center',padding:'0 14px',gap:14,overflow:'hidden'}}>
+        <div>
+          <div style={{fontSize:9,fontWeight:700,color:T.text,letterSpacing:.4}}>MIX BUS</div>
+          <div style={{height:3,background:'rgba(255,255,255,0.06)',borderRadius:2,marginTop:4}}>
+            <div style={{height:'100%',background:`linear-gradient(90deg,${T.fuchsia},${T.pink})`,borderRadius:2,width:'68%'}}/>
           </div>
-          <div style={{padding:'2px 8px',borderRadius:980,background:`${activePreset.color}18`,color:activePreset.color,fontSize:9,fontWeight:600,alignSelf:'flex-start',border:`0.5px solid ${activePreset.color}33`}}>✦ {activePreset.name}</div>
+          <div style={{marginTop:4,padding:'2px 7px',borderRadius:980,background:`${preset.color}18`,color:preset.color,fontSize:8,fontWeight:600,display:'inline-block',border:`0.5px solid ${preset.color}33`}}>✦ {preset.name}</div>
         </div>
-        {/* FFT mini */}
-        <div style={{padding:'10px 14px',borderRight:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',gap:6}}>
-          <div style={{fontSize:9,color:T.text3,letterSpacing:.4,textTransform:'uppercase'}}>EQ Master</div>
-          <div style={{display:'flex',gap:10,flex:1,alignItems:'center'}}>
-            {[{l:'Bass',v:bassGain,c:T.pink,b:'bass' as const},{l:'Mid',v:midGain,c:T.fuchsia,b:'mid' as const},{l:'High',v:highGain,c:T.violet,b:'high' as const}].map(eq=>(
-              <div key={eq.l} style={{flex:1}}>
-                <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}><span style={{fontSize:9,color:T.text3}}>{eq.l}</span><span style={{fontSize:9,color:eq.c,fontFamily:'monospace'}}>{eq.v>0?'+':''}{eq.v}</span></div>
-                <div style={{height:3,background:'rgba(192,38,211,0.15)',borderRadius:2}}><div style={{height:'100%',background:eq.c,borderRadius:2,width:`${((eq.v+12)/24)*100}%`}}/></div>
-              </div>
-            ))}
-          </div>
+        {/* EQ strip */}
+        <div style={{display:'flex',gap:10,alignItems:'center'}}>
+          {[{l:'Bass',v:bassGain,c:T.pink,b:'bass'as const},{l:'Mid',v:midGain,c:T.fuchsia,b:'mid'as const},{l:'High',v:highGain,c:T.violet,b:'high'as const}].map(eq=>(
+            <div key={eq.l} style={{flex:1}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}><span style={{fontSize:8,color:T.text3}}>{eq.l}</span><span style={{fontSize:8,color:eq.c,fontFamily:'monospace'}}>{eq.v>0?'+':''}{eq.v}</span></div>
+              <div style={{height:2,background:'rgba(192,38,211,0.12)',borderRadius:1}}><div style={{height:'100%',background:eq.c,borderRadius:1,width:`${((eq.v+12)/24)*100}%`}}/></div>
+            </div>
+          ))}
         </div>
-        {/* FX */}
-        <div style={{padding:'10px 14px',borderRight:`0.5px solid ${T.border}`}}>
-          <div style={{fontSize:9,color:T.text3,letterSpacing:.4,textTransform:'uppercase',marginBottom:6}}>FX Master</div>
-          <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-            {[{l:'Reverb',a:reverbActive},{l:'Delay',a:delayActive},{l:'Wide',a:widenerActive}].map(fx=>(
-              <span key={fx.l} style={{padding:'3px 8px',borderRadius:980,background:fx.a?`linear-gradient(135deg,${T.fuchsia}33,${T.pink}22)`:'rgba(255,255,255,0.04)',color:fx.a?T.pink:T.text3,fontSize:9,fontWeight:500,border:`0.5px solid ${fx.a?T.borderStrong:T.border}`}}>{fx.l}</span>
-            ))}
-          </div>
+        {/* FX pills */}
+        <div style={{display:'flex',gap:4}}>
+          {[{l:'Rev',a:revActive},{l:'Dly',a:delActive},{l:'Wide',a:widActive}].map(fx=>(
+            <span key={fx.l} style={{padding:'3px 7px',borderRadius:980,background:fx.a?`${T.fuchsia}22`:'rgba(255,255,255,0.04)',color:fx.a?T.pink:T.text3,fontSize:8,fontWeight:500,border:`0.5px solid ${fx.a?T.borderStrong:T.border}`}}>{fx.l}</span>
+          ))}
         </div>
         {/* IA EQ */}
-        <div style={{padding:'10px 14px',borderRight:`0.5px solid ${T.border}`}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><span style={{fontSize:9,color:T.text3,letterSpacing:.4,textTransform:'uppercase'}}>IA EQ</span><span style={{fontSize:9,color:T.green,display:'flex',alignItems:'center',gap:3}}><span style={{width:4,height:4,borderRadius:'50%',background:T.green,display:'inline-block'}}/>Live</span></div>
-          <select value={iaEqPreset.id} onChange={e=>{const p=IAEQ_PRESETS.find(x=>x.id===e.target.value);if(p)setIaEqPreset(p);}} style={{width:'100%',padding:'5px 8px',borderRadius:6,background:'rgba(192,38,211,0.1)',color:T.pink,fontSize:10,fontWeight:500,border:`0.5px solid ${T.borderStrong}`,cursor:'pointer',fontFamily:'inherit'}}>
-            {IAEQ_PRESETS.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+        <div style={{fontSize:9,color:T.pink,fontWeight:500,padding:'4px 10px',borderRadius:980,background:'rgba(192,38,211,0.1)',border:`0.5px solid ${T.borderStrong}`}}>IA · {iaEq.name}</div>
+        {/* LUFS strip */}
+        <div style={{display:'flex',gap:5}}>
+          {[{v:momLufs,l:'MOM'},{v:intLufs,l:'INT'}].map(m=>(
+            <div key={m.l} style={{padding:'3px 7px',borderRadius:6,background:'rgba(8,4,16,0.7)',border:`0.5px solid ${T.border}`,textAlign:'center'}}>
+              <div style={{fontFamily:'monospace',fontSize:11,fontWeight:600,color:T.pink}}>{m.v.toFixed(1)}</div>
+              <div style={{fontSize:7,color:T.text3,textTransform:'uppercase'}}>{m.l}</div>
+            </div>
+          ))}
         </div>
-        {/* LUFS */}
-        <div style={{padding:'10px 14px'}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-            <span style={{fontSize:9,color:T.text3,letterSpacing:.4,textTransform:'uppercase'}}>LUFS</span>
-            <span style={{padding:'1px 6px',borderRadius:980,background:'rgba(192,38,211,0.15)',color:T.pink,fontSize:9,fontWeight:500,border:`0.5px solid ${T.borderStrong}`}}>+ Safe</span>
-          </div>
-          <div style={{display:'flex',gap:5}}>
-            {[{v:momentaryLufs,l:'MOM'},{v:integratedLufs,l:'INT'}].map(m=>(
-              <div key={m.l} style={{flex:1,padding:'4px 6px',borderRadius:6,background:'rgba(10,6,18,0.6)',border:`0.5px solid ${T.border}`,textAlign:'center'}}>
-                <div style={{fontFamily:'monospace',fontSize:12,fontWeight:600,color:T.pink}}>{m.v.toFixed(1)}</div>
-                <div style={{fontSize:8,color:T.text3,textTransform:'uppercase'}}>{m.l}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{display:'flex',justifyContent:'space-between',marginTop:5,fontSize:9}}><span style={{color:T.green,display:'flex',alignItems:'center',gap:3}}><span style={{width:3,height:3,borderRadius:'50%',background:T.green,display:'inline-block'}}/>Spotify</span><span style={{color:T.text3,fontFamily:'monospace'}}>-14</span></div>
-        </div>
+        {/* Safe badge */}
+        <span style={{fontSize:9,color:T.green,padding:'3px 8px',borderRadius:980,background:'rgba(74,222,128,0.08)',border:'0.5px solid rgba(74,222,128,0.3)'}}>+ Safe</span>
       </div>
+
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
     </div>
   );
 }
 
-// ─── WAV encoder ─────────────────────────────────────────────────────────────
-function audioBufferToWav(buffer:AudioBuffer):ArrayBuffer {
-  const numCh=buffer.numberOfChannels,sr=buffer.sampleRate,len=buffer.length,bps=16,bpS=bps/8,ba=numCh*bpS,dl=len*ba;
+// WAV encoder
+function toWav(buf:AudioBuffer):ArrayBuffer{
+  const nc=buf.numberOfChannels,sr=buf.sampleRate,len=buf.length,bps=16,bpS=bps/8,ba=nc*bpS,dl=len*ba;
   const ab=new ArrayBuffer(44+dl);const v=new DataView(ab);
-  const wr=(o:number,s:string)=>s.split('').forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
-  wr(0,'RIFF');v.setUint32(4,36+dl,true);wr(8,'WAVE');wr(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,numCh,true);v.setUint32(24,sr,true);v.setUint32(28,sr*ba,true);v.setUint16(32,ba,true);v.setUint16(34,bps,true);wr(36,'data');v.setUint32(40,dl,true);
-  let off=44;
-  for(let i=0;i<len;i++){for(let ch=0;ch<numCh;ch++){const s=Math.max(-1,Math.min(1,buffer.getChannelData(ch)[i]));v.setInt16(off,s<0?s*32768:s*32767,true);off+=2;}}
+  const w=(o:number,s:string)=>s.split('').forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
+  w(0,'RIFF');v.setUint32(4,36+dl,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,nc,true);v.setUint32(24,sr,true);v.setUint32(28,sr*ba,true);v.setUint16(32,ba,true);v.setUint16(34,bps,true);w(36,'data');v.setUint32(40,dl,true);
+  let off=44;for(let i=0;i<len;i++){for(let ch=0;ch<nc;ch++){const s=Math.max(-1,Math.min(1,buf.getChannelData(ch)[i]));v.setInt16(off,s<0?s*32768:s*32767,true);off+=2;}}
   return ab;
 }
