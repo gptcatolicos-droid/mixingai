@@ -12,7 +12,7 @@ const SUPABASE_ANON = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
 const MP_PUBLIC_KEY = 'APP_USR-13129ced-ad54-4ed2-b5dc-0ae59e62f9cd';
 
 const BENEFITS = [
-  { icon: '🎛️', text: 'Mezclas ilimitadas' },
+  { icon: '🎛️', text: '1,000 créditos · nunca vencen' },
   { icon: '✦',  text: 'Masterizar con IA — -12 LUFS' },
   { icon: '💾', text: 'Exportar WAV 24-bit' },
   { icon: '📊', text: 'Análisis AI del audio' },
@@ -31,9 +31,9 @@ export default function UpgradeModal({ onClose, onSuccess, user, trigger = 'mast
   const [payMethod, setPayMethod] = useState<'mp' | 'paypal' | null>(null);
 
   const triggerText = {
-    master: 'Para masterizar con IA necesitas el plan Pro',
-    export: 'Para exportar WAV necesitas el plan Pro',
-    limit: 'Llegaste al límite de 2 mezclas gratuitas este mes',
+    master: 'Para continuar necesitas más créditos. 1,000 créditos por $5.99, nunca vencen.',
+    export: 'Para exportar en WAV necesitas créditos.',
+    limit: 'Agotaste tus créditos gratuitos.',
   }[trigger];
 
   const handleGoogleAuth = () => {
@@ -88,7 +88,7 @@ export default function UpgradeModal({ onClose, onSuccess, user, trigger = 'mast
       const res = await fetch(`${SUPABASE_URL}/functions/v1/create-paypal-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON}` },
-        body: JSON.stringify({ userId: currentUser.id, amount: '3.99', description: 'MixingMusic.AI Pro — 1 mes' })
+        body: JSON.stringify({ userId: currentUser.id, amount: '3.99', description: 'MixingMusic.AI · 1,000 créditos' })
       });
       const data = await res.json();
       if (data.approvalUrl) window.open(data.approvalUrl, '_blank');
@@ -115,7 +115,7 @@ export default function UpgradeModal({ onClose, onSuccess, user, trigger = 'mast
           <div style={{ textAlign:'center', marginBottom:'24px' }}>
             <div style={{ fontSize:'36px', marginBottom:'10px' }}>✦</div>
             <h2 style={{ fontSize:'22px', fontWeight:800, color:'#F8F0FF', marginBottom:'8px', letterSpacing:'-0.5px' }}>
-              {trigger === 'master' ? 'Masteriza como un pro' : trigger === 'limit' ? '2 mezclas usadas' : 'Exporta en WAV 24-bit'}
+              {trigger === 'master' ? 'Crea música sin límites' : trigger === 'limit' ? 'Créditos agotados' : 'Exporta sin restricciones'}
             </h2>
             <p style={{ fontSize:'13px', color:'#9B7EC8', lineHeight:1.6 }}>{triggerText}</p>
           </div>
@@ -138,7 +138,7 @@ export default function UpgradeModal({ onClose, onSuccess, user, trigger = 'mast
               <div style={{ position:'absolute' as const, top:'-10px', left:'50%', transform:'translateX(-50%)', background:'linear-gradient(135deg,#EC4899,#C026D3)', borderRadius:'980px', padding:'3px 12px', fontSize:'10px', fontWeight:700, color:'#fff', whiteSpace:'nowrap' }}>🔥 POPULAR</div>
               <div style={{ fontSize:'12px', fontWeight:700, color:'#C026D3', marginBottom:'6px' }}>Pro</div>
               <div style={{ display:'flex', alignItems:'baseline', gap:'3px', lineHeight:1 }}>
-                <span style={{ fontSize:'28px', fontWeight:900, background:'linear-gradient(135deg,#EC4899,#C026D3)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>$3.99</span>
+                <span style={{ fontSize:'28px', fontWeight:900, background:'linear-gradient(135deg,#EC4899,#C026D3)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>$5.99</span>
               </div>
               <div style={{ fontSize:'11px', color:'rgba(248,240,255,0.4)', margin:'8px 0 12px' }}>/mes · cancela cuando quieras</div>
               {BENEFITS.map((b,i)=>(
@@ -151,7 +151,7 @@ export default function UpgradeModal({ onClose, onSuccess, user, trigger = 'mast
 
           <button onClick={() => user ? setStep('paying') : setStep('register')}
             style={{ width:'100%', background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)', border:'none', color:'#fff', padding:'16px', borderRadius:'980px', fontSize:'16px', fontWeight:800, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 0 28px rgba(192,38,211,0.5)', marginBottom:'10px' }}>
-            🚀 Hazte Pro — $3.99/mes
+            🚀 Obtener 1,000 créditos — $5.99 · 1,000 créditos
           </button>
           <div style={{ textAlign:'center', fontSize:'11px', color:'rgba(248,240,255,0.3)' }}>
             PayPal · Mercado Pago · Cancela cuando quieras
@@ -209,7 +209,7 @@ export default function UpgradeModal({ onClose, onSuccess, user, trigger = 'mast
             <div style={{ fontSize:'36px', marginBottom:'10px' }}>💳</div>
             <h2 style={{ fontSize:'20px', fontWeight:800, color:'#F8F0FF', marginBottom:'6px' }}>Elige cómo pagar</h2>
             <div style={{ display:'inline-flex', alignItems:'baseline', gap:'4px', background:'rgba(192,38,211,0.1)', border:'1px solid rgba(192,38,211,0.2)', borderRadius:'980px', padding:'6px 16px' }}>
-              <span style={{ fontSize:'24px', fontWeight:900, background:'linear-gradient(135deg,#EC4899,#C026D3)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>$3.99</span>
+              <span style={{ fontSize:'24px', fontWeight:900, background:'linear-gradient(135deg,#EC4899,#C026D3)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>$5.99</span>
               <span style={{ fontSize:'13px', color:'#9B7EC8' }}>/mes</span>
             </div>
           </div>
