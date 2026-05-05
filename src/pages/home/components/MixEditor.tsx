@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import UpgradeModal from './UpgradeModal';
 import Header from '@/components/feature/Header';
+import FlowNav from '@/components/flow/FlowNav';
 import UploadModal from '@/components/feature/UploadModal';
 import { drawFFTAnalyzer, drawMiniFFT } from '@/utils/drawFFT';
 import { drawWaveform, handleWaveformClick } from '@/utils/drawWaveform';
@@ -73,6 +74,7 @@ interface MixEditorProps {
   onExport: (d: { audioBuffer: AudioBuffer; audioUrl: string; waveformPeaks: Float32Array; finalLufs: number; presetName?: string; iaEqPreset?: string }) => void;
   initialPreset?: MixPreset;
   reverbOn?: boolean; delayOn?: boolean; stereoOn?: boolean;
+  onNavigate?: (id: string) => void;
 }
 
 // =============================================
@@ -235,7 +237,7 @@ const C = {
   progressBar: (pct:number) => ({height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'8px',width:`${pct}%`,transition:'width 0.3s ease'}),
 };
 
-export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCreditsUpdate, onExport, initialPreset, reverbOn=false, delayOn=false, stereoOn=false }: MixEditorProps) {
+export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCreditsUpdate, onExport, initialPreset, reverbOn=false, delayOn=false, stereoOn=false, onNavigate }: MixEditorProps) {
   const [stems, setStems] = useState<Stem[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -246,7 +248,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const [bassGain, setBassGain] = useState(initialPreset?.bass ?? 0);
   const [midGain, setMidGain] = useState(initialPreset?.mid ?? 0);
   const [highGain, setHighGain] = useState(initialPreset?.high ?? 0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(uploadedFiles.length > 0);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStep, setLoadingStep] = useState('Inicializando...');
   const [isExporting, setIsExporting] = useState(false);
@@ -835,13 +837,13 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
   return(
     <div style={C.page}>
-      <Header user={user} onLogout={()=>{}} onCreditsUpdate={onCreditsUpdate}/>
+      <FlowNav active="studio" onNavigate={(id) => { if(onNavigate) onNavigate(id); else onBack(); }} user={user} />
       <div style={{maxWidth:'1400px',margin:'0 auto',padding:'16px 12px 40px'}}>
 
         {/* Header */}
         <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'16px',gap:'10px',flexWrap:'wrap'}}>
           <div>
-            <h1 style={{fontSize:'clamp(18px,4vw,26px)',fontWeight:700,letterSpacing:'-0.5px',...C.grad,margin:0}}>🎛️ Mezclador AI Pro</h1>
+            <h1 style={{fontSize:'clamp(18px,4vw,26px)',fontWeight:700,letterSpacing:'-0.5px',...C.grad,margin:0}}>✦ MixingStudio AI</h1>
             <p style={{color:'#9B7EC8',fontSize:'12px',marginTop:'4px'}}>
               {stems.length} stems · {fmt(duration)}
               {activePreset&&(

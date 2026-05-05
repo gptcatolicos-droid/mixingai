@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+
 
 const T = {
   text: '#F8F0FF', text2: '#b8a8d0', text3: '#7a6a90',
