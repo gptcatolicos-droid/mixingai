@@ -59,6 +59,7 @@ export default function Header({ user, onLogout, onCreditsUpdate }: HeaderProps)
             <nav style={{display:'flex',gap:'4px'}} className="hide-mobile">
               <button onClick={() => navigate('/')} style={{...S.navBtn,color:isActive('/')?'#F8F0FF':'#9B7EC8'}}>Inicio</button>
               <Link to="/blog" style={{...S.navBtn,color:'#9B7EC8'}}>Blog</Link>
+              <button onClick={() => navigate('/?studio=1')} style={{...S.navBtn,background:'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(192,38,211,0.15))',border:'1px solid rgba(192,38,211,0.4)',color:'#EC4899',fontWeight:600}}>✦ MixingStudio AI</button>
             </nav>
           </div>
 
