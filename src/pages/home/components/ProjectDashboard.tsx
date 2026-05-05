@@ -10,7 +10,7 @@ import AIChat from './AIChat';
 import StemSeparator from './StemSeparator';
 import AIGenerator from './AIGenerator';
 import InstrumentAdder from './InstrumentAdder';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 
 interface User {
   id: string; firstName: string; lastName: string; email: string;
@@ -26,7 +26,7 @@ interface ExportData {
   finalLufs: number; mp3Url?: string; wavUrl?: string;
 }
 
-type Screen = 'dashboard'|'chat'|'newProject'|'preset'|'mixer'|'export'|'separator'|'generator'|'instruments';
+type Screen = 'dashboard'|'daw'|'newProject'|'preset'|'mixer'|'export'|'separator'|'generator'|'instruments';
 
 const T = {
   text: '#F8F0FF', text2: 'rgba(248,240,255,0.65)', text3: 'rgba(248,240,255,0.38)',
@@ -35,17 +35,20 @@ const T = {
 };
 
 const MODES = [
-  { id:'chat',        icon:'🎛️', label:'Mezclar stems',       sub:'Sube pistas · EQ · Efectos',       color:'#EC4899', credits:1,  desc:'Mezcla profesional en minutos' },
-  { id:'generator',   icon:'✦',  label:'Crear canción con IA', sub:'Prompt · Letra · Referencia',      color:'#C026D3', credits:10, desc:'ACE-Step genera música completa' },
-  { id:'separator',   icon:'🎚️', label:'Separar stems',        sub:'Vocals · Drums · Bass · Other',    color:'#7C3AED', credits:3,  desc:'Demucs · 100% en tu dispositivo' },
-  { id:'instruments', icon:'🎹', label:'Agregar instrumento',  sub:'Elige · Describe · Genera',        color:'#a259ff', credits:5,  desc:'El stem aparece en tu DAW' },
+  { id:'daw',         icon:'🎹', label:'MixingStudio AI',       sub:'DAW · Crea · Mezcla · Exporta', color:'#a259ff', credits:0,  desc:'Abre el estudio completo con IA' },
+  { id:'generator',   icon:'✦',  label:'Crear canción con IA',   sub:'Prompt · Letra · Referencia',   color:'#C026D3', credits:10, desc:'ACE-Step genera música completa' },
+  { id:'separator',   icon:'🎚️', label:'Separar stems',          sub:'Vocals · Drums · Bass · Other', color:'#7C3AED', credits:3,  desc:'Demucs separa cualquier canción' },
+  { id:'instruments', icon:'🎸', label:'Agregar instrumento IA',  sub:'Elige · Describe · Genera',     color:'#EC4899', credits:5,  desc:'Stem nuevo directo al DAW' },
 ];
+
+// Genera un ID de proyecto único
+const newProjectId = () => `proj_${Date.now()}`;
 
 export default function ProjectDashboard() {
   const [user, setUser] = useState<User|null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
-  const [selectedProject, setSelectedProject] = useState<string|null>(null);
+  const [selectedProject, setSelectedProject] = useState<string>(newProjectId());
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<MixPreset>(PRESETS[0]);
   const [reverbOn, setReverbOn] = useState(false);
@@ -55,6 +58,7 @@ export default function ProjectDashboard() {
   const [showUpgradeHint, setShowUpgradeHint] = useState(false);
   const exportDataRef = useRef<ExportData|null>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const stored = localStorage.getItem('audioMixerUser');
@@ -64,6 +68,10 @@ export default function ProjectDashboard() {
         if (!u.username) u.username = `${u.firstName.toLowerCase()}_${u.lastName?.toLowerCase()||''}`;
         setUser(u);
       } catch { localStorage.removeItem('audioMixerUser'); }
+    }
+    // Si viene con ?studio=1 en la URL, abrir el DAW directamente
+    if (searchParams.get('studio') === '1') {
+      setCurrentScreen('daw');
     }
   }, []);
 
@@ -79,9 +87,19 @@ export default function ProjectDashboard() {
     setCurrentScreen('dashboard'); navigate('/');
   };
 
+  // Abrir el DAW siempre — sin necesitar proyecto previo
+  const openDAW = (files: File[] = [], preset: MixPreset = PRESETS[0], rv = false, dl = false, st = false) => {
+    const projId = newProjectId();
+    setSelectedProject(projId);
+    setUploadedFiles(files);
+    setSelectedPreset(preset);
+    setReverbOn(rv); setDelayOn(dl); setStereoOn(st);
+    setCurrentScreen('mixer');
+  };
+
   const handleUploadComplete = (files: File[]) => {
     if (!user) return;
-    const proj: Project = { id:Date.now().toString(), name:`Proyecto ${projects.length+1}`, stems:files.length, status:'draft', createdAt:new Date(), mode:'mix' };
+    const proj: Project = { id: newProjectId(), name: `Proyecto ${projects.length+1}`, stems: files.length, status: 'draft', createdAt: new Date(), mode: 'mix' };
     setProjects(prev => [proj,...prev]);
     setSelectedProject(proj.id);
     setUploadedFiles(files);
@@ -89,20 +107,11 @@ export default function ProjectDashboard() {
   };
 
   const handleChatStartMixer = (preset: MixPreset, files: File[]) => {
-    const proj: Project = { id:Date.now().toString(), name:`Proyecto ${projects.length+1}`, stems:files.length, status:'draft', createdAt:new Date(), mode:'mix' };
-    setProjects(prev => [proj,...prev]);
-    setSelectedProject(proj.id);
-    setUploadedFiles(files);
-    setSelectedPreset(preset);
-    setReverbOn(preset.reverbWet > 0);
-    setDelayOn(preset.delayWet > 0);
-    setStereoOn(preset.stereoWidth > 0.5);
-    setCurrentScreen('mixer');
+    openDAW(files, preset, preset.reverbWet > 0, preset.delayWet > 0, preset.stereoWidth > 0.5);
   };
 
   const handlePresetConfirm = (preset: MixPreset, rv: boolean, dl: boolean, st: boolean) => {
-    setSelectedPreset(preset); setReverbOn(rv); setDelayOn(dl); setStereoOn(st);
-    setCurrentScreen('mixer');
+    openDAW(uploadedFiles, preset, rv, dl, st);
   };
 
   const handleExport = (data: ExportData) => {
@@ -113,32 +122,38 @@ export default function ProjectDashboard() {
   };
 
   const handleBackToDashboard = () => {
-    setCurrentScreen('dashboard'); setSelectedProject(null); setUploadedFiles([]); setExportData(null);
-  };
-
-  // — Separator: stems generados → ir al mixer con ellos
-  const handleStemsReady = (files: File[]) => {
-    if (!files.length || !user) { setCurrentScreen('dashboard'); return; }
-    const proj: Project = { id:Date.now().toString(), name:`Separación ${projects.length+1}`, stems:files.length, status:'draft', createdAt:new Date(), mode:'separator' };
-    setProjects(prev => [proj,...prev]);
-    setSelectedProject(proj.id);
-    setUploadedFiles(files);
-    setCurrentScreen('preset');
-  };
-
-  // — Generator: track generado → ir al mixer
-  const handleTrackReady = (url: string, title: string) => {
     setCurrentScreen('dashboard');
+    setUploadedFiles([]);
+    setExportData(null);
   };
 
-  // — Instrument: stem generado → agregar al mixer
+  // Stems separados → abrir DAW con esos stems
+  const handleStemsReady = (files: File[]) => {
+    if (!user) return;
+    const proj: Project = { id: newProjectId(), name: `Separación ${projects.length+1}`, stems: files.length, status: 'draft', createdAt: new Date(), mode: 'separator' };
+    setProjects(prev => [proj,...prev]);
+    openDAW(files, PRESETS[0]);
+  };
+
+  // Track generado → abrir DAW con ese track
+  const handleTrackReady = (url: string, title: string) => {
+    // Convertir URL a File para el DAW
+    fetch(url).then(r => r.blob()).then(blob => {
+      const file = new File([blob], `${title}.wav`, { type: 'audio/wav' });
+      const proj: Project = { id: newProjectId(), name: title, stems: 1, status: 'draft', createdAt: new Date(), mode: 'generator' };
+      setProjects(prev => [proj,...prev]);
+      openDAW([file], PRESETS[0]);
+    }).catch(() => setCurrentScreen('dashboard'));
+  };
+
+  // Instrumento generado → agregar al DAW y abrir
   const handleInstrumentReady = (file: File, name: string) => {
     setUploadedFiles(prev => [...prev, file]);
     setCurrentScreen('mixer');
   };
 
-  // ─── Screens ──────────────────────────────────────────────────────────
-  if (currentScreen === 'chat' && user)
+  // ─── Screens ──────────────────────────────────────────────────────────────
+  if (currentScreen === 'daw' && user)
     return <AIChat user={user} onStartMixer={handleChatStartMixer} onCreditsUpdate={handleCreditsUpdate} />;
 
   if (currentScreen === 'separator' && user)
@@ -156,7 +171,8 @@ export default function ProjectDashboard() {
   if (currentScreen === 'preset' && user)
     return <PresetScreen user={user} stemCount={uploadedFiles.length} onBack={() => setCurrentScreen('newProject')} onConfirm={handlePresetConfirm} />;
 
-  if (currentScreen === 'mixer' && selectedProject && user)
+  // El mixer SIEMPRE abre — selectedProject siempre tiene valor
+  if (currentScreen === 'mixer' && user)
     return <MixEditor
       projectId={selectedProject} user={user} uploadedFiles={uploadedFiles}
       onBack={handleBackToDashboard} onCreditsUpdate={handleCreditsUpdate} onExport={handleExport}
@@ -166,8 +182,7 @@ export default function ProjectDashboard() {
   if (currentScreen === 'export') {
     const expData = pendingExportData || exportDataRef.current || exportData;
     const expUser = user || { id:'guest', firstName:'Usuario', lastName:'', email:'', country:'', credits:999999, createdAt:'' };
-    const expProject = selectedProject || 'export';
-    return <ExportScreen user={expUser} projectId={expProject} exportData={expData}
+    return <ExportScreen user={expUser} projectId={selectedProject} exportData={expData}
       exportProgress={expData ? 100 : 0} exportStep={expData ? '¡Listo!' : 'Preparando...'}
       onBack={() => setCurrentScreen('mixer')}
       onNewMix={() => setCurrentScreen('newProject')}
@@ -175,9 +190,9 @@ export default function ProjectDashboard() {
       onCreditsUpdate={handleCreditsUpdate} />;
   }
 
-  // ─── Dashboard principal ──────────────────────────────────────────────
+  // ─── Dashboard principal ──────────────────────────────────────────────────
   const isPro = user?.is_pro || user?.plan === 'unlimited';
-  const creditsLow = user && user.credits < 10;
+  const creditsLow = user && user.credits < 10 && !isPro;
 
   return (
     <div style={{ minHeight:'100vh', background:'transparent', fontFamily:"'DM Sans',system-ui,sans-serif", color:T.text }}>
@@ -185,7 +200,6 @@ export default function ProjectDashboard() {
 
       <div style={{ maxWidth:'720px', margin:'0 auto', padding:'40px 16px' }}>
 
-        {/* No user logged in */}
         {!user ? (
           <div style={{ textAlign:'center', paddingTop:'60px' }}>
             <h1 style={{ fontSize:'40px', fontWeight:700, letterSpacing:'-1px', background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', marginBottom:'12px' }}>
@@ -210,16 +224,14 @@ export default function ProjectDashboard() {
               </h1>
               <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' }}>
                 <p style={{ color:'#9B7EC8', fontSize:'14px', margin:0 }}>
-                  {isPro ? '∞ Plan Creador Pro activo' : `Plan Gratis · 2 canciones incluidas`}
+                  {isPro ? '∞ Plan Creador Pro activo' : 'Plan Gratis · 2 canciones incluidas'}
                 </p>
-                {/* Credits badge */}
                 <div style={{ background:'rgba(192,38,211,0.1)', border:`1px solid ${T.border}`, borderRadius:'980px', padding:'3px 12px', fontSize:'12px', color:'#9B7EC8' }}>
-                  <span style={{ color:T.pink, fontWeight:700 }}>{user.credits}</span> créditos
+                  <span style={{ color:T.pink, fontWeight:700 }}>{isPro ? '∞' : user.credits}</span> créditos
                 </div>
               </div>
             </div>
 
-            {/* Low credits warning */}
             {creditsLow && (
               <div style={{ background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:'12px', padding:'14px 18px', marginBottom:'20px', display:'flex', alignItems:'center', gap:'12px' }}>
                 <span style={{ fontSize:'20px' }}>⚡</span>
@@ -228,46 +240,53 @@ export default function ProjectDashboard() {
                   <div style={{ fontSize:'12px', color:T.text2 }}>1,000 créditos por $5.99 · nunca vencen</div>
                 </div>
                 <Link to="/billing" style={{ background:'linear-gradient(135deg,#EC4899,#C026D3)', color:'#fff', padding:'8px 18px', borderRadius:'980px', fontSize:'12px', fontWeight:700, textDecoration:'none', whiteSpace:'nowrap' }}>
-                  Comprar créditos
+                  Comprar
                 </Link>
               </div>
             )}
 
-            {/* 4 Mode cards */}
+            {/* 4 modos */}
             <div style={{ fontSize:'10px', fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:'#9B7EC8', marginBottom:'14px' }}>
               ¿Qué quieres hacer hoy?
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'28px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'20px' }}>
               {MODES.map(mode => {
-                const canUse = user.credits >= mode.credits;
+                const canUse = isPro || user.credits >= mode.credits || mode.credits === 0;
                 return (
                   <button key={mode.id}
-                    onClick={() => canUse ? setCurrentScreen(mode.id as Screen) : setShowUpgradeHint(true)}
+                    onClick={() => canUse ? (
+                      mode.id === 'daw'
+                        ? openDAW() // Abrir DAW vacío directamente
+                        : setCurrentScreen(mode.id as Screen)
+                    ) : setShowUpgradeHint(true)}
                     style={{ background:`linear-gradient(135deg,rgba(26,16,40,0.95),rgba(15,10,26,0.95))`, border:`1px solid ${mode.color}33`, borderRadius:'14px', padding:'20px', cursor:'pointer', textAlign:'left', fontFamily:'inherit', transition:'all 0.15s', position:'relative', overflow:'hidden' }}
                     onMouseEnter={e => { (e.currentTarget.style.borderColor=`${mode.color}66`); (e.currentTarget.style.transform='translateY(-2px)'); }}
                     onMouseLeave={e => { (e.currentTarget.style.borderColor=`${mode.color}33`); (e.currentTarget.style.transform='translateY(0)'); }}>
-                    {/* Top accent */}
                     <div style={{ position:'absolute', top:0, left:0, right:0, height:'2px', background:mode.color }}></div>
                     <div style={{ fontSize:'24px', marginBottom:'10px' }}>{mode.icon}</div>
                     <div style={{ fontSize:'13px', fontWeight:700, color:T.text, marginBottom:'3px' }}>{mode.label}</div>
-                    <div style={{ fontSize:'11px', color:`${mode.color}`, fontWeight:600, marginBottom:'6px' }}>{mode.sub}</div>
+                    <div style={{ fontSize:'11px', color:mode.color, fontWeight:600, marginBottom:'6px' }}>{mode.sub}</div>
                     <div style={{ fontSize:'11px', color:T.text3, lineHeight:1.4, marginBottom:'10px' }}>{mode.desc}</div>
                     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                      <span style={{ background:`${mode.color}18`, border:`1px solid ${mode.color}33`, borderRadius:'6px', padding:'2px 8px', fontSize:'10px', fontWeight:700, color:mode.color }}>
-                        {mode.credits} crédito{mode.credits>1?'s':''}
-                      </span>
-                      {!canUse && (
-                        <span style={{ fontSize:'10px', color:'#F59E0B' }}>⚡ Sin créditos</span>
+                      {mode.credits > 0 ? (
+                        <span style={{ background:`${mode.color}18`, border:`1px solid ${mode.color}33`, borderRadius:'6px', padding:'2px 8px', fontSize:'10px', fontWeight:700, color:mode.color }}>
+                          {mode.credits} créditos
+                        </span>
+                      ) : (
+                        <span style={{ background:`${mode.color}18`, border:`1px solid ${mode.color}33`, borderRadius:'6px', padding:'2px 8px', fontSize:'10px', fontWeight:700, color:mode.color }}>
+                          Gratis
+                        </span>
                       )}
+                      {!canUse && <span style={{ fontSize:'10px', color:'#F59E0B' }}>⚡ Sin créditos</span>}
                     </div>
                   </button>
                 );
               })}
             </div>
 
-            {/* Quick upload fallback */}
+            {/* Subir stems */}
             <button onClick={() => setCurrentScreen('newProject')}
-              style={{ width:'100%', background:'transparent', border:`1px solid ${T.border}`, color:T.text2, padding:'12px 24px', borderRadius:'12px', fontSize:'14px', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', marginBottom:'28px' }}>
+              style={{ width:'100%', background:'transparent', border:`1px solid ${T.border}`, color:T.text2, padding:'12px 24px', borderRadius:'12px', fontSize:'14px', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', marginBottom:'24px' }}>
               ⬆ Subir stems directamente al mezclador
             </button>
 
@@ -282,12 +301,10 @@ export default function ProjectDashboard() {
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px' }}>
                   {[
-                    { icon:'🎛️', label:'Mezclar stems', cost:'1 cr.' },
-                    { icon:'✦',  label:'Generar canción', cost:'10 cr.' },
-                    { icon:'🎚️', label:'Separar stems', cost:'3 cr.' },
-                    { icon:'🎹', label:'Instrumento IA', cost:'5 cr.' },
-                    { icon:'⬇️', label:'Exportar WAV', cost:'1 cr.' },
-                    { icon:'∞',  label:'Sin vencimiento', cost:'para siempre' },
+                    {icon:'🎹', label:'MixingStudio AI', cost:'Gratis'},
+                    {icon:'✦',  label:'Generar canción', cost:'10 cr.'},
+                    {icon:'🎚️', label:'Separar stems', cost:'3 cr.'},
+                    {icon:'🎸', label:'Instrumento IA', cost:'5 cr.'},
                   ].map(item => (
                     <div key={item.label} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'12px', color:T.text2, padding:'4px 0' }}>
                       <span style={{ fontSize:'14px' }}>{item.icon}</span>
@@ -299,7 +316,7 @@ export default function ProjectDashboard() {
               </div>
             )}
 
-            {/* Recent projects */}
+            {/* Proyectos recientes */}
             {projects.length > 0 && (
               <div>
                 <div style={{ fontSize:'10px', fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:'#9B7EC8', marginBottom:'12px' }}>
@@ -332,23 +349,15 @@ export default function ProjectDashboard() {
         )}
       </div>
 
-      {/* Upgrade hint overlay */}
+      {/* Upgrade modal */}
       {showUpgradeHint && (
         <div style={{ position:'fixed', inset:0, background:'rgba(8,4,16,0.9)', backdropFilter:'blur(12px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
           <div style={{ background:'linear-gradient(135deg,rgba(36,18,58,0.99),rgba(20,10,36,0.99))', border:'1px solid rgba(192,38,211,0.4)', borderRadius:'24px', padding:'36px 32px', maxWidth:'420px', width:'100%', textAlign:'center', boxShadow:'0 0 60px rgba(192,38,211,0.3)' }}>
             <div style={{ fontSize:'36px', marginBottom:'14px' }}>⚡</div>
             <h2 style={{ fontSize:'22px', fontWeight:800, color:T.text, marginBottom:'6px' }}>Sin créditos suficientes</h2>
             <p style={{ fontSize:'14px', color:T.text2, marginBottom:'24px', lineHeight:1.6 }}>
-              Obtén 1,000 créditos por $5.99.<br/>
-              Nunca vencen. Usarlos como quieras.
+              1,000 créditos por $5.99 · nunca vencen
             </p>
-            <div style={{ background:'rgba(8,4,16,0.5)', borderRadius:'12px', padding:'12px', marginBottom:'20px' }}>
-              {[{a:'Mezclar stems',c:'1'},{a:'Generar canción',c:'10'},{a:'Separar stems',c:'3'},{a:'Instrumento IA',c:'5'}].map(r => (
-                <div key={r.a} style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:T.text2, padding:'4px 0', borderBottom:'1px solid rgba(192,38,211,0.06)' }}>
-                  <span>{r.a}</span><span style={{ color:T.pink, fontWeight:700 }}>{r.c} cr.</span>
-                </div>
-              ))}
-            </div>
             <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
               <Link to="/billing" onClick={() => setShowUpgradeHint(false)}
                 style={{ background:'linear-gradient(135deg,#EC4899,#C026D3)', color:'#fff', padding:'16px', borderRadius:'14px', fontSize:'15px', fontWeight:800, textDecoration:'none', display:'block', boxShadow:'0 0 24px rgba(192,38,211,0.4)' }}>
@@ -356,7 +365,7 @@ export default function ProjectDashboard() {
               </Link>
               <button onClick={() => setShowUpgradeHint(false)}
                 style={{ background:'transparent', border:'none', color:T.text3, fontSize:'13px', cursor:'pointer', fontFamily:'inherit', padding:'8px' }}>
-                Volver al dashboard
+                Volver
               </button>
             </div>
           </div>

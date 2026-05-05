@@ -75,7 +75,13 @@ function base64ToBlob(b64: string, mime = 'audio/wav'): Blob {
 // ─── Helper: obtener JWT del usuario desde localStorage ───────────────────────
 function getUserToken(): string | null {
   try {
-    // Supabase guarda la sesión en localStorage con clave sb-<project>-auth-token
+    // La app guarda el token en audioMixerUser.accessToken
+    const stored = localStorage.getItem('audioMixerUser');
+    if (stored) {
+      const u = JSON.parse(stored);
+      if (u?.accessToken) return u.accessToken;
+    }
+    // Fallback: buscar en claves de Supabase
     const keys = Object.keys(localStorage).filter(k => k.includes('-auth-token'));
     for (const key of keys) {
       const val = localStorage.getItem(key);

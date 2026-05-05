@@ -23,18 +23,18 @@ const T = {
 };
 
 const INSTRUMENTS = [
-  { id:'drums',   icon:'🥁', label:'Batería',    color:'#10B981', desc:'Kick, snare, hi-hats, percusión' },
-  { id:'bass',    icon:'🎸', label:'Bajo',        color:'#F97316', desc:'Bajo eléctrico, 808, sub bass' },
-  { id:'piano',   icon:'🎹', label:'Piano',       color:'#3B82F6', desc:'Acústico, eléctrico, Rhodes' },
-  { id:'guitar',  icon:'🎸', label:'Guitarra',    color:'#FBBF24', desc:'Eléctrica, acústica, distorsión' },
-  { id:'strings', icon:'🎻', label:'Cuerdas',     color:'#A78BFA', desc:'Violín, viola, cello, orquesta' },
-  { id:'brass',   icon:'🎺', label:'Vientos',     color:'#F472B6', desc:'Trompeta, saxo, trombón' },
-  { id:'synth',   icon:'🔊', label:'Sintetizador',color:'#6366F1', desc:'Lead synth, pad, arpeggio' },
-  { id:'choir',   icon:'🎤', label:'Coro',        color:'#EC4899', desc:'Voces de fondo, harmonías' },
-  { id:'organ',   icon:'🎹', label:'Órgano',      color:'#8B5CF6', desc:'Hammond, iglesia, jazz' },
-  { id:'marimba', icon:'🪘', label:'Marimba',     color:'#14B8A6', desc:'Marimba, xilófono, percusión tonal' },
-  { id:'fx',      icon:'🎛️', label:'FX / Texturas',color:'#94A3B8', desc:'Efectos, ambientes, transiciones' },
-  { id:'flute',   icon:'🎷', label:'Flauta',      color:'#34D399', desc:'Flauta travesera, flauta dulce' },
+  { id:'drums',   icon:'🥁', label:'Batería',      color:'#10B981', desc:'Kick, snare, hi-hats, percusión',    gradient:'linear-gradient(135deg,#065F46,#10B981)' },
+  { id:'bass',    icon:'🎸', label:'Bajo',          color:'#F97316', desc:'Bajo eléctrico, 808, sub bass',      gradient:'linear-gradient(135deg,#7C2D12,#F97316)' },
+  { id:'piano',   icon:'🎹', label:'Piano',         color:'#3B82F6', desc:'Acústico, eléctrico, Rhodes',        gradient:'linear-gradient(135deg,#1E3A8A,#3B82F6)' },
+  { id:'guitar',  icon:'🎸', label:'Guitarra',      color:'#FBBF24', desc:'Eléctrica, acústica, distorsión',    gradient:'linear-gradient(135deg,#78350F,#FBBF24)' },
+  { id:'strings', icon:'🎻', label:'Cuerdas',       color:'#A78BFA', desc:'Violín, viola, cello, orquesta',     gradient:'linear-gradient(135deg,#4C1D95,#A78BFA)' },
+  { id:'brass',   icon:'🎺', label:'Vientos',       color:'#F472B6', desc:'Trompeta, saxo, trombón',            gradient:'linear-gradient(135deg,#831843,#F472B6)' },
+  { id:'synth',   icon:'🎛️', label:'Sintetizador',  color:'#6366F1', desc:'Lead synth, pad, arpeggio',          gradient:'linear-gradient(135deg,#312E81,#6366F1)' },
+  { id:'choir',   icon:'🎤', label:'Coro / Voz',    color:'#EC4899', desc:'Voces de fondo, harmonías',          gradient:'linear-gradient(135deg,#9D174D,#EC4899)' },
+  { id:'organ',   icon:'🎹', label:'Órgano',        color:'#8B5CF6', desc:'Hammond, iglesia, jazz',             gradient:'linear-gradient(135deg,#4C1D95,#8B5CF6)' },
+  { id:'marimba', icon:'🪘', label:'Percusión',     color:'#14B8A6', desc:'Marimba, xilófono, timbal',          gradient:'linear-gradient(135deg,#134E4A,#14B8A6)' },
+  { id:'fx',      icon:'✦',  label:'FX / Texturas', color:'#94A3B8', desc:'Efectos, ambientes, transiciones',   gradient:'linear-gradient(135deg,#1E293B,#94A3B8)' },
+  { id:'flute',   icon:'🎷', label:'Flauta / Saxo', color:'#34D399', desc:'Flauta travesera, saxofón, clarinete',gradient:'linear-gradient(135deg,#064E3B,#34D399)' },
 ];
 
 const STYLE_PRESETS = [
@@ -133,13 +133,18 @@ export default function InstrumentAdder({ user, onBack, onCreditsUpdate, onInstr
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:'10px' }}>
                 {INSTRUMENTS.map(inst => (
                   <button key={inst.id} onClick={() => { setSelectedInstrument(inst.id); setError(''); }}
-                    style={{ background: selectedInstrument===inst.id ? `${inst.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${selectedInstrument===inst.id ? inst.color+'66' : T.border}`, borderRadius:'12px', padding:'16px 10px', cursor:'pointer', textAlign:'center', fontFamily:'inherit', transition:'all 0.15s', position:'relative' }}>
+                    style={{ background: selectedInstrument===inst.id ? `${inst.color}20` : 'rgba(255,255,255,0.03)', border: `1.5px solid ${selectedInstrument===inst.id ? inst.color : T.border}`, borderRadius:'14px', padding:'18px 12px', cursor:'pointer', textAlign:'center', fontFamily:'inherit', transition:'all 0.18s', position:'relative', overflow:'hidden' }}
+                    onMouseEnter={e => { if(selectedInstrument!==inst.id){(e.currentTarget as HTMLElement).style.borderColor=inst.color+'66';(e.currentTarget as HTMLElement).style.background=inst.color+'10';} }}
+                    onMouseLeave={e => { if(selectedInstrument!==inst.id){(e.currentTarget as HTMLElement).style.borderColor=T.border;(e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.03)';} }}>
                     {selectedInstrument===inst.id && (
-                      <div style={{ position:'absolute', top:'8px', right:'8px', width:'8px', height:'8px', borderRadius:'50%', background:inst.color }}></div>
+                      <div style={{ position:'absolute', top:0, left:0, right:0, height:'2px', background:inst.gradient }}></div>
                     )}
-                    <div style={{ fontSize:'24px', marginBottom:'6px' }}>{inst.icon}</div>
-                    <div style={{ fontSize:'12px', fontWeight:700, color: selectedInstrument===inst.id ? inst.color : T.text, marginBottom:'4px' }}>{inst.label}</div>
-                    <div style={{ fontSize:'10px', color:T.text3, lineHeight:1.3 }}>{inst.desc}</div>
+                    {/* Icono con fondo de color */}
+                    <div style={{ width:'44px', height:'44px', borderRadius:'12px', background: selectedInstrument===inst.id ? inst.gradient : `${inst.color}18`, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px', fontSize:'20px', transition:'all 0.18s' }}>
+                      {inst.icon}
+                    </div>
+                    <div style={{ fontSize:'12px', fontWeight:700, color: selectedInstrument===inst.id ? inst.color : T.text, marginBottom:'3px' }}>{inst.label}</div>
+                    <div style={{ fontSize:'10px', color: selectedInstrument===inst.id ? inst.color+'99' : T.text3, lineHeight:1.4 }}>{inst.desc}</div>
                   </button>
                 ))}
               </div>

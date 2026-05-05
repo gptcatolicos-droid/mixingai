@@ -82,6 +82,8 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 function getUserToken(): string | null {
   try {
+    const stored = localStorage.getItem('audioMixerUser');
+    if (stored) { const u = JSON.parse(stored); if (u?.accessToken) return u.accessToken; }
     const keys = Object.keys(localStorage).filter(k => k.includes('-auth-token'));
     for (const key of keys) {
       const val = localStorage.getItem(key);
