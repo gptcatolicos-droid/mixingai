@@ -41,26 +41,6 @@ function getStemIcon(key: string): string {
 }
 
 
-  try {
-    const stored = localStorage.getItem('audioMixerUser');
-    if (stored) { const u = JSON.parse(stored); if (u?.accessToken) return u.accessToken; }
-    const keys = Object.keys(localStorage);
-    for (const key of keys) {
-      if (key.includes('auth-token') || (key.includes('sb-') && key.includes('-auth'))) {
-        const val = localStorage.getItem(key);
-        if (val) {
-          try {
-            const p = JSON.parse(val);
-            if (p?.access_token) return p.access_token;
-            if (p?.session?.access_token) return p.session.access_token;
-          } catch {}
-        }
-      }
-    }
-    return null;
-  } catch { return null; }
-}
-
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let bin = '';
