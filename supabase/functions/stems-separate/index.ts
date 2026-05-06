@@ -28,9 +28,22 @@ serve(async (req) => {
     if (authErr || !user)
       return new Response(JSON.stringify({ error: 'Token inválido' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-    const { data: profile } = await supabase.from('profiles').select('credits, plan').eq('id', user.id).single();
-    const credits = profile?.credits ?? 0;
-    const isPro = profile?.plan === 'unlimited';
+    // Obtener o crear perfil con créditos por defecto
+    let { data: profile } = await supabase.from('profiles').select('credits, plan').eq('id', user.id).single();
+    if (!profile) {
+      // Primera vez — crear perfil con 10 créditos de bienvenida
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        email: user.email,
+        credits: 10,
+        plan: 'free',
+        is_pro: false,
+        created_at: new Date().toISOString(),
+      });
+      profile = { credits: 10, plan: 'free' };
+    }
+    const credits = profile?.credits ?? 10;
+    const isPro = profile?.plan === 'unlimited' || (user.email && ['danipalacio@gmail.com'].includes(user.email));
     if (!isPro && credits < 3)
       return new Response(JSON.stringify({ error: 'Créditos insuficientes', creditsRemaining: credits }), { status: 402, headers: { ...cors, 'Content-Type': 'application/json' } });
 

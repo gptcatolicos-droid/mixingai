@@ -56,9 +56,9 @@ const LoginPage: React.FC = () => {
           });
           const superData = await superRes.json();
           if (superRes.ok && superData.access_token) {
-            // Login real exitoso — super user con token válido
+            // Login real exitoso — super user con token válido e ilimitado
             saveAndGo(superData.user.id, superData.user.email,
-              { first_name: SUPER[key].firstName, last_name: SUPER[key].lastName, country: 'Colombia', is_pro: true },
+              { first_name: SUPER[key].firstName, last_name: SUPER[key].lastName, country: 'Colombia', is_pro: true, plan: 'unlimited' },
               superData.access_token, true, superData.refresh_token);
             return;
           }

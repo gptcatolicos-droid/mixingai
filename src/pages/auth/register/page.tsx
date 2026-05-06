@@ -22,7 +22,7 @@ const RegisterPage: React.FC = () => {
     const { firstName, lastName, country } = form;
     localStorage.setItem('audioMixerUser', JSON.stringify({
       id, email, firstName, lastName, country,
-      credits: 0, plan: 'free', is_pro: false,
+      credits: 10, plan: 'free', is_pro: false,
       provider: 'email',
       createdAt: new Date().toISOString(),
       username: `${firstName.toLowerCase().replace(/\s/g,'_')}_${lastName.toLowerCase().replace(/\s/g,'_')}`,
@@ -84,7 +84,7 @@ const RegisterPage: React.FC = () => {
             last_name: lastName,
             email,
             country,
-            credits: 0,
+            credits: 10,
             plan: 'free',
             is_pro: false,
             provider: 'email',
