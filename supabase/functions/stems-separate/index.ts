@@ -7,6 +7,9 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+// ✅ v20: Version hash actual de cjwbw/demucs
+const DEMUCS_VERSION = '25a173108cff36ef9f80f854c162d01df9e6528be175794b81158fa03836d953';
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -40,20 +43,37 @@ serve(async (req) => {
         status: 402, headers: { ...cors, 'Content-Type': 'application/json' },
       });
 
-    const { audioUrl } = await req.json();
-    if (!audioUrl) throw new Error('Se requiere audioUrl');
+    const { audioBase64, mimeType = 'audio/wav', model = 'htdemucs' } = await req.json();
+    if (!audioBase64) throw new Error('Se requiere audioBase64');
 
-    // ✅ Demucs via Replicate — endpoint de modelo (sin version hash)
-    const replicateResp = await fetch('https://api.replicate.com/v1/models/cjwbw/demucs/predictions', {
+    // ✅ FIX: limpiar base64 antes de decodificar
+    const cleanBase64 = audioBase64.replace(/\s/g, '');
+    const binaryStr = atob(cleanBase64);
+    const audioBytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) audioBytes[i] = binaryStr.charCodeAt(i);
+
+    // Subir a storage para que Replicate pueda descargarlo
+    const fileName = `stems-input-${Date.now()}-${Math.random().toString(36).slice(2)}.wav`;
+    const { error: uploadErr } = await supabase.storage
+      .from('audio-temp')
+      .upload(fileName, audioBytes, { contentType: mimeType, upsert: true });
+
+    if (uploadErr) throw new Error(`Storage upload error: ${uploadErr.message}`);
+
+    const { data: { publicUrl } } = supabase.storage.from('audio-temp').getPublicUrl(fileName);
+
+    // ✅ FIX: Bearer (no Token)
+    const replicateResp = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${REPLICATE_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        version: DEMUCS_VERSION,
         input: {
-          audio: audioUrl,
-          model: 'htdemucs',
+          audio: publicUrl,
+          model: model,
           stem: null,
           clip_mode: 'rescale',
           shifts: 1,
@@ -67,6 +87,8 @@ serve(async (req) => {
 
     if (!replicateResp.ok) {
       const errBody = await replicateResp.text();
+      // Limpiar el archivo antes de lanzar error
+      await supabase.storage.from('audio-temp').remove([fileName]);
       throw new Error(`Replicate ${replicateResp.status}: ${errBody}`);
     }
 
@@ -81,22 +103,22 @@ serve(async (req) => {
         headers: { 'Authorization': `Bearer ${REPLICATE_TOKEN}` },
       });
       const pollData = await poll.json();
-
       if (pollData.status === 'succeeded') {
-        stems = pollData.output; // { bass, drums, vocals, other }
+        stems = pollData.output;
         break;
       }
-      if (pollData.status === 'failed') throw new Error(`Demucs falló: ${pollData.error}`);
+      if (pollData.status === 'failed') throw new Error(`Demucs falló: ${pollData.error ?? 'error desconocido'}`);
+      if (pollData.status === 'canceled') throw new Error('Predicción cancelada');
     }
 
-    if (!stems) throw new Error('Timeout en separación de stems');
+    // Limpiar archivo temporal
+    await supabase.storage.from('audio-temp').remove([fileName]);
+
+    if (!stems) throw new Error('Timeout en separación de stems (más de 10 minutos)');
 
     // Descontar créditos
     if (!isPro) {
       await supabase.from('profiles').update({ credits: credits - 3 }).eq('id', user.id);
-      await supabase.from('credits_ledger').insert({
-        user_id: user.id, delta: -3, reason: 'stems_separation', created_at: new Date().toISOString(),
-      }).catch(() => {});
     }
 
     return new Response(JSON.stringify({

@@ -204,6 +204,9 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
   const dryRef=useRef<GainNode|null>(null);
   const revRef=useRef<GainNode|null>(null);
   const delRef=useRef<GainNode|null>(null);
+  const iaEqLoRef=useRef<BiquadFilterNode|null>(null);
+  const iaEqMidRef=useRef<BiquadFilterNode|null>(null);
+  const iaEqHiRef=useRef<BiquadFilterNode|null>(null);
   const pauseRef=useRef(0);
   const timerRef=useRef<number>();
   const fftRef=useRef<HTMLCanvasElement>(null);
@@ -248,7 +251,11 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
       const delNode=ctx.createDelay(2.0);delNode.delayTime.value=0.25;
       const del=ctx.createGain();del.gain.value=delActive?0.18:0;delRef.current=del;
       // Signal chain: stems → dry → bass → mid → high → master → analyser → dest
-      dry.connect(bass);bass.connect(mid);mid.connect(high);high.connect(master);
+      // IA EQ nodes (post master EQ, pre reverb/delay)
+      const iaLo=ctx.createBiquadFilter();iaLo.type='lowshelf';iaLo.frequency.value=120;iaLo.gain.value=0;iaEqLoRef.current=iaLo;
+      const iaMid=ctx.createBiquadFilter();iaMid.type='peaking';iaMid.frequency.value=2500;iaMid.Q.value=0.8;iaMid.gain.value=0;iaEqMidRef.current=iaMid;
+      const iaHi=ctx.createBiquadFilter();iaHi.type='highshelf';iaHi.frequency.value=8000;iaHi.gain.value=0;iaEqHiRef.current=iaHi;
+      dry.connect(bass);bass.connect(mid);mid.connect(high);high.connect(iaLo);iaLo.connect(iaMid);iaMid.connect(iaHi);iaHi.connect(master);
       // Parallel FX
       dry.connect(revDelay);revDelay.connect(rev);rev.connect(master);
       dry.connect(delNode);delNode.connect(del);del.connect(master);
@@ -856,7 +863,21 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
                   </div>
                   <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
                     {IAEQ.map(p=>(
-                      <button key={p.id} onClick={()=>setIaEq(p)} style={{padding:'3px 7px',borderRadius:980,background:iaEq.id===p.id?`linear-gradient(135deg,${T.fuchsia},${T.pink})`:'rgba(255,255,255,0.04)',border:`0.5px solid ${iaEq.id===p.id?T.borderStrong:T.border}`,color:iaEq.id===p.id?'#fff':T.text2,fontSize:8,fontWeight:iaEq.id===p.id?600:400,cursor:'pointer',fontFamily:'inherit'}}>
+                      <button key={p.id} onClick={()=>{
+                        setIaEq(p);
+                        const ctx=ctxRef.current;if(!ctx)return;
+                        const t=ctx.currentTime;
+                        // Presets de IA EQ: [low, mid, high] en dB
+                        const presets:Record<string,[number,number,number]>={
+                          default:[0,0,0],car:[-2,3,2],iphone:[-3,-1,4],macbook:[-1,0,3],
+                          headphones:[3,0,2],tv:[0,2,-1],theater:[2,1,-1],bt:[-2,2,3],
+                          studio:[0,0,0],gaming:[4,1,3],tablet:[-1,1,2]
+                        };
+                        const [lo,mi,hi]=presets[p.id]??[0,0,0];
+                        if(iaEqLoRef.current)iaEqLoRef.current.gain.setTargetAtTime(lo,t,0.05);
+                        if(iaEqMidRef.current)iaEqMidRef.current.gain.setTargetAtTime(mi,t,0.05);
+                        if(iaEqHiRef.current)iaEqHiRef.current.gain.setTargetAtTime(hi,t,0.05);
+                      }} style={{padding:'3px 7px',borderRadius:980,background:iaEq.id===p.id?`linear-gradient(135deg,${T.fuchsia},${T.pink})`:'rgba(255,255,255,0.04)',border:`0.5px solid ${iaEq.id===p.id?T.borderStrong:T.border}`,color:iaEq.id===p.id?'#fff':T.text2,fontSize:8,fontWeight:iaEq.id===p.id?600:400,cursor:'pointer',fontFamily:'inherit'}}>
                         {p.name}
                       </button>
                     ))}
