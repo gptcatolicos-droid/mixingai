@@ -67,6 +67,9 @@ export default function FlowCreate({ user, onNavigate, onTrackReady, onCreditsUp
   const [progress, setProgress] = useState(0);
   const [genStep, setGenStep] = useState<GenStep>('idle');
   const [error, setError] = useState('');
+
+  // Limpiar error al montar el componente
+  useEffect(() => { setError(''); }, []);
   const refInputRef = useRef<HTMLInputElement>(null);
   const progRef = useRef<ReturnType<typeof setInterval>|null>(null);
 
