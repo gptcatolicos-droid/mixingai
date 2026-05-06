@@ -86,6 +86,8 @@ export default function FlowCreate({ user, onNavigate, onTrackReady, onCreditsUp
 
     const token = await getValidToken();
     if (!token) { setError('Sesión expirada. Recarga la página e intenta de nuevo.'); return; }
+    // Super users sin token real no pueden usar las Edge Functions
+    if (token === '__SUPER_USER__') { setError('Tu cuenta de administrador no puede generar canciones desde aquí. Usa una cuenta normal.'); return; }
 
     setError(''); setGenerating(true); setProgress(2); setGenStep('parsing');
 

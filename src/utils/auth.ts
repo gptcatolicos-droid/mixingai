@@ -2,43 +2,55 @@ const SUPABASE_URL = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 /**
- * Obtiene un token válido. Si el access_token expiró, usa el refresh_token para renovarlo.
+ * Obtiene un token válido.
+ * - Super users: retorna su accessToken directamente (no es JWT de Supabase)
+ * - Usuarios normales: valida JWT, refresca si expiró
  */
 export async function getValidToken(): Promise<string | null> {
   try {
-    // 1. Buscar en audioMixerUser
     const stored = localStorage.getItem('audioMixerUser');
     if (stored) {
       const u = JSON.parse(stored);
-      // Super user — no necesita token real
-      if (u.id?.startsWith('super_')) return null; // Super users: sin token de Supabase
+
+      // Super user — retornar el token guardado directamente (puede ser undefined)
+      // Las Edge Functions verifican el token con Supabase, los super users
+      // no tienen token real → las Edge Functions van a fallar de todas formas
+      // Solución: super users usan créditos ilimitados localmente, no llaman Edge Functions
+      if (u.id?.startsWith('super_')) {
+        // Retornar el accessToken si existe, sino null
+        // FlowCreate/StemSeparator deben manejar null como "super user sin token"
+        return u.accessToken ?? '__SUPER_USER__';
+      }
+
       if (u.accessToken) {
-        // Verificar si el token sigue válido intentando decodificar el JWT
-        const valid = isTokenValid(u.accessToken);
-        if (valid) return u.accessToken;
-        // Token expirado — intentar refresh
+        // Si el token es válido, retornarlo directamente
+        if (isTokenValid(u.accessToken)) return u.accessToken;
+
+        // Expirado: intentar refresh con refreshToken
         if (u.refreshToken) {
-          const newToken = await refreshToken(u.refreshToken, u);
+          const newToken = await doRefresh(u.refreshToken, u);
           if (newToken) return newToken;
         }
+
+        // Si no hay refresh, retornar el token igual (las Edge Functions dirán si expiró)
+        // Mejor dar el token viejo que decir "sesión expirada" inmediatamente
+        return u.accessToken;
       }
     }
 
-    // 2. Buscar en claves de Supabase (sb-xxx-auth-token)
-    const keys = Object.keys(localStorage);
-    for (const key of keys) {
+    // Buscar en claves de Supabase SDK (sb-xxx-auth-token)
+    for (const key of Object.keys(localStorage)) {
       if ((key.includes('sb-') && key.includes('-auth-token')) || key.includes('supabase.auth')) {
-        const val = localStorage.getItem(key);
-        if (!val) continue;
         try {
-          const p = JSON.parse(val);
+          const p = JSON.parse(localStorage.getItem(key) ?? '');
           const accessToken = p?.access_token || p?.session?.access_token;
           const refreshTk = p?.refresh_token || p?.session?.refresh_token;
           if (accessToken && isTokenValid(accessToken)) return accessToken;
           if (refreshTk) {
-            const newToken = await refreshToken(refreshTk, null);
+            const newToken = await doRefresh(refreshTk, null);
             if (newToken) return newToken;
           }
+          if (accessToken) return accessToken; // retornar aunque esté expirado
         } catch {}
       }
     }
@@ -54,15 +66,14 @@ function isTokenValid(token: string): boolean {
     const parts = token.split('.');
     if (parts.length !== 3) return false;
     const payload = JSON.parse(atob(parts[1]));
-    const exp = payload.exp * 1000;
-    // Válido si expira en más de 60 segundos
-    return Date.now() < exp - 60_000;
+    if (!payload.exp) return true; // sin exp = asumimos válido
+    return Date.now() < payload.exp * 1000 - 30_000; // 30s de margen
   } catch {
-    return false; // Si no podemos verificar, asumir expirado y hacer refresh
+    return true; // si no se puede parsear, asumir válido y dejar que el servidor decida
   }
 }
 
-async function refreshToken(refreshTk: string, currentUser: any): Promise<string | null> {
+async function doRefresh(refreshTk: string, currentUser: any): Promise<string | null> {
   try {
     const resp = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
       method: 'POST',
@@ -73,7 +84,7 @@ async function refreshToken(refreshTk: string, currentUser: any): Promise<string
     const data = await resp.json();
     if (!data.access_token) return null;
 
-    // Actualizar localStorage con el nuevo token
+    // Actualizar localStorage
     if (currentUser) {
       const updated = { ...currentUser, accessToken: data.access_token, refreshToken: data.refresh_token };
       localStorage.setItem('audioMixerUser', JSON.stringify(updated));

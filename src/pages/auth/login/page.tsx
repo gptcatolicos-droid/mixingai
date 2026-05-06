@@ -44,9 +44,26 @@ const LoginPage: React.FC = () => {
 
     setLoading(true);
     try {
-      // ── 1. Super user bypass ──────────────────────────────────
+      // ── 1. Super user — intentar login real en Supabase primero ──────────
       const key = email.trim().toLowerCase();
       if (SUPER[key]) {
+        // Intentar login real para obtener token válido
+        try {
+          const superRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+            body: JSON.stringify({ email: email.trim(), password }),
+          });
+          const superData = await superRes.json();
+          if (superRes.ok && superData.access_token) {
+            // Login real exitoso — super user con token válido
+            saveAndGo(superData.user.id, superData.user.email,
+              { first_name: SUPER[key].firstName, last_name: SUPER[key].lastName, country: 'Colombia', is_pro: true },
+              superData.access_token, true, superData.refresh_token);
+            return;
+          }
+        } catch {}
+        // Fallback: bypass sin token (DAW local funciona, Edge Functions no)
         saveAndGo(`super_${key}`, key, { first_name: SUPER[key].firstName, last_name: SUPER[key].lastName, country: 'Colombia' }, undefined, true);
         return;
       }

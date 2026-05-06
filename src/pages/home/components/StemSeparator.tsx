@@ -109,6 +109,7 @@ export default function StemSeparator({ user, onBack, onCreditsUpdate, onStemsRe
     if (!file || (!isPro && user.credits < 3)) return;
     const token = await getValidToken();
     if (!token) { setError('Sesión expirada. Recarga la página.'); return; }
+    if (token === '__SUPER_USER__') { setError('Cuenta de administrador: usa una cuenta normal para separar stems.'); return; }
 
     setError(''); setPhase('uploading'); setProgress(5); setProgressText('Preparando audio…');
 
