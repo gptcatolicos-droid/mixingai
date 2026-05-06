@@ -7,7 +7,6 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// ✅ v20: Version hash actual de lucataco/ace-step (mayo 2026)
 const ACESTEP_VERSION = '280fc4f9ee507577f880a167f639c02622421d8fecf492454320311217b688f1';
 
 serve(async (req) => {
@@ -18,7 +17,7 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
     const SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
 
-    if (!REPLICATE_TOKEN) throw new Error('REPLICATE_API_TOKEN no configurado en Supabase secrets');
+    if (!REPLICATE_TOKEN) throw new Error('REPLICATE_API_TOKEN no configurado');
     if (!SUPABASE_URL) throw new Error('SUPABASE_URL no configurado');
     if (!SERVICE_ROLE_KEY) throw new Error('SERVICE_ROLE_KEY no configurado');
 
@@ -32,7 +31,7 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
     if (authErr || !user)
-      return new Response(JSON.stringify({ error: 'Token inválido', detail: authErr?.message }), {
+      return new Response(JSON.stringify({ error: 'Token invalido' }), {
         status: 401, headers: { ...cors, 'Content-Type': 'application/json' },
       });
 
@@ -49,7 +48,7 @@ serve(async (req) => {
     const isPro = profile?.plan === 'unlimited' || ['danipalacio@gmail.com'].includes(user.email ?? '');
 
     if (!isPro && credits < 10)
-      return new Response(JSON.stringify({ error: 'Créditos insuficientes', creditsRemaining: credits }), {
+      return new Response(JSON.stringify({ error: 'Creditos insuficientes', creditsRemaining: credits }), {
         status: 402, headers: { ...cors, 'Content-Type': 'application/json' },
       });
 
@@ -64,7 +63,6 @@ serve(async (req) => {
     const fullPrompt = genreTags ? `${genreTags}, ${prompt}` : prompt;
     const resolvedSeed = seed === -1 ? Math.floor(Math.random() * 999999) : seed;
 
-    // ✅ FIX: Bearer (no Token), version hash actual
     const replicateResp = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
@@ -93,9 +91,8 @@ serve(async (req) => {
 
     const prediction = await replicateResp.json();
     const predId = prediction.id;
-    if (!predId) throw new Error(`Replicate no devolvió ID: ${JSON.stringify(prediction)}`);
+    if (!predId) throw new Error(`Sin ID: ${JSON.stringify(prediction)}`);
 
-    // Polling hasta completar (máx 7 min)
     let audioUrl: string | null = null;
     for (let i = 0; i < 84; i++) {
       await new Promise(r => setTimeout(r, 5000));
@@ -107,41 +104,28 @@ serve(async (req) => {
         audioUrl = Array.isArray(pollData.output) ? pollData.output[0] : pollData.output;
         break;
       }
-      if (pollData.status === 'failed') throw new Error(`ACE-Step falló: ${pollData.error ?? 'error desconocido'}`);
-      if (pollData.status === 'canceled') throw new Error('Predicción cancelada en Replicate');
+      if (pollData.status === 'failed') throw new Error(`ACE-Step fallo: ${pollData.error ?? 'error desconocido'}`);
+      if (pollData.status === 'canceled') throw new Error('Cancelado en Replicate');
     }
 
-    if (!audioUrl) throw new Error('Timeout: la generación tardó más de 7 minutos');
+    if (!audioUrl) throw new Error('Timeout: mas de 7 minutos');
 
-    // Descargar audio
-    const audioResp = await fetch(audioUrl);
-    if (!audioResp.ok) throw new Error(`No se pudo descargar el audio: ${audioResp.status}`);
-
-    // ✅ FIX: base64 en chunks para evitar stack overflow con archivos grandes
-    const buf = await audioResp.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let audioBase64 = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      audioBase64 += btoa(String.fromCharCode(...bytes.subarray(i, i + chunkSize)));
-    }
-
-    // Descontar créditos
+    // Descontar creditos
     if (!isPro) {
       await supabase.from('profiles').update({ credits: credits - 10 }).eq('id', user.id);
     }
 
-    // Guardar historial (no crítico — no bloquea la respuesta)
+    // Guardar historial
     try {
       await supabase.from('ai_generations').insert({
         user_id: user.id, prompt, genres, duration: audioDuration, bpm,
         status: 'done', audio_url: audioUrl, created_at: new Date().toISOString(),
       });
-    } catch (_) { /* no crítico */ }
+    } catch (_) { /* no critico */ }
 
+    // Devolver URL directa - sin base64
     return new Response(JSON.stringify({
       success: true,
-      audioBase64,
       audioUrl,
       mimeType: 'audio/wav',
       creditsRemaining: isPro ? 999999 : credits - 10,
@@ -150,7 +134,7 @@ serve(async (req) => {
   } catch (err: any) {
     console.error('[acestep-generate] ERROR:', err?.message ?? err);
     return new Response(JSON.stringify({
-      error: err?.message ?? 'Error interno del servidor',
+      error: err?.message ?? 'Error interno',
     }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 });

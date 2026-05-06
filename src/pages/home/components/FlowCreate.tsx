@@ -133,14 +133,10 @@ export default function FlowCreate({ user, onNavigate, onTrackReady, onCreditsUp
       }
 
       const data = await resp.json();
-      if (!data.audioBase64) throw new Error('No se recibió audio del servidor');
+      if (!data.audioUrl) throw new Error('No se recibio audio del servidor');
 
-      const cleanBase64 = data.audioBase64.replace(/\s/g, "");
-      const binary = atob(cleanBase64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], { type: data.mimeType ?? 'audio/wav' });
-      const url = URL.createObjectURL(blob);
+      // Usar URL directa de Replicate - sin base64
+      const url = data.audioUrl;
       const title = prompt.slice(0,40).trim() + (prompt.length>40?'…':'');
 
       setProgress(100); setGenStep('done');
