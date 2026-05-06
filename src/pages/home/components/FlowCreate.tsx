@@ -36,7 +36,7 @@ const STYLES = [
 
 type GenStep = 'idle'|'parsing'|'structuring'|'synthesizing'|'mastering'|'done';
 
-function await getValidToken(): string | null {
+
   try {
     // 1. Token guardado en el user object
     const stored = localStorage.getItem('audioMixerUser');

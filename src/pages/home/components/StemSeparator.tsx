@@ -40,7 +40,7 @@ function getStemIcon(key: string): string {
   return STEM_ICONS[key.toLowerCase()] || '🎵';
 }
 
-function await getValidToken(): string | null {
+
   try {
     const stored = localStorage.getItem('audioMixerUser');
     if (stored) { const u = JSON.parse(stored); if (u?.accessToken) return u.accessToken; }
