@@ -8,8 +8,10 @@ const cors = {
 };
 
 const REPLICATE_TOKEN = Deno.env.get('REPLICATE_API_TOKEN') ?? '';
-// ACE-Step en Replicate
-const ACESTEP_MODEL = 'lucataco/ace-step:a4b06a8b37c7c5b2e0fdf74d35038e65e21558f24def3b27e62cfc945db2df3c';
+
+// ✅ FIX: Usando endpoint de modelo sin version hash fijo
+// En lugar de /v1/predictions con version hash, usamos /v1/models/{owner}/{model}/predictions
+// Esto siempre apunta al latest del modelo y nunca queda desactualizado.
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -29,10 +31,8 @@ serve(async (req) => {
     if (authErr || !user)
       return new Response(JSON.stringify({ error: 'Token inválido' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-    // Obtener o crear perfil con créditos por defecto
     let { data: profile } = await supabase.from('profiles').select('credits, plan').eq('id', user.id).single();
     if (!profile) {
-      // Primera vez — crear perfil con 10 créditos de bienvenida
       await supabase.from('profiles').upsert({
         id: user.id,
         email: user.email,
@@ -52,19 +52,18 @@ serve(async (req) => {
     if (!prompt)
       return new Response(JSON.stringify({ error: 'Se requiere prompt' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-    // Construir tags de género
     const genreTags = genres?.length ? genres.join(', ') : '';
     const fullPrompt = genreTags ? `${genreTags}, ${prompt}` : prompt;
 
-    // Llamar a Replicate — ACE-Step
-    const replicateResp = await fetch('https://api.replicate.com/v1/predictions', {
+    // ✅ FIX: /v1/models/lucataco/ace-step/predictions (sin version hash)
+    //    Header cambia de "Token xxx" a "Bearer xxx" (formato moderno de Replicate)
+    const replicateResp = await fetch('https://api.replicate.com/v1/models/lucataco/ace-step/predictions', {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${REPLICATE_TOKEN}`,
+        'Authorization': `Bearer ${REPLICATE_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        version: ACESTEP_MODEL,
         input: {
           tags: fullPrompt,
           lyrics: lyrics ?? '[verse]\n[chorus]',
@@ -91,7 +90,7 @@ serve(async (req) => {
     for (let i = 0; i < 72; i++) {
       await new Promise(r => setTimeout(r, 5000));
       const poll = await fetch(`https://api.replicate.com/v1/predictions/${predId}`, {
-        headers: { 'Authorization': `Token ${REPLICATE_TOKEN}` },
+        headers: { 'Authorization': `Bearer ${REPLICATE_TOKEN}` },
       });
       const pollData = await poll.json();
       if (pollData.status === 'succeeded') {
