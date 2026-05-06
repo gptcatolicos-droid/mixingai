@@ -1,3 +1,4 @@
+import { getValidToken } from '@/utils/auth';
 import { useState, useCallback, useRef } from 'react';
 
 interface User { id: string; firstName: string; credits: number; is_pro?: boolean; plan?: string; }
@@ -39,7 +40,7 @@ function getStemIcon(key: string): string {
   return STEM_ICONS[key.toLowerCase()] || '🎵';
 }
 
-function getUserToken(): string | null {
+function await getValidToken(): string | null {
   try {
     const stored = localStorage.getItem('audioMixerUser');
     if (stored) { const u = JSON.parse(stored); if (u?.accessToken) return u.accessToken; }
@@ -124,7 +125,7 @@ export default function StemSeparator({ user, onBack, onCreditsUpdate, onStemsRe
 
   const handleSeparate = async () => {
     if (!file || (!isPro && user.credits < 3)) return;
-    const token = getUserToken();
+    const token = await getValidToken();
     if (!token) { setError('Sesión expirada. Recarga la página.'); return; }
 
     setError(''); setPhase('uploading'); setProgress(5); setProgressText('Preparando audio…');

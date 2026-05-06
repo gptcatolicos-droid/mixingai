@@ -2,7 +2,7 @@ import FlowNav from '@/components/flow/FlowNav';
 import { useState } from 'react';
 
 interface User { id:string; firstName:string; credits:number; is_pro?:boolean; plan?:string; genre?:string; level?:string; }
-interface Props { user:User|null; onNavigate:(id:string)=>void; }
+interface Props { user:User|null; onNavigate:(id:string)=>void; onLogout?:()=>void; }
 
 const TABS = [
   {
@@ -72,7 +72,7 @@ function Bars({color,n=20}:{color:string;n?:number}){
   );
 }
 
-export default function FlowHome({user,onNavigate}:Props){
+export default function FlowHome({user,onNavigate,onLogout}:Props){
   const [tab,setTab]=useState(0);
   const t=TABS[tab];
   const isPro=user?.is_pro||user?.plan==='unlimited';
@@ -85,7 +85,7 @@ export default function FlowHome({user,onNavigate}:Props){
 
   return(
     <div style={{width:'100%',minHeight:'100vh',background:'radial-gradient(ellipse at 80% 0%,rgba(192,38,211,0.12),transparent 50%),radial-gradient(ellipse at 0% 100%,rgba(162,89,255,0.1),transparent 50%),#0a0612',fontFamily:'-apple-system,BlinkMacSystemFont,"DM Sans",system-ui,sans-serif',color:'#F8F0FF'}}>
-      <FlowNav active="home" onNavigate={onNavigate} user={user}/>
+      <FlowNav active="home" onNavigate={onNavigate} user={user} onLogout={onLogout}/>
 
       <div style={{maxWidth:1140,margin:'0 auto',padding:'36px 24px 60px'}}>
 

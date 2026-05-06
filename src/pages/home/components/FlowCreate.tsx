@@ -3,6 +3,7 @@
  * Diseño con grid de presets de género (igual que el mezclador)
  * Conectado al Edge Function real → ACE-Step en RunPod
  */
+import { getValidToken } from '@/utils/auth';
 import { useState, useRef } from 'react';
 import FlowNav from '@/components/flow/FlowNav';
 import { PRESETS, MixPreset } from './PresetScreen';
@@ -35,7 +36,7 @@ const STYLES = [
 
 type GenStep = 'idle'|'parsing'|'structuring'|'synthesizing'|'mastering'|'done';
 
-function getUserToken(): string | null {
+function await getValidToken(): string | null {
   try {
     // 1. Token guardado en el user object
     const stored = localStorage.getItem('audioMixerUser');
@@ -110,7 +111,7 @@ export default function FlowCreate({ user, onNavigate, onTrackReady, onCreditsUp
     if (!user) { onNavigate('login'); return; }
     if (!isPro && user.credits < 10) { setError(`Necesitas 10 créditos. Tienes ${user.credits}.`); return; }
 
-    const token = getUserToken();
+    const token = await getValidToken();
     if (!token) { setError('Sesión expirada. Recarga la página e intenta de nuevo.'); return; }
 
     setError(''); setGenerating(true); setProgress(2); setGenStep('parsing');

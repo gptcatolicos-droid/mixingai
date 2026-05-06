@@ -31,6 +31,7 @@ const LoginPage: React.FC = () => {
       createdAt: new Date().toISOString(),
       username: meta.username || email.split('@')[0],
       ...(token ? { accessToken: token } : {}),
+      ...(data?.refresh_token ? { refreshToken: data.refresh_token } : {}),
     }));
     navigate('/');
   };

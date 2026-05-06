@@ -4,7 +4,7 @@ import { MixPreset, PRESETS } from './PresetScreen';
 
 interface User { id:string; firstName:string; lastName:string; email:string; country:string; credits:number; provider?:string; createdAt:string; is_pro?:boolean; plan?:string; }
 interface Stem { id:string; name:string; file:File; buffer:AudioBuffer; gainNode:GainNode; panNode:StereoPannerNode; analyserNode:AnalyserNode; eqLow:BiquadFilterNode; eqMid:BiquadFilterNode; eqHigh:BiquadFilterNode; sourceNode?:AudioBufferSourceNode; volume:number; pan:number; muted:boolean; solo:boolean; waveformPeaks:Float32Array; instrument:string; icon:string; color:string; startOffset:number; endOffset:number; fadeIn:number; fadeOut:number; }
-interface Props { projectId:string; user:User; uploadedFiles:File[]; onBack:()=>void; onCreditsUpdate:(n:number)=>void; onExport:(d:any)=>void; initialPreset?:MixPreset; reverbOn?:boolean; delayOn?:boolean; stereoOn?:boolean; onNavigate?:(id:string)=>void; }
+interface Props { projectId:string; user:User; uploadedFiles:File[]; onBack:()=>void; onCreditsUpdate:(n:number)=>void; onExport:(d:any)=>void; initialPreset?:MixPreset; reverbOn?:boolean; delayOn?:boolean; stereoOn?:boolean; onNavigate?:(id:string)=>void; onLogout?:()=>void; }
 
 const T = { bgDeep:'#0F0A1A', surface:'rgba(26,16,40,0.8)', surface2:'rgba(35,20,55,0.6)', surfaceSolid:'#12091e', text:'#F8F0FF', text2:'#b8a8d0', text3:'#7a6a90', pink:'#ec4899', fuchsia:'#C026D3', violet:'#a259ff', amber:'#fbbf24', green:'#10b981', red:'#ef4444', border:'rgba(192,38,211,0.2)', borderStrong:'rgba(192,38,211,0.5)' };
 const COLORS = ['#ec4899','#10b981','#f97316','#3b82f6','#fbbf24','#a259ff','#14b8a6','#f472b6','#4ade80','#fb923c','#60a5fa','#c084fc'];
@@ -166,7 +166,7 @@ function TrackEditor({stem,onClose,onUpdate}:{stem:Stem;onClose:()=>void;onUpdat
   );
 }
 
-export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],reverbOn=false,delayOn=false,stereoOn=false,onBack,onCreditsUpdate,onExport,onNavigate}:Props){
+export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],reverbOn=false,delayOn=false,stereoOn=false,onBack,onCreditsUpdate,onExport,onNavigate,onLogout}:Props){
   const [stems,setStems]=useState<Stem[]>([]);
   const [playing,setPlaying]=useState(false);
   const [currentTime,setCurrentTime]=useState(0);
@@ -347,7 +347,15 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
   };
   const updateStemEQ=(id:string,band:'low'|'mid'|'high',val:number)=>{
     const ctx=ctxRef.current;
-    setStems(p=>p.map(s=>{if(s.id===id){if(ctx){if(band==='low')s.eqLow.gain.setTargetAtTime(val,ctx.currentTime,0.05);else if(band==='mid')s.eqMid.gain.setTargetAtTime(val,ctx.currentTime,0.05);else s.eqHigh.gain.setTargetAtTime(val,ctx.currentTime,0.05);}return{...s};}return s;}));
+    setStems(p=>p.map(s=>{
+      if(s.id!==id)return s;
+      if(ctx){
+        if(band==='low'){s.eqLow.gain.value=val;s.eqLow.gain.setTargetAtTime(val,ctx.currentTime,0.02);}
+        else if(band==='mid'){s.eqMid.gain.value=val;s.eqMid.gain.setTargetAtTime(val,ctx.currentTime,0.02);}
+        else{s.eqHigh.gain.value=val;s.eqHigh.gain.setTargetAtTime(val,ctx.currentTime,0.02);}
+      }
+      return{...s};
+    }));
   };
   const applyPreset=(p:MixPreset)=>{
     setPreset(p);setBassGain(p.bass);setMidGain(p.mid);setHighGain(p.high);
@@ -371,9 +379,9 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
   };
   const updMasterEQ=(band:'bass'|'mid'|'high',v:number)=>{
     const ctx=ctxRef.current;
-    if(band==='bass'){setBassGain(v);if(bassRef.current&&ctx)bassRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
-    else if(band==='mid'){setMidGain(v);if(midRef.current&&ctx)midRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
-    else{setHighGain(v);if(highRef.current&&ctx)highRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
+    if(band==='bass'){setBassGain(v);if(bassRef.current&&ctx){bassRef.current.gain.value=v;bassRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.02);}}
+    else if(band==='mid'){setMidGain(v);if(midRef.current&&ctx){midRef.current.gain.value=v;midRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.02);}}
+    else{setHighGain(v);if(highRef.current&&ctx){highRef.current.gain.value=v;highRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.02);}}
   };
   const addFiles=(files:File[])=>setAllFiles(p=>[...p,...files]);
 
@@ -453,7 +461,7 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
   return(
     <div style={{width:'100%',height:'100vh',background:`radial-gradient(ellipse at 80% -10%,rgba(192,38,211,0.15),transparent 50%),${T.bgDeep}`,fontFamily:'-apple-system,BlinkMacSystemFont,"DM Sans",system-ui,sans-serif',color:T.text,display:'flex',flexDirection:'column',overflow:'hidden'}}>
 
-      <FlowNav active="studio" onNavigate={id=>{if(onNavigate)onNavigate(id);else onBack();}} user={user}/>
+      <FlowNav active="studio" onNavigate={id=>{ stopAll(); if(onNavigate)onNavigate(id);else onBack(); }} user={user} onLogout={onLogout}/>
 
       {/* TITLE BAR */}
       <div style={{padding:'7px 16px',display:'flex',alignItems:'center',gap:10,borderBottom:`0.5px solid ${T.border}`,background:'rgba(10,6,18,0.8)',flexShrink:0,flexWrap:'wrap'}}>
@@ -558,11 +566,17 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
                   <HSlider value={eq.v} min={-12} max={12} step={1} color={eq.c} onChange={v=>updateStemEQ(selStem.id,eq.b,v)}/>
                 </div>
               ))}
-              {/* Presets de género para el stem */}
+              {/* Presets de género — miniaturas visuales */}
               <div style={{fontSize:8,color:T.text3,letterSpacing:.5,textTransform:'uppercase',margin:'10px 0 6px'}}>Preset para este stem</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:4}}>
                 {PRESETS.map(p=>(
-                  <button key={p.id} onClick={()=>applyPresetToStem(selStem.id,p)} style={{padding:'2px 7px',borderRadius:980,background:`${p.color}12`,border:`0.5px solid ${p.color}44`,color:p.color,fontSize:8,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{p.name}</button>
+                  <button key={p.id} onClick={()=>applyPresetToStem(selStem.id,p)}
+                    style={{background:`${p.color}11`,border:`1px solid ${p.color}33`,borderRadius:7,padding:'5px 4px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
+                    <div style={{height:12,display:'flex',alignItems:'flex-end',gap:'1px',marginBottom:3}}>
+                      {p.wavePattern.map((h:number,i:number)=><div key={i} style={{flex:1,height:`${h*100}%`,background:p.color,borderRadius:'1px 1px 0 0',opacity:0.85}}/>)}
+                    </div>
+                    <div style={{fontSize:8,fontWeight:700,color:T.text}}>{p.name}</div>
+                  </button>
                 ))}
               </div>
               {/* Edit button */}
@@ -621,8 +635,16 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
 
             {/* Timeline clips + scroll */}
             <div style={{flex:1,overflow:'auto',position:'relative',background:'rgba(8,4,12,0.5)'}}>
-              {/* Ruler */}
-              <div style={{height:20,position:'sticky',top:0,zIndex:3,background:'rgba(12,7,22,0.98)',borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',padding:'0 0 0 6px'}}>
+              {/* Ruler - clickeable para seek */}
+              <div style={{height:20,position:'sticky',top:0,zIndex:3,background:'rgba(12,7,22,0.98)',borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',padding:'0 0 0 6px',cursor:'pointer'}}
+                onClick={e=>{
+                  const rect=e.currentTarget.getBoundingClientRect();
+                  const p=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+                  const newTime=p*duration;
+                  pauseRef.current=newTime;
+                  setCurrentTime(newTime);
+                  if(playing){ stopAll(); setTimeout(()=>playPause(),50); }
+                }}>
                 {Array.from({length:32}).map((_,i)=>(
                   <div key={i} style={{width:50,fontSize:8,color:i%4===0?T.text3:'rgba(122,106,144,0.2)',fontFamily:'monospace',flexShrink:0,borderLeft:`0.5px solid ${i%4===0?T.border:'transparent'}`,paddingLeft:2}}>
                     {i%4===0?`${i+1}`:''}
@@ -696,6 +718,13 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
                       <button onClick={e=>{e.stopPropagation();muteStem(s.id);}} style={{width:18,height:14,fontSize:7,fontWeight:700,borderRadius:3,background:s.muted?T.amber:'rgba(255,255,255,0.06)',color:s.muted?'#000':T.text3,border:`0.5px solid ${s.muted?T.amber:T.border}`,cursor:'pointer'}}>M</button>
                       <button onClick={e=>{e.stopPropagation();soloStem(s.id);}} style={{width:18,height:14,fontSize:7,fontWeight:700,borderRadius:3,background:s.solo?T.pink:'rgba(255,255,255,0.06)',color:s.solo?'#fff':T.text3,border:`0.5px solid ${s.solo?T.pink:T.border}`,cursor:'pointer'}}>S</button>
                     </div>
+                    {/* Mini preset selector */}
+                    <select onChange={e=>{const p=PRESETS.find(x=>x.id===e.target.value);if(p)applyPresetToStem(s.id,p);}}
+                      style={{width:44,fontSize:7,background:'rgba(255,255,255,0.05)',border:`0.5px solid ${T.border}`,borderRadius:4,color:T.text3,cursor:'pointer',padding:'1px 2px',fontFamily:'inherit'}}
+                      defaultValue="">
+                      <option value="" disabled>EQ</option>
+                      {PRESETS.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
                   </div>
                 ))}
                 {/* Master fader */}

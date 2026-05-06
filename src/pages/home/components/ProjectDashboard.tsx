@@ -151,6 +151,7 @@ export default function ProjectDashboard() {
       delayOn={activePreset.delayWet > 0}
       stereoOn={activePreset.stereoWidth > 0.5}
       onNavigate={handleNavigate}
+      onLogout={handleLogout}
     />;
   }
 
@@ -198,5 +199,5 @@ export default function ProjectDashboard() {
   }
 
   // Home - tablero
-  return <FlowHome user={user!} onNavigate={handleNavigate} />;
+  return <FlowHome user={user!} onNavigate={handleNavigate} onLogout={handleLogout} />;
 }
