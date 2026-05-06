@@ -63,13 +63,18 @@ export async function getValidToken(): Promise<string | null> {
 
 function isTokenValid(token: string): boolean {
   try {
+    if (!token || typeof token !== 'string') return false;
     const parts = token.split('.');
     if (parts.length !== 3) return false;
-    const payload = JSON.parse(atob(parts[1]));
-    if (!payload.exp) return true; // sin exp = asumimos válido
-    return Date.now() < payload.exp * 1000 - 30_000; // 30s de margen
+    // JWT usa base64url (- y _ en vez de + y /) — normalizar antes de atob
+    const base64url = parts[1];
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '=='.slice(0, (4 - base64.length % 4) % 4);
+    const payload = JSON.parse(atob(padded));
+    if (!payload.exp) return true;
+    return Date.now() < payload.exp * 1000 - 30_000;
   } catch {
-    return true; // si no se puede parsear, asumir válido y dejar que el servidor decida
+    return true; // si no se puede parsear, dejar que el servidor decida
   }
 }
 
