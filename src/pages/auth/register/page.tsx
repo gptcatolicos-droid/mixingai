@@ -18,7 +18,7 @@ const RegisterPage: React.FC = () => {
   const onChange = (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement>) =>
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
-  const saveAndGo = (id: string, email: string, token?: string) => {
+  const saveAndGo = (id: string, email: string, token?: string, refreshToken?: string) => {
     const { firstName, lastName, country } = form;
     localStorage.setItem('audioMixerUser', JSON.stringify({
       id, email, firstName, lastName, country,
@@ -27,6 +27,7 @@ const RegisterPage: React.FC = () => {
       createdAt: new Date().toISOString(),
       username: `${firstName.toLowerCase().replace(/\s/g,'_')}_${lastName.toLowerCase().replace(/\s/g,'_')}`,
       ...(token ? { accessToken: token } : {}),
+      ...(refreshToken ? { refreshToken } : {}),
     }));
     localStorage.removeItem('mixingai_used_free');
     navigate('/');
@@ -99,7 +100,7 @@ const RegisterPage: React.FC = () => {
 
       // ── 4. Signup OK con session ──────────────────────────────
       if (accessToken && signupData.user) {
-        saveAndGo(signupData.user.id, signupData.user.email, accessToken);
+        saveAndGo(signupData.user.id, signupData.user.email, accessToken, signupData.session?.refresh_token);
         return;
       }
 
@@ -111,7 +112,7 @@ const RegisterPage: React.FC = () => {
       });
       const loginData = await loginRes.json();
       if (loginRes.ok && loginData.access_token) {
-        saveAndGo(loginData.user.id, loginData.user.email, loginData.access_token);
+        saveAndGo(loginData.user.id, loginData.user.email, loginData.access_token, loginData.refresh_token);
         return;
       }
 

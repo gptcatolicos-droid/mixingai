@@ -18,7 +18,7 @@ const LoginPage: React.FC = () => {
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
-  const saveAndGo = (id: string, email: string, meta: any = {}, token?: string, isPro = false) => {
+  const saveAndGo = (id: string, email: string, meta: any = {}, token?: string, isPro = false, refreshToken?: string) => {
     localStorage.setItem('audioMixerUser', JSON.stringify({
       id, email,
       firstName: meta.first_name || email.split('@')[0],
@@ -31,7 +31,7 @@ const LoginPage: React.FC = () => {
       createdAt: new Date().toISOString(),
       username: meta.username || email.split('@')[0],
       ...(token ? { accessToken: token } : {}),
-      ...(data?.refresh_token ? { refreshToken: data.refresh_token } : {}),
+      ...(refreshToken ? { refreshToken } : {}),
     }));
     navigate('/');
   };
@@ -62,7 +62,7 @@ const LoginPage: React.FC = () => {
       if (res.ok && data.access_token) {
         const meta = data.user?.user_metadata || {};
         const isPro = meta.is_pro || meta.plan === 'unlimited' || false;
-        saveAndGo(data.user.id, data.user.email, meta, data.access_token, isPro);
+        saveAndGo(data.user.id, data.user.email, meta, data.access_token, isPro, data.refresh_token);
         return;
       }
 

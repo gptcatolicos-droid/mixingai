@@ -119,7 +119,7 @@ export default function FlowCreate({ user, onNavigate, onTrackReady, onCreditsUp
 
       if (!resp.ok) {
         const err = await resp.json().catch(()=>({}));
-        if (resp.status === 503) setError('Servidor RunPod no activo. Actívalo primero.');
+        if (resp.status === 503) setError('Servidor no disponible. Verifica tu cuenta en replicate.com/billing');
         else if (resp.status === 402) setError(`Sin créditos (tienes ${err.creditsRemaining ?? 0})`);
         else if (resp.status === 401) setError('Sesión expirada. Recarga la página.');
         else setError(err.error ?? `Error ${resp.status}`);
@@ -355,7 +355,7 @@ export default function FlowCreate({ user, onNavigate, onTrackReady, onCreditsUp
               </button>
               <div style={{ fontSize:9.5, color:T.text3, textAlign:'center', marginTop:8 }}>
                 10 créditos · te quedan {isPro ? '∞' : (user?.credits ?? 0)}<br/>
-                ACE-Step 1.5 · RunPod GPU → se abre en el DAW
+                ACE-Step 1.5 · Replicate → se abre en el DAW
               </div>
             </div>
           </div>

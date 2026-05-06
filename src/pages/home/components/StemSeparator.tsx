@@ -291,7 +291,7 @@ export default function StemSeparator({ user, onBack, onCreditsUpdate, onStemsRe
                 ⚠️ {error}
                 {error.includes('RunPod') && (
                   <div style={{ marginTop: '6px', fontSize: '11px', color: '#f87171' }}>
-                    → Ve a runpod.io → tu pod → Enable Web Terminal → pega el Comando 3
+                    → Verifica que tu cuenta de Replicate tiene créditos en replicate.com/billing
                   </div>
                 )}
               </div>
@@ -329,7 +329,7 @@ export default function StemSeparator({ user, onBack, onCreditsUpdate, onStemsRe
                   </button>
                 )}
                 <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '11px', color: T.text3 }}>
-                  Requiere servidor RunPod activo · Demucs de Meta AI
+                  Replicate · Demucs de Meta AI · Calidad profesional
                 </div>
               </>
             )}
