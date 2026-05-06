@@ -37,33 +37,6 @@ const STYLES = [
 type GenStep = 'idle'|'parsing'|'structuring'|'synthesizing'|'mastering'|'done';
 
 
-  try {
-    // 1. Token guardado en el user object
-    const stored = localStorage.getItem('audioMixerUser');
-    if (stored) {
-      const u = JSON.parse(stored);
-      if (u?.accessToken) return u.accessToken;
-    }
-    // 2. Token en sesión de Supabase (formato nuevo sb-xxx-auth-token)
-    const keys = Object.keys(localStorage);
-    for (const key of keys) {
-      if (key.includes('auth-token') || key.includes('sb-') && key.includes('-auth')) {
-        const val = localStorage.getItem(key);
-        if (val) {
-          try {
-            const p = JSON.parse(val);
-            // Formato nuevo Supabase v2
-            if (p?.access_token) return p.access_token;
-            // Formato con session nested
-            if (p?.session?.access_token) return p.session.access_token;
-          } catch {}
-        }
-      }
-    }
-    return null;
-  } catch { return null; }
-}
-
 function fmtDur(s: number) { return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
 
 interface User { id:string; firstName:string; credits:number; is_pro?:boolean; plan?:string; }
@@ -139,7 +112,7 @@ export default function FlowCreate({ user, onNavigate, onTrackReady, onCreditsUp
           genres: genres.length ? genres : undefined,
           seed: -1,
         }),
-        signal: AbortSignal.timeout(360_000),
+        signal: (() => { const ac = new AbortController(); setTimeout(() => ac.abort(), 360_000); return ac.signal; })(),
       });
 
       stopProg();

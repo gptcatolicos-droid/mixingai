@@ -211,8 +211,20 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
   const rafRef=useRef<number>();
 
   useEffect(()=>{setAllFiles(uploadedFiles);},[uploadedFiles]);
-  useEffect(()=>{if(allFiles.length>0)initAudio();},[allFiles]);
-  useEffect(()=>()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);},[]);
+  const initializedRef=useRef(false);
+  useEffect(()=>{
+    if(allFiles.length>0){
+      // Si es la primera vez O si cambió el número de archivos
+      initAudio();
+    }
+  },[allFiles]);
+  useEffect(()=>()=>{
+    if(rafRef.current)cancelAnimationFrame(rafRef.current);
+    if(timerRef.current)clearInterval(timerRef.current);
+    if(ctxRef.current&&ctxRef.current.state!=='closed'){
+      ctxRef.current.close().catch(()=>{});
+    }
+  },[]);
 
   const initAudio=async()=>{
     setLoading(true);setLoadPct(5);
@@ -220,9 +232,13 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
       if(ctxRef.current&&ctxRef.current.state!=='closed')await ctxRef.current.close();
       const ctx=new(window.AudioContext||(window as any).webkitAudioContext)();
       ctxRef.current=ctx;
-      const master=ctx.createGain();master.gain.value=0.85;masterRef.current=master;
+      const master=ctx.createGain();master.gain.value=0.7;masterRef.current=master;
+      // Limiter para evitar clipping
+      const limiter=ctx.createDynamicsCompressor();
+      limiter.threshold.value=-3;limiter.knee.value=0;limiter.ratio.value=20;
+      limiter.attack.value=0.001;limiter.release.value=0.1;
       const analyser=ctx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=0.8;analyserRef.current=analyser;
-      master.connect(analyser);analyser.connect(ctx.destination);
+      master.connect(limiter);limiter.connect(analyser);analyser.connect(ctx.destination);
       const bass=ctx.createBiquadFilter();bass.type='lowshelf';bass.frequency.value=200;bass.gain.value=bassGain;bassRef.current=bass;
       const mid=ctx.createBiquadFilter();mid.type='peaking';mid.frequency.value=1000;mid.Q.value=1;mid.gain.value=midGain;midRef.current=mid;
       const high=ctx.createBiquadFilter();high.type='highshelf';high.frequency.value=5000;high.gain.value=highGain;highRef.current=high;
@@ -292,6 +308,8 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
 
   const playPause=async()=>{
     const ctx=ctxRef.current;if(!ctx||stems.length===0)return;
+    const playableStems=stems.filter(s=>!s.muted);
+    if(!playing&&playableStems.length===0)return; // nada que reproducir
     if(ctx.state==='suspended')await ctx.resume();
     if(playing){
       stems.forEach(s=>{try{s.sourceNode?.stop();s.sourceNode?.disconnect();}catch(e){}});
@@ -372,7 +390,14 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
     const ctx=ctxRef.current;
     setStems(prev=>prev.map(s=>{
       if(s.id===stemId){
-        if(ctx){s.eqLow.gain.setTargetAtTime(p.bass,ctx.currentTime,0.05);s.eqMid.gain.setTargetAtTime(p.mid,ctx.currentTime,0.05);s.eqHigh.gain.setTargetAtTime(p.high,ctx.currentTime,0.05);}
+        if(ctx){
+          s.eqLow.gain.value=p.bass;s.eqLow.gain.setTargetAtTime(p.bass,ctx.currentTime,0.02);
+          s.eqMid.gain.value=p.mid;s.eqMid.gain.setTargetAtTime(p.mid,ctx.currentTime,0.02);
+          s.eqHigh.gain.value=p.high;s.eqHigh.gain.setTargetAtTime(p.high,ctx.currentTime,0.02);
+          // Aplicar reverb/delay si el preset los tiene
+          if(revRef.current)revRef.current.gain.setTargetAtTime(p.reverbWet>0?p.reverbWet:0,ctx.currentTime,0.1);
+          if(delRef.current)delRef.current.gain.setTargetAtTime(p.delayWet>0?p.delayWet:0,ctx.currentTime,0.1);
+        }
         return{...s};
       }return s;
     }));
@@ -643,7 +668,24 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
                   const newTime=p*duration;
                   pauseRef.current=newTime;
                   setCurrentTime(newTime);
-                  if(playing){ stopAll(); setTimeout(()=>playPause(),50); }
+                  if(playing){
+                    // Seek: detener sources actuales y reiniciar desde nueva posición
+                    stems.forEach(s=>{try{s.sourceNode?.stop();s.sourceNode?.disconnect();}catch(e){}});
+                    if(timerRef.current)clearInterval(timerRef.current);
+                    const ctx2=ctxRef.current;
+                    if(ctx2){
+                      const t0=ctx2.currentTime;
+                      const upd=stems.map(s=>{
+                        if(!s.muted){const src=ctx2.createBufferSource();src.buffer=s.buffer;src.connect(s.gainNode);src.start(t0,newTime);return{...s,sourceNode:src};}return s;
+                      });
+                      setStems(upd);
+                      timerRef.current=window.setInterval(()=>{
+                        const el=ctx2.currentTime-t0+newTime;
+                        setCurrentTime(Math.min(el,duration));
+                        if(el>=duration)stopAll();
+                      },80);
+                    }
+                  }
                 }}>
                 {Array.from({length:32}).map((_,i)=>(
                   <div key={i} style={{width:50,fontSize:8,color:i%4===0?T.text3:'rgba(122,106,144,0.2)',fontFamily:'monospace',flexShrink:0,borderLeft:`0.5px solid ${i%4===0?T.border:'transparent'}`,paddingLeft:2}}>

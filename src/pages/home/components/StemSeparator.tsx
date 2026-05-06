@@ -44,10 +44,12 @@ function getStemIcon(key: string): string {
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let bin = '';
-  // Process in chunks to avoid stack overflow on large files
-  const chunkSize = 8192;
+  const chunkSize = 4096; // Más pequeño para evitar stack overflow en archivos grandes
   for (let i = 0; i < bytes.length; i += chunkSize) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    for (let j = 0; j < chunk.length; j++) {
+      bin += String.fromCharCode(chunk[j]);
+    }
   }
   return btoa(bin);
 }
@@ -131,7 +133,7 @@ export default function StemSeparator({ user, onBack, onCreditsUpdate, onStemsRe
           mimeType: file.type || 'audio/wav',
           model,
         }),
-        signal: AbortSignal.timeout(360_000),
+        signal: (() => { const ac = new AbortController(); setTimeout(() => ac.abort(), 360_000); return ac.signal; })(),
       });
 
       // Simular progreso mientras espera

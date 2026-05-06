@@ -11,7 +11,7 @@ export async function getValidToken(): Promise<string | null> {
     if (stored) {
       const u = JSON.parse(stored);
       // Super user — no necesita token real
-      if (u.id?.startsWith('super_')) return 'super_token_' + u.id;
+      if (u.id?.startsWith('super_')) return null; // Super users: sin token de Supabase
       if (u.accessToken) {
         // Verificar si el token sigue válido intentando decodificar el JWT
         const valid = isTokenValid(u.accessToken);
@@ -58,7 +58,7 @@ function isTokenValid(token: string): boolean {
     // Válido si expira en más de 60 segundos
     return Date.now() < exp - 60_000;
   } catch {
-    return true; // Si no podemos verificar, asumimos válido
+    return false; // Si no podemos verificar, asumir expirado y hacer refresh
   }
 }
 

@@ -94,6 +94,22 @@ export default function ProjectDashboard() {
   const updateUser = (u: User) => { setUser(u); localStorage.setItem('audioMixerUser', JSON.stringify(u)); };
   const handleCredits = (n: number) => { if (!user) return; updateUser({...user, credits:n}); };
 
+  const handleLogout = () => {
+    // Limpiar TODO el estado y localStorage
+    setUser(null);
+    setScreen('home');
+    setUploadedFiles([]);
+    // Limpiar localStorage completo de auth
+    localStorage.removeItem('audioMixerUser');
+    Object.keys(localStorage).forEach(k => {
+      if (k.includes('supabase') || k.includes('sb-') || k.includes('auth-token')) {
+        localStorage.removeItem(k);
+      }
+    });
+    // Forzar recarga para limpiar estado de React completamente
+    window.location.href = '/';
+  };
+
   // Navegar — todo va al DAW
   const handleNavigate = (id: string) => {
     if (id === 'login')    { navigate('/auth/login');    return; }
