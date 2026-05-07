@@ -38,36 +38,61 @@ serve(async (req) => {
     const credits = profile?.credits ?? 0;
     const isPro = profile?.plan === 'unlimited' || ['danipalacio@gmail.com'].includes(user.email ?? '');
 
-    // ACCION: poll — verificar estado de request existente
+    // POLL — verificar estado de request existente
     if (action === 'poll' && existingRequestId) {
       const statusResp = await fetch(
         `https://queue.fal.run/fal-ai/demucs/requests/${existingRequestId}/status`,
         { headers: { 'Authorization': `Key ${FAL_KEY}` } }
       );
-      const statusData = await statusResp.json();
+      const statusText = await statusResp.text();
+      let statusData: any = {};
+      try { statusData = JSON.parse(statusText); } catch(e) {}
+
+      console.log(`[stems] poll status: ${statusData.status}`);
 
       if (statusData.status === 'COMPLETED') {
         const resultResp = await fetch(
           `https://queue.fal.run/fal-ai/demucs/requests/${existingRequestId}`,
           { headers: { 'Authorization': `Key ${FAL_KEY}` } }
         );
-        const result = await resultResp.json();
-        const output = result.output ?? result;
+        const resultText = await resultResp.text();
+        console.log('[stems] result raw:', resultText.slice(0, 500));
 
-        // Descontar creditos al completar
+        let result: any = {};
+        try { result = JSON.parse(resultText); } catch(e) {}
+
+        // FAL Demucs puede devolver distintas estructuras — manejar todas
+        // Estructura 1: { vocals: {url}, drums: {url}, ... }
+        // Estructura 2: { output: { vocals: {url}, ... } }
+        // Estructura 3: { stems: { vocals: "url", ... } }
+        const out = result.output ?? result.stems ?? result;
+        
+        const extractUrl = (v: any): string | null => {
+          if (!v) return null;
+          if (typeof v === 'string') return v;
+          if (v.url) return v.url;
+          return null;
+        };
+
+        const stems = {
+          vocals: extractUrl(out.vocals),
+          drums: extractUrl(out.drums),
+          bass: extractUrl(out.bass),
+          other: extractUrl(out.other ?? out.guitar ?? out.piano),
+        };
+
+        console.log('[stems] extracted:', JSON.stringify(stems));
+
+        if (!stems.vocals && !stems.drums) {
+          throw new Error(`Demucs devolvio estructura inesperada: ${resultText.slice(0, 300)}`);
+        }
+
         if (!isPro) {
           await supabase.from('profiles').update({ credits: credits - 3 }).eq('id', user.id);
         }
 
         return new Response(JSON.stringify({
-          success: true,
-          status: 'COMPLETED',
-          stems: {
-            vocals: output.vocals?.url ?? output.vocals ?? null,
-            drums: output.drums?.url ?? output.drums ?? null,
-            bass: output.bass?.url ?? output.bass ?? null,
-            other: output.other?.url ?? output.other ?? null,
-          },
+          success: true, status: 'COMPLETED', stems,
           creditsRemaining: isPro ? 999999 : credits - 3,
         }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
       }
@@ -75,11 +100,10 @@ serve(async (req) => {
       if (statusData.status === 'FAILED') {
         return new Response(JSON.stringify({
           success: false, status: 'FAILED',
-          error: `Demucs fallo: ${statusData.error ?? 'error desconocido'}`,
+          error: `Demucs fallo: ${statusData.error ?? statusText.slice(0, 200)}`,
         }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
       }
 
-      // IN_QUEUE o IN_PROGRESS
       return new Response(JSON.stringify({
         success: true,
         status: statusData.status ?? 'IN_PROGRESS',
@@ -87,7 +111,7 @@ serve(async (req) => {
       }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    // ACCION: submit — iniciar nueva separacion
+    // SUBMIT — nueva separacion
     if (!isPro && credits < 3)
       return new Response(JSON.stringify({ error: 'Creditos insuficientes (necesitas 3)', creditsRemaining: credits }), {
         status: 402, headers: { ...cors, 'Content-Type': 'application/json' },
@@ -95,7 +119,6 @@ serve(async (req) => {
 
     if (!audioBase64) throw new Error('Se requiere audioBase64');
 
-    // Decodificar y subir a storage
     const clean = audioBase64.replace(/\s/g, '');
     const binaryStr = atob(clean);
     const audioBytes = new Uint8Array(binaryStr.length);
@@ -111,8 +134,9 @@ serve(async (req) => {
     if (uploadErr) throw new Error(`Storage error: ${uploadErr.message}`);
 
     const { data: { publicUrl } } = supabase.storage.from('audio-temp').getPublicUrl(storageKey);
+    console.log('[stems] uploaded to storage:', publicUrl);
 
-    // Submit a FAL — Demucs (solo submit, no polling)
+    // Submit a FAL — input va envuelto en { input: {...} }
     const submitResp = await fetch('https://queue.fal.run/fal-ai/demucs', {
       method: 'POST',
       headers: {
@@ -122,22 +146,22 @@ serve(async (req) => {
       body: JSON.stringify({ input: { audio_url: publicUrl, model } }),
     });
 
+    const submitText = await submitResp.text();
+    console.log('[stems] FAL submit:', submitResp.status, submitText.slice(0, 200));
+
     if (!submitResp.ok) {
-      const errBody = await submitResp.text();
       await supabase.storage.from('audio-temp').remove([storageKey]);
-      throw new Error(`FAL submit error ${submitResp.status}: ${errBody}`);
+      throw new Error(`FAL submit ${submitResp.status}: ${submitText}`);
     }
 
-    const submitJson = await submitResp.json();
-    const request_id = submitJson.request_id;
-    if (!request_id) throw new Error('FAL no devolvio request_id');
+    let submitJson: any = {};
+    try { submitJson = JSON.parse(submitText); } catch(e) {}
 
-    // Devolver request_id al frontend para que haga polling
+    const request_id = submitJson.request_id;
+    if (!request_id) throw new Error(`FAL no devolvio request_id: ${submitText.slice(0, 200)}`);
+
     return new Response(JSON.stringify({
-      success: true,
-      status: 'IN_PROGRESS',
-      request_id,
-      storageKey,
+      success: true, status: 'IN_PROGRESS', request_id,
     }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
 
   } catch (err: any) {

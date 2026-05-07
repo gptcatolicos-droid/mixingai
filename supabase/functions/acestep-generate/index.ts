@@ -98,34 +98,38 @@ serve(async (req) => {
     }
 
     const request_id = submitJson.request_id;
+    // FAL devuelve URLs exactas — usarlas directamente evita bugs de version en la URL
+    const status_url = submitJson.status_url as string | undefined;
+    const response_url = submitJson.response_url as string | undefined;
     if (!request_id) throw new Error(`FAL no devolvio request_id: ${submitText.slice(0, 200)}`);
 
     console.log('[minimax] request_id:', request_id);
+    console.log('[minimax] status_url:', status_url);
 
     let audioUrl: string | null = null;
     for (let i = 0; i < 54; i++) {
       await new Promise(r => setTimeout(r, 5000));
 
-      const statusResp = await fetch(
-        `https://queue.fal.run/fal-ai/minimax-music/v2.6/requests/${request_id}/status`,
-        { headers: { 'Authorization': `Key ${FAL_KEY}` } }
-      );
+      // Usar la URL exacta que FAL devolvio (sin /v2.6/ hardcodeado)
+      const pollUrl = status_url ?? `https://queue.fal.run/fal-ai/minimax-music/requests/${request_id}/status`;
+      const statusResp = await fetch(pollUrl, {
+        headers: { 'Authorization': `Key ${FAL_KEY}` }
+      });
       const statusText = await statusResp.text();
       let statusData: any = {};
       try { statusData = JSON.parse(statusText); } catch(e) {}
 
-      console.log(`[minimax] poll ${i}: ${statusData.status}`);
+      console.log(`[minimax] poll ${i}: ${statusData.status} raw: ${statusText.slice(0,100)}`);
 
       if (statusData.status === 'COMPLETED') {
-        const resultResp = await fetch(
-          `https://queue.fal.run/fal-ai/minimax-music/v2.6/requests/${request_id}`,
-          { headers: { 'Authorization': `Key ${FAL_KEY}` } }
-        );
+        const resultUrl = response_url ?? `https://queue.fal.run/fal-ai/minimax-music/requests/${request_id}`;
+        const resultResp = await fetch(resultUrl, {
+          headers: { 'Authorization': `Key ${FAL_KEY}` }
+        });
         const resultText = await resultResp.text();
         console.log('[minimax] result:', resultText.slice(0, 300));
         let result: any = {};
         try { result = JSON.parse(resultText); } catch(e) {}
-        // Segun docs: { audio: { url: "..." } }
         audioUrl = result.audio?.url ?? result.data?.audio?.url ?? result.data?.audio_url ?? null;
         break;
       }

@@ -803,8 +803,9 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
               {/* Ruler - click y drag para seek */}
               <div style={{height:20,position:'sticky',top:0,zIndex:3,background:'rgba(12,7,22,0.98)',borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',padding:'0 0 0 6px',cursor:'pointer',userSelect:'none'}}
                 onMouseDown={e=>{
+                  const rulerRect=e.currentTarget.getBoundingClientRect();
                   const seek=(clientX:number)=>{
-                    const rect=e.currentTarget.getBoundingClientRect();
+                    const rect=rulerRect;
                     const p=Math.max(0,Math.min(1,(clientX-rect.left)/rect.width));
                     const newTime=p*duration;
                     pauseRef.current=newTime;
