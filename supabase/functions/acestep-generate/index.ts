@@ -58,38 +58,42 @@ serve(async (req) => {
     const isInstrumental = selectedStyle === 'instrumental';
     const hasLyrics = !isInstrumental && !!lyrics?.trim();
     const genreTags = genres?.length ? genres.join(', ') + ', ' : '';
-    const stylePrompt = (genreTags + prompt).slice(0, 2000);
+    // prompt max 300 chars segun docs
+    const stylePrompt = (genreTags + prompt).slice(0, 300);
 
-    // MiniMax v2.6 — parametros correctos segun documentacion de FAL
+    // Input exacto segun documentacion de FAL MiniMax v2.6
     const falInput: Record<string, unknown> = {
       prompt: stylePrompt,
+      is_instrumental: isInstrumental,
     };
 
-    if (!isInstrumental && hasLyrics) {
-      // Con letra personalizada — va en el prompt con formato especial
-      falInput.prompt = `${stylePrompt}\n\n${lyrics.trim().slice(0, 600)}`;
+    if (!isInstrumental) {
+      // lyrics max 1000 chars, requerido cuando is_instrumental es false
+      falInput.lyrics = hasLyrics
+        ? lyrics.trim().slice(0, 1000)
+        : `[Verse]\nA song about ${prompt.slice(0, 60)}\n[Chorus]\n${prompt.slice(0, 40)}`;
     }
 
-    // SUBMIT a FAL queue — MiniMax Music v2.6 (mas reciente)
+    // Submit a FAL queue — body directo sin wrapper "input"
     const submitResp = await fetch('https://queue.fal.run/fal-ai/minimax-music/v2.6', {
       method: 'POST',
       headers: {
         'Authorization': `Key ${FAL_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ input: falInput }),
+      body: JSON.stringify(falInput),
     });
 
     if (!submitResp.ok) {
       const errBody = await submitResp.text();
-      throw new Error(`FAL submit error ${submitResp.status}: ${errBody}`);
+      throw new Error(`FAL submit ${submitResp.status}: ${errBody}`);
     }
 
     const submitJson = await submitResp.json();
     const request_id = submitJson.request_id;
     if (!request_id) throw new Error(`FAL no devolvio request_id: ${JSON.stringify(submitJson)}`);
 
-    // Polling — max 4.5 min (dentro del timeout de Supabase Edge Functions)
+    // Polling — max 4.5 min
     let audioUrl: string | null = null;
     for (let i = 0; i < 54; i++) {
       await new Promise(r => setTimeout(r, 5000));
@@ -106,12 +110,9 @@ serve(async (req) => {
           { headers: { 'Authorization': `Key ${FAL_KEY}` } }
         );
         const result = await resultResp.json();
-        // FAL devuelve result.data.audio_url o result.audio_url
-        audioUrl = result.data?.audio_url
-          ?? result.audio_url
-          ?? result.data?.audio?.url
-          ?? result.audio?.url
-          ?? null;
+        // Segun docs: output es { audio: { url: "..." } }
+        audioUrl = result.audio?.url ?? null;
+        console.log('FAL result:', JSON.stringify(result).slice(0, 200));
         break;
       }
 
@@ -120,20 +121,18 @@ serve(async (req) => {
       }
     }
 
-    if (!audioUrl) throw new Error('Timeout: la generacion tardo mas de 4 minutos. Intenta de nuevo.');
+    if (!audioUrl) throw new Error('Timeout: la generacion tardo mas de 4 minutos.');
 
-    // Descontar creditos
     if (!isPro) {
       await supabase.from('profiles').update({ credits: credits - 10 }).eq('id', user.id);
     }
 
-    // Guardar historial
     try {
       await supabase.from('ai_generations').insert({
         user_id: user.id, prompt, genres, status: 'done',
         audio_url: audioUrl, created_at: new Date().toISOString(),
       });
-    } catch (_) { /* no critico */ }
+    } catch (_) {}
 
     return new Response(JSON.stringify({
       success: true,
