@@ -15,9 +15,7 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
     const SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
 
-    if (!FAL_KEY) throw new Error('FAL_API_KEY no configurado en Supabase secrets');
-    if (!SUPABASE_URL) throw new Error('SUPABASE_URL no configurado');
-    if (!SERVICE_ROLE_KEY) throw new Error('SERVICE_ROLE_KEY no configurado');
+    if (!FAL_KEY) throw new Error('FAL_API_KEY no configurado');
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer '))
@@ -61,65 +59,75 @@ serve(async (req) => {
     const hasLyrics = !isInstrumental && !!lyrics?.trim();
     const genreTags = genres?.length ? genres.join(', ') + ', ' : '';
     const stylePrompt = (genreTags + prompt).slice(0, 2000);
-    const songLyrics = hasLyrics
-      ? lyrics.trim()
-      : `[Verse]\nA song about ${prompt.slice(0, 80)}\n\n[Chorus]\n${prompt.slice(0, 40)}`;
 
-    // Submit a FAL — MiniMax Music 2.5
-    const submitResp = await fetch('https://queue.fal.run/fal-ai/minimax-music/v2.5', {
+    // MiniMax v2.6 — parametros correctos segun documentacion de FAL
+    const falInput: Record<string, unknown> = {
+      prompt: stylePrompt,
+    };
+
+    if (!isInstrumental && hasLyrics) {
+      // Con letra personalizada — va en el prompt con formato especial
+      falInput.prompt = `${stylePrompt}\n\n${lyrics.trim().slice(0, 600)}`;
+    }
+
+    // SUBMIT a FAL queue — MiniMax Music v2.6 (mas reciente)
+    const submitResp = await fetch('https://queue.fal.run/fal-ai/minimax-music/v2.6', {
       method: 'POST',
       headers: {
         'Authorization': `Key ${FAL_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        prompt: stylePrompt,
-        lyrics: isInstrumental ? '' : songLyrics,
-        is_instrumental: isInstrumental,
-        lyrics_optimizer: !hasLyrics && !isInstrumental,
-      }),
+      body: JSON.stringify({ input: falInput }),
     });
 
     if (!submitResp.ok) {
       const errBody = await submitResp.text();
-      throw new Error(`FAL error ${submitResp.status}: ${errBody}`);
+      throw new Error(`FAL submit error ${submitResp.status}: ${errBody}`);
     }
 
     const submitJson = await submitResp.json();
     const request_id = submitJson.request_id;
     if (!request_id) throw new Error(`FAL no devolvio request_id: ${JSON.stringify(submitJson)}`);
 
-    // Polling max 5 min
+    // Polling — max 4.5 min (dentro del timeout de Supabase Edge Functions)
     let audioUrl: string | null = null;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 54; i++) {
       await new Promise(r => setTimeout(r, 5000));
 
       const statusResp = await fetch(
-        `https://queue.fal.run/fal-ai/minimax-music/v2.5/requests/${request_id}/status`,
+        `https://queue.fal.run/fal-ai/minimax-music/v2.6/requests/${request_id}/status`,
         { headers: { 'Authorization': `Key ${FAL_KEY}` } }
       );
       const statusData = await statusResp.json();
 
       if (statusData.status === 'COMPLETED') {
         const resultResp = await fetch(
-          `https://queue.fal.run/fal-ai/minimax-music/v2.5/requests/${request_id}`,
+          `https://queue.fal.run/fal-ai/minimax-music/v2.6/requests/${request_id}`,
           { headers: { 'Authorization': `Key ${FAL_KEY}` } }
         );
         const result = await resultResp.json();
-        audioUrl = result.audio?.url ?? result.output?.audio?.url ?? null;
+        // FAL devuelve result.data.audio_url o result.audio_url
+        audioUrl = result.data?.audio_url
+          ?? result.audio_url
+          ?? result.data?.audio?.url
+          ?? result.audio?.url
+          ?? null;
         break;
       }
+
       if (statusData.status === 'FAILED') {
-        throw new Error(`MiniMax fallo: ${statusData.error ?? 'error desconocido'}`);
+        throw new Error(`MiniMax fallo: ${statusData.error ?? JSON.stringify(statusData)}`);
       }
     }
 
-    if (!audioUrl) throw new Error('Timeout: mas de 5 minutos');
+    if (!audioUrl) throw new Error('Timeout: la generacion tardo mas de 4 minutos. Intenta de nuevo.');
 
+    // Descontar creditos
     if (!isPro) {
       await supabase.from('profiles').update({ credits: credits - 10 }).eq('id', user.id);
     }
 
+    // Guardar historial
     try {
       await supabase.from('ai_generations').insert({
         user_id: user.id, prompt, genres, status: 'done',

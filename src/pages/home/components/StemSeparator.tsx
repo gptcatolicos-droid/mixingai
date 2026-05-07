@@ -114,57 +114,75 @@ export default function StemSeparator({ user, onBack, onCreditsUpdate, onStemsRe
 
     setError(''); setPhase('uploading'); setProgress(5); setProgressText('Preparando audio…');
 
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'apikey': SUPABASE_ANON,
+    };
+
     try {
-      // Convertir a base64 y enviar a la edge function
-      // La edge function se encarga de subir al storage con service role
+      // 1. Convertir a base64
       const arrayBuffer = await file.arrayBuffer();
-      setProgress(15); setProgressText('Preparando audio…');
+      setProgress(12); setProgressText('Subiendo audio al servidor…');
       const audioBase64 = arrayBufferToBase64(arrayBuffer);
 
-      setPhase('processing'); setProgress(20); setProgressText('Conectando con Demucs via FAL…');
-
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/stems-separate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'apikey': SUPABASE_ANON,
-        },
-        body: JSON.stringify({
-          audioBase64,
-          mimeType: file.type || 'audio/wav',
-          fileName: file.name,
-          model,
-        }),
-        signal: (() => { const ac = new AbortController(); setTimeout(() => ac.abort(), 360_000); return ac.signal; })(),
+      // 2. Submit — la edge function sube el archivo y devuelve request_id inmediatamente
+      setPhase('processing'); setProgress(20); setProgressText('Iniciando separación con Demucs…');
+      const submitResp = await fetch(`${SUPABASE_URL}/functions/v1/stems-separate`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ audioBase64, mimeType: file.type || 'audio/wav', fileName: file.name, model }),
       });
 
-      // Simular progreso mientras espera
-      const progInterval = setInterval(() => {
-        setProgress(p => Math.min(p + 2, 85));
-        setProgressText('Demucs separando instrumentos…');
-      }, 3000);
-
-      const data = await resp.json();
-      clearInterval(progInterval);
-
-      if (!resp.ok || !data.success) {
-        if (data.needsServer) {
-          setError('El servidor RunPod no está activo. Actívalo primero desde runpod.io.');
-        } else {
-          setError(data.error || `Error ${resp.status}`);
-        }
-        setPhase('idle');
-        return;
+      const submitData = await submitResp.json();
+      if (!submitResp.ok || !submitData.success) {
+        setError(submitData.error || `Error ${submitResp.status}`);
+        setPhase('idle'); return;
       }
 
-      setProgress(90); setProgressText('Procesando stems…');
+      const { request_id } = submitData;
+      if (!request_id) { setError('No se obtuvo ID de proceso'); setPhase('idle'); return; }
 
-      // Construir resultados desde URLs de FAL (ya no son base64)
-      const stemEntries = Object.entries(data.stems as Record<string, string>);
+      // 3. Polling desde el frontend — cada 6 segundos, max 12 min
+      setProgress(25); setProgressText('Demucs separando instrumentos…');
+      let stems: Record<string, string> | null = null;
+      let attempts = 0;
+      const maxAttempts = 120;
+
+      while (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 6000));
+        attempts++;
+
+        // Avanzar progreso suavemente
+        const prog = Math.min(25 + (attempts / maxAttempts) * 60, 85);
+        setProgress(Math.round(prog));
+
+        const pollResp = await fetch(`${SUPABASE_URL}/functions/v1/stems-separate`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ action: 'poll', request_id }),
+        });
+
+        const pollData = await pollResp.json();
+
+        if (pollData.status === 'COMPLETED' && pollData.stems) {
+          stems = pollData.stems;
+          onCreditsUpdate(pollData.creditsRemaining ?? (isPro ? user.credits : user.credits - 3));
+          break;
+        }
+
+        if (pollData.status === 'FAILED') {
+          setError(pollData.error || 'Demucs falló al separar los stems');
+          setPhase('idle'); return;
+        }
+        // IN_QUEUE o IN_PROGRESS — seguir esperando
+      }
+
+      if (!stems) { setError('Timeout: la separación tardó demasiado. Intenta con un archivo más corto.'); setPhase('idle'); return; }
+
+      // 4. Descargar stems y construir resultados
+      setProgress(90); setProgressText('Descargando stems…');
+      const stemEntries = Object.entries(stems).filter(([,url]) => url);
       const stemResults: StemResult[] = await Promise.all(
-        stemEntries.filter(([,url]) => url).map(async ([key, url], idx) => {
-          // Descargar el stem para obtener blob y duracion
+        stemEntries.map(async ([key, url], idx) => {
           const stemResp = await fetch(url);
           const stemBuf = await stemResp.arrayBuffer();
           const blob = new Blob([stemBuf], { type: 'audio/mp3' });
@@ -175,9 +193,7 @@ export default function StemSeparator({ user, onBack, onCreditsUpdate, onStemsRe
             label: key.charAt(0).toUpperCase() + key.slice(1),
             color: getStemColor(key, idx),
             icon: getStemIcon(key),
-            blob,
-            url: objUrl,
-            duration,
+            blob, url: objUrl, duration,
           };
         })
       );
@@ -186,14 +202,9 @@ export default function StemSeparator({ user, onBack, onCreditsUpdate, onStemsRe
       setPhase('done');
       setProgress(100);
       setServerActive(true);
-      onCreditsUpdate(data.creditsRemaining ?? (isPro ? user.credits : user.credits - 3));
 
     } catch (err: any) {
-      const isTimeout = err?.name === 'TimeoutError';
-      setError(isTimeout
-        ? 'La separación tardó demasiado. Intenta con un archivo más corto.'
-        : err?.message ?? 'Error desconocido'
-      );
+      setError(err?.message ?? 'Error desconocido');
       setPhase('idle');
     }
   };
