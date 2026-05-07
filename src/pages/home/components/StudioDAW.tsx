@@ -117,49 +117,182 @@ function ContextMenu({x,y,stemId,onSeparate,onRename,onClose}:{x:number;y:number
   );
 }
 
-// Track editor modal
+// Waveform Editor — Logic Pro style con fade in/out visual y recorte
 function TrackEditor({stem,onClose,onUpdate}:{stem:Stem;onClose:()=>void;onUpdate:(changes:Partial<Stem>)=>void}){
   const [name,setName]=useState(stem.name);
   const [gain,setGain]=useState(stem.volume);
   const [fadeIn,setFadeIn]=useState(stem.fadeIn);
   const [fadeOut,setFadeOut]=useState(stem.fadeOut);
-  const apply=()=>{onUpdate({name,volume:gain,fadeIn,fadeOut});onClose();};
+  const [trimStart,setTrimStart]=useState(stem.startOffset/stem.buffer.duration);
+  const [trimEnd,setTrimEnd]=useState(stem.endOffset/stem.buffer.duration);
+  const canvasRef=useRef<HTMLCanvasElement>(null);
+  const W=600,H=120;
+
+  // Dibujar waveform con fade in/out y trim markers
+  useEffect(()=>{
+    const c=canvasRef.current;if(!c)return;
+    const ctx=c.getContext('2d');if(!ctx)return;
+    c.width=W;c.height=H;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='rgba(8,4,16,1)';
+    ctx.fillRect(0,0,W,H);
+
+    // Zona recortada (fuera del trim) — oscura
+    ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.fillRect(0,0,trimStart*W,H);
+    ctx.fillRect(trimEnd*W,0,(1-trimEnd)*W,H);
+
+    // Waveform
+    const peaks=stem.waveformPeaks;
+    const step=Math.ceil(peaks.length/W);
+    for(let x=0;x<W;x++){
+      const idx=Math.floor(x/W*peaks.length);
+      const amp=Math.abs(peaks[idx]??0);
+      // Calcular opacidad por fade
+      const pct=x/W;
+      let alpha=1;
+      if(fadeIn>0&&pct<fadeIn)alpha=pct/fadeIn;
+      if(fadeOut>0&&pct>1-fadeOut)alpha=(1-pct)/fadeOut;
+      // Color segun zona
+      const inTrim=pct>=trimStart&&pct<=trimEnd;
+      ctx.fillStyle=inTrim?`rgba(${stem.color==='#e879f9'?'232,121,249':stem.color==='#f87171'?'248,113,113':stem.color==='#60a5fa'?'96,165,250':stem.color==='#34d399'?'52,211,153':'168,85,247'},${0.3+amp*0.7})`:'rgba(80,60,100,0.3)';
+      const h=Math.max(1,amp*H*0.45);
+      ctx.fillRect(x,H/2-h,1,h*2);
+    }
+
+    // Fade In overlay (amarillo)
+    if(fadeIn>0){
+      const grad=ctx.createLinearGradient(trimStart*W,0,trimStart*W+fadeIn*W,0);
+      grad.addColorStop(0,'rgba(251,191,36,0.35)');
+      grad.addColorStop(1,'rgba(251,191,36,0)');
+      ctx.fillStyle=grad;
+      ctx.fillRect(trimStart*W,0,fadeIn*W,H);
+    }
+    // Fade Out overlay (rosa)
+    if(fadeOut>0){
+      const grad=ctx.createLinearGradient((trimEnd-fadeOut)*W,0,trimEnd*W,0);
+      grad.addColorStop(0,'rgba(232,121,249,0)');
+      grad.addColorStop(1,'rgba(232,121,249,0.35)');
+      ctx.fillStyle=grad;
+      ctx.fillRect((trimEnd-fadeOut)*W,0,fadeOut*W,H);
+    }
+
+    // Trim handles
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(trimStart*W,0);ctx.lineTo(trimStart*W,H);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(trimEnd*W,0);ctx.lineTo(trimEnd*W,H);ctx.stroke();
+
+    // Fade In handle (amarillo)
+    const fiX=trimStart*W+fadeIn*W;
+    ctx.strokeStyle='#fbbf24';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(fiX,0);ctx.lineTo(fiX,H);ctx.stroke();
+    // Fade Out handle (rosa)
+    const foX=trimEnd*W-fadeOut*W;
+    ctx.strokeStyle='#e879f9';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(foX,0);ctx.lineTo(foX,H);ctx.stroke();
+
+    // Labels
+    ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='9px monospace';
+    ctx.fillText(`${fmt(trimStart*stem.buffer.duration)}`,trimStart*W+4,12);
+    ctx.fillText(`${fmt(trimEnd*stem.buffer.duration)}`,Math.max(4,trimEnd*W-36),12);
+  },[fadeIn,fadeOut,trimStart,trimEnd,stem]);
+
+  // Drag handlers para trim y fade
+  const dragging=useRef<null|'trimStart'|'trimEnd'|'fadeIn'|'fadeOut'>(null);
+  const onMouseDown=(e:React.MouseEvent)=>{
+    const c=canvasRef.current;if(!c)return;
+    const rect=c.getBoundingClientRect();
+    const px=(e.clientX-rect.left)/rect.width;
+    // Detectar qua handle esta mas cerca (tolerancia 3%)
+    const handles=[
+      {id:'trimStart',pos:trimStart},{id:'trimEnd',pos:trimEnd},
+      {id:'fadeIn',pos:trimStart+fadeIn},{id:'fadeOut',pos:trimEnd-fadeOut},
+    ];
+    const closest=handles.reduce((a,b)=>Math.abs(b.pos-px)<Math.abs(a.pos-px)?b:a);
+    if(Math.abs(closest.pos-px)<0.05)dragging.current=closest.id as any;
+  };
+  const onMouseMove=(e:React.MouseEvent)=>{
+    if(!dragging.current||!canvasRef.current)return;
+    const rect=canvasRef.current.getBoundingClientRect();
+    const px=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+    if(dragging.current==='trimStart')setTrimStart(Math.min(px,trimEnd-0.05));
+    else if(dragging.current==='trimEnd')setTrimEnd(Math.max(px,trimStart+0.05));
+    else if(dragging.current==='fadeIn')setFadeIn(Math.max(0,Math.min(px-trimStart,0.5)));
+    else if(dragging.current==='fadeOut')setFadeOut(Math.max(0,Math.min(trimEnd-px,0.5)));
+  };
+  const onMouseUp=()=>{dragging.current=null;};
+
+  const apply=()=>{
+    onUpdate({
+      name,volume:gain,fadeIn,fadeOut,
+      startOffset:trimStart*stem.buffer.duration,
+      endOffset:trimEnd*stem.buffer.duration,
+    });
+    onClose();
+  };
+
   return(
-    <div style={{position:'fixed',inset:0,background:'rgba(8,4,16,0.9)',backdropFilter:'blur(12px)',zIndex:500,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-      <div style={{background:T.surfaceSolid,border:`1px solid ${T.borderStrong}`,borderRadius:18,padding:28,maxWidth:420,width:'100%'}}>
-        <h3 style={{fontSize:16,fontWeight:700,color:T.text,marginBottom:20,display:'flex',alignItems:'center',gap:8}}>
-          <span style={{color:stem.color}}>{stem.icon}</span> Editar track
-        </h3>
-        <div style={{marginBottom:16}}>
-          <label style={{fontSize:10,color:T.text3,letterSpacing:.5,textTransform:'uppercase',display:'block',marginBottom:6}}>Nombre</label>
-          <input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:'8px 12px',borderRadius:8,background:'rgba(255,255,255,0.06)',border:`1px solid ${T.border}`,color:T.text,fontSize:13,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}/>
+    <div style={{position:'fixed',inset:0,background:'rgba(8,4,16,0.95)',backdropFilter:'blur(16px)',zIndex:500,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+      <div style={{background:T.surfaceSolid,border:`1px solid ${T.borderStrong}`,borderRadius:18,padding:24,maxWidth:660,width:'100%'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <h3 style={{fontSize:15,fontWeight:700,color:T.text,margin:0,display:'flex',alignItems:'center',gap:8}}>
+            <span style={{color:stem.color}}>{stem.icon}</span> Editor de clip — {stem.name}
+          </h3>
+          <button onClick={onClose} style={{background:'none',border:'none',color:T.text3,fontSize:18,cursor:'pointer',padding:'0 4px'}}>✕</button>
         </div>
-        <div style={{marginBottom:16}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-            <label style={{fontSize:10,color:T.text3,letterSpacing:.5,textTransform:'uppercase'}}>Ganancia</label>
-            <span style={{fontSize:11,color:stem.color,fontFamily:'monospace',fontWeight:600}}>{gain>0?'+':''}{gain} dB</span>
+
+        {/* Waveform visual interactivo */}
+        <div style={{marginBottom:16,borderRadius:10,overflow:'hidden',border:`1px solid ${T.border}`,position:'relative'}}>
+          <canvas ref={canvasRef} style={{width:'100%',height:H,display:'block',cursor:'col-resize'}}
+            onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}/>
+          <div style={{position:'absolute',bottom:4,left:8,display:'flex',gap:12,fontSize:9,color:'rgba(255,255,255,0.4)'}}>
+            <span style={{color:'#fff'}}>◀▶ Trim</span>
+            <span style={{color:'#fbbf24'}}>━ Fade In</span>
+            <span style={{color:'#e879f9'}}>━ Fade Out</span>
           </div>
-          <HSlider value={gain} min={-24} max={6} step={1} color={stem.color} onChange={setGain}/>
+          <div style={{position:'absolute',bottom:4,right:8,fontSize:9,color:'rgba(255,255,255,0.3)'}}>
+            Arrastra los marcadores para editar
+          </div>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:20}}>
+
+        {/* Controles */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,marginBottom:16}}>
+          <div>
+            <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:4}}>Inicio</div>
+            <div style={{fontSize:12,fontWeight:600,color:T.text,fontFamily:'monospace'}}>{fmt(trimStart*stem.buffer.duration)}</div>
+          </div>
+          <div>
+            <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:4}}>Fin</div>
+            <div style={{fontSize:12,fontWeight:600,color:T.text,fontFamily:'monospace'}}>{fmt(trimEnd*stem.buffer.duration)}</div>
+          </div>
+          <div>
+            <div style={{fontSize:9,color:'#fbbf24',letterSpacing:.5,textTransform:'uppercase',marginBottom:4}}>Fade In</div>
+            <div style={{fontSize:12,fontWeight:600,color:'#fbbf24',fontFamily:'monospace'}}>{fmt(fadeIn*stem.buffer.duration)}</div>
+          </div>
+          <div>
+            <div style={{fontSize:9,color:'#e879f9',letterSpacing:.5,textTransform:'uppercase',marginBottom:4}}>Fade Out</div>
+            <div style={{fontSize:12,fontWeight:600,color:'#e879f9',fontFamily:'monospace'}}>{fmt(fadeOut*stem.buffer.duration)}</div>
+          </div>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
+          <div>
+            <div style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:6}}>Nombre</div>
+            <input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:'7px 10px',borderRadius:7,background:'rgba(255,255,255,0.06)',border:`1px solid ${T.border}`,color:T.text,fontSize:12,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}/>
+          </div>
           <div>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-              <label style={{fontSize:10,color:T.text3,letterSpacing:.5,textTransform:'uppercase'}}>Fade In</label>
-              <span style={{fontSize:11,color:T.green,fontFamily:'monospace'}}>{Math.round(fadeIn*100)}%</span>
+              <span style={{fontSize:9,color:T.text3,letterSpacing:.5,textTransform:'uppercase'}}>Ganancia</span>
+              <span style={{fontSize:10,color:stem.color,fontFamily:'monospace',fontWeight:600}}>{gain>0?'+':''}{gain} dB</span>
             </div>
-            <HSlider value={fadeIn} min={0} max={0.3} step={0.01} color={T.green} onChange={setFadeIn}/>
-          </div>
-          <div>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-              <label style={{fontSize:10,color:T.text3,letterSpacing:.5,textTransform:'uppercase'}}>Fade Out</label>
-              <span style={{fontSize:11,color:T.pink,fontFamily:'monospace'}}>{Math.round(fadeOut*100)}%</span>
-            </div>
-            <HSlider value={fadeOut} min={0} max={0.3} step={0.01} color={T.pink} onChange={setFadeOut}/>
+            <HSlider value={gain} min={-24} max={6} step={1} color={stem.color} onChange={setGain}/>
           </div>
         </div>
+
         <div style={{display:'flex',gap:10}}>
-          <button onClick={apply} style={{flex:1,padding:'12px',borderRadius:10,background:`linear-gradient(135deg,${T.fuchsia},${T.pink})`,border:'none',color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Aplicar</button>
-          <button onClick={onClose} style={{padding:'12px 16px',borderRadius:10,background:'rgba(255,255,255,0.05)',border:`1px solid ${T.border}`,color:T.text2,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>Cancelar</button>
+          <button onClick={apply} style={{flex:1,padding:'11px',borderRadius:10,background:`linear-gradient(135deg,${T.fuchsia},${T.pink})`,border:'none',color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Aplicar cambios</button>
+          <button onClick={()=>{setTrimStart(0);setTrimEnd(1);setFadeIn(0);setFadeOut(0);}} style={{padding:'11px 14px',borderRadius:10,background:'rgba(255,255,255,0.04)',border:`1px solid ${T.border}`,color:T.text2,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Reset</button>
+          <button onClick={onClose} style={{padding:'11px 14px',borderRadius:10,background:'rgba(255,255,255,0.04)',border:`1px solid ${T.border}`,color:T.text2,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Cancelar</button>
         </div>
       </div>
     </div>
@@ -667,32 +800,38 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
 
             {/* Timeline clips + scroll */}
             <div style={{flex:1,overflow:'auto',position:'relative',background:'rgba(8,4,12,0.5)'}}>
-              {/* Ruler - clickeable para seek */}
-              <div style={{height:20,position:'sticky',top:0,zIndex:3,background:'rgba(12,7,22,0.98)',borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',padding:'0 0 0 6px',cursor:'pointer'}}
-                onClick={e=>{
-                  const rect=e.currentTarget.getBoundingClientRect();
-                  const p=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
-                  const newTime=p*duration;
-                  pauseRef.current=newTime;
-                  setCurrentTime(newTime);
-                  if(playing){
-                    // Seek: detener sources actuales y reiniciar desde nueva posición
-                    stems.forEach(s=>{try{s.sourceNode?.stop();s.sourceNode?.disconnect();}catch(e){}});
-                    if(timerRef.current)clearInterval(timerRef.current);
-                    const ctx2=ctxRef.current;
-                    if(ctx2){
-                      const t0=ctx2.currentTime;
-                      const upd=stems.map(s=>{
-                        if(!s.muted){const src=ctx2.createBufferSource();src.buffer=s.buffer;src.connect(s.gainNode);src.start(t0,newTime);return{...s,sourceNode:src};}return s;
-                      });
-                      setStems(upd);
-                      timerRef.current=window.setInterval(()=>{
-                        const el=ctx2.currentTime-t0+newTime;
-                        setCurrentTime(Math.min(el,duration));
-                        if(el>=duration)stopAll();
-                      },80);
+              {/* Ruler - click y drag para seek */}
+              <div style={{height:20,position:'sticky',top:0,zIndex:3,background:'rgba(12,7,22,0.98)',borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',padding:'0 0 0 6px',cursor:'pointer',userSelect:'none'}}
+                onMouseDown={e=>{
+                  const seek=(clientX:number)=>{
+                    const rect=e.currentTarget.getBoundingClientRect();
+                    const p=Math.max(0,Math.min(1,(clientX-rect.left)/rect.width));
+                    const newTime=p*duration;
+                    pauseRef.current=newTime;
+                    setCurrentTime(newTime);
+                    if(playing){
+                      stems.forEach(s=>{try{s.sourceNode?.stop();s.sourceNode?.disconnect();}catch(e){}});
+                      if(timerRef.current)clearInterval(timerRef.current);
+                      const ctx2=ctxRef.current;
+                      if(ctx2){
+                        const t0=ctx2.currentTime;
+                        const upd=stems.map(s=>{
+                          if(!s.muted){const src=ctx2.createBufferSource();src.buffer=s.buffer;src.connect(s.gainNode);src.start(t0,newTime);return{...s,sourceNode:src};}return s;
+                        });
+                        setStems(upd);
+                        timerRef.current=window.setInterval(()=>{
+                          const el=ctx2.currentTime-t0+newTime;
+                          setCurrentTime(Math.min(el,duration));
+                          if(el>=duration)stopAll();
+                        },80);
+                      }
                     }
-                  }
+                  };
+                  seek(e.clientX);
+                  const onMove=(ev:MouseEvent)=>seek(ev.clientX);
+                  const onUp=()=>{window.removeEventListener('mousemove',onMove);window.removeEventListener('mouseup',onUp);};
+                  window.addEventListener('mousemove',onMove);
+                  window.addEventListener('mouseup',onUp);
                 }}>
                 {Array.from({length:32}).map((_,i)=>(
                   <div key={i} style={{width:50,fontSize:8,color:i%4===0?T.text3:'rgba(122,106,144,0.2)',fontFamily:'monospace',flexShrink:0,borderLeft:`0.5px solid ${i%4===0?T.border:'transparent'}`,paddingLeft:2}}>
