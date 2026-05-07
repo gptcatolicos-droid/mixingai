@@ -7,18 +7,15 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// ✅ v20: Version hash actual de cjwbw/demucs
-const DEMUCS_VERSION = '25a173108cff36ef9f80f854c162d01df9e6528be175794b81158fa03836d953';
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    const REPLICATE_TOKEN = Deno.env.get('REPLICATE_API_TOKEN') ?? '';
+    const FAL_KEY = Deno.env.get('FAL_API_KEY') ?? '';
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
     const SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
 
-    if (!REPLICATE_TOKEN) throw new Error('REPLICATE_API_TOKEN no configurado');
+    if (!FAL_KEY) throw new Error('FAL_API_KEY no configurado');
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer '))
@@ -30,7 +27,7 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
     if (authErr || !user)
-      return new Response(JSON.stringify({ error: 'Token inválido' }), {
+      return new Response(JSON.stringify({ error: 'Token invalido' }), {
         status: 401, headers: { ...cors, 'Content-Type': 'application/json' },
       });
 
@@ -39,84 +36,73 @@ serve(async (req) => {
     const isPro = profile?.plan === 'unlimited' || ['danipalacio@gmail.com'].includes(user.email ?? '');
 
     if (!isPro && credits < 3)
-      return new Response(JSON.stringify({ error: 'Créditos insuficientes (necesitas 3)', creditsRemaining: credits }), {
+      return new Response(JSON.stringify({ error: 'Creditos insuficientes (necesitas 3)', creditsRemaining: credits }), {
         status: 402, headers: { ...cors, 'Content-Type': 'application/json' },
       });
 
-    const { audioBase64, mimeType = 'audio/wav', model = 'htdemucs' } = await req.json();
-    if (!audioBase64) throw new Error('Se requiere audioBase64');
+    const body = await req.json();
+    const { audioUrl, model = 'htdemucs' } = body;
 
-    // ✅ FIX: limpiar base64 antes de decodificar
-    const cleanBase64 = audioBase64.replace(/\s/g, '');
-    const binaryStr = atob(cleanBase64);
-    const audioBytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) audioBytes[i] = binaryStr.charCodeAt(i);
+    if (!audioUrl) throw new Error('Se requiere audioUrl');
 
-    // Subir a storage para que Replicate pueda descargarlo
-    const fileName = `stems-input-${Date.now()}-${Math.random().toString(36).slice(2)}.wav`;
-    const { error: uploadErr } = await supabase.storage
-      .from('audio-temp')
-      .upload(fileName, audioBytes, { contentType: mimeType, upsert: true });
+    // Subir a FAL storage si es base64, o usar URL directa
+    let inputUrl = audioUrl;
 
-    if (uploadErr) throw new Error(`Storage upload error: ${uploadErr.message}`);
-
-    const { data: { publicUrl } } = supabase.storage.from('audio-temp').getPublicUrl(fileName);
-
-    // ✅ FIX: Bearer (no Token)
-    const replicateResp = await fetch('https://api.replicate.com/v1/predictions', {
+    // Submit a FAL queue — Demucs
+    const submitResp = await fetch('https://queue.fal.run/fal-ai/demucs', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${REPLICATE_TOKEN}`,
+        'Authorization': `Key ${FAL_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        version: DEMUCS_VERSION,
-        input: {
-          audio: publicUrl,
-          model: model,
-          stem: null,
-          clip_mode: 'rescale',
-          shifts: 1,
-          overlap: 0.25,
-          mp3_bitrate: 320,
-          float32: false,
-          output_format: 'mp3',
-        },
+        audio_url: inputUrl,
+        model: model,
       }),
     });
 
-    if (!replicateResp.ok) {
-      const errBody = await replicateResp.text();
-      // Limpiar el archivo antes de lanzar error
-      await supabase.storage.from('audio-temp').remove([fileName]);
-      throw new Error(`Replicate ${replicateResp.status}: ${errBody}`);
+    if (!submitResp.ok) {
+      const errBody = await submitResp.text();
+      throw new Error(`FAL error ${submitResp.status}: ${errBody}`);
     }
 
-    const prediction = await replicateResp.json();
-    const predId = prediction.id;
+    const { request_id } = await submitResp.json();
+    if (!request_id) throw new Error('FAL no devolvio request_id');
 
-    // Polling máx 10 min (Demucs es más lento)
+    // Polling max 10 min
     let stems: Record<string, string> | null = null;
     for (let i = 0; i < 120; i++) {
       await new Promise(r => setTimeout(r, 5000));
-      const poll = await fetch(`https://api.replicate.com/v1/predictions/${predId}`, {
-        headers: { 'Authorization': `Bearer ${REPLICATE_TOKEN}` },
-      });
-      const pollData = await poll.json();
-      if (pollData.status === 'succeeded') {
-        stems = pollData.output;
+
+      const statusResp = await fetch(
+        `https://queue.fal.run/fal-ai/demucs/requests/${request_id}/status`,
+        { headers: { 'Authorization': `Key ${FAL_KEY}` } }
+      );
+      const statusData = await statusResp.json();
+
+      if (statusData.status === 'COMPLETED') {
+        const resultResp = await fetch(
+          `https://queue.fal.run/fal-ai/demucs/requests/${request_id}`,
+          { headers: { 'Authorization': `Key ${FAL_KEY}` } }
+        );
+        const result = await resultResp.json();
+        // FAL devuelve { vocals: {url}, drums: {url}, bass: {url}, other: {url} }
+        const output = result.output ?? result;
+        stems = {
+          vocals: output.vocals?.url ?? output.vocals,
+          drums: output.drums?.url ?? output.drums,
+          bass: output.bass?.url ?? output.bass,
+          other: output.other?.url ?? output.other,
+        };
         break;
       }
-      if (pollData.status === 'failed') throw new Error(`Demucs falló: ${pollData.error ?? 'error desconocido'}`);
-      if (pollData.status === 'canceled') throw new Error('Predicción cancelada');
+      if (statusData.status === 'FAILED') {
+        throw new Error(`Demucs fallo: ${statusData.error ?? 'error desconocido'}`);
+      }
     }
 
-    // Limpiar archivo temporal
-    await supabase.storage.from('audio-temp').remove([fileName]);
+    if (!stems) throw new Error('Timeout en separacion de stems (mas de 10 minutos)');
 
-    if (!stems) throw new Error('Timeout en separación de stems (más de 10 minutos)');
-
-    // Descontar créditos
     if (!isPro) {
       await supabase.from('profiles').update({ credits: credits - 3 }).eq('id', user.id);
     }
