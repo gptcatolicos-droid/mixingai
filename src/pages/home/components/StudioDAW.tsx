@@ -97,7 +97,7 @@ function HSlider({value,min,max,step,color,onChange}:{value:number;min:number;ma
 }
 
 // Context menu
-function ContextMenu({x,y,stemId,onSeparate,onRename,onClose}:{x:number;y:number;stemId:string;onSeparate:()=>void;onRename:()=>void;onClose:()=>void}){
+function ContextMenu({x,y,stemId,onRename,onClose}:{x:number;y:number;stemId:string;onRename:()=>void;onClose:()=>void}){
   useEffect(()=>{
     const h=()=>onClose();
     document.addEventListener('click',h,{once:true});
@@ -106,7 +106,7 @@ function ContextMenu({x,y,stemId,onSeparate,onRename,onClose}:{x:number;y:number
   return(
     <div style={{position:'fixed',left:x,top:y,background:T.surfaceSolid,border:`1px solid ${T.borderStrong}`,borderRadius:8,padding:4,zIndex:1000,minWidth:180,boxShadow:'0 8px 24px rgba(0,0,0,0.6)'}}>
       {[
-        {icon:'✂',label:'Separar stems con Demucs',fn:onSeparate,color:T.violet},
+
         {icon:'✏',label:'Renombrar track',fn:onRename,color:T.text2},
       ].map(item=>(
         <button key={item.label} onClick={()=>{item.fn();onClose();}} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'8px 12px',borderRadius:6,background:'transparent',border:'none',color:item.color,fontSize:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
@@ -324,6 +324,8 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
   const [recActive,setRecActive]=useState(false);
   const [mediaRec,setMediaRec]=useState<MediaRecorder|null>(null);
   const [ctxMenu,setCtxMenu]=useState<{x:number;y:number;stemId:string}|null>(null);
+  const [dragIdx,setDragIdx]=useState<number|null>(null);
+  const [dragOverIdx,setDragOverIdx]=useState<number|null>(null);
   const [editStem,setEditStem]=useState<Stem|null>(null);
   const [renamingId,setRenamingId]=useState<string|null>(null);
   const [renameVal,setRenameVal]=useState('');
@@ -526,6 +528,16 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
     if(delRef.current&&ctx)delRef.current.gain.setTargetAtTime(p.delayWet>0?0.18:0,ctx.currentTime,0.1);
     setShowPresets(false);
   };
+  const reorderStem=(from:number,to:number)=>{
+    if(from===to)return;
+    setStems(prev=>{
+      const arr=[...prev];
+      const [moved]=arr.splice(from,1);
+      arr.splice(to,0,moved);
+      return arr;
+    });
+  };
+
   const applyPresetToStem=(stemId:string,p:MixPreset)=>{
     const ctx=ctxRef.current;
     setStems(prev=>prev.map(s=>{
@@ -779,11 +791,17 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
                     <div style={{fontSize:9,color:T.text3}}>Botón "Stems" arriba a la derecha</div>
                   </div>
                 )}
-                {stems.map(s=>(
-                  <div key={s.id} onClick={()=>setSelId(s.id)}
+                {stems.map((s,idx)=>(
+                  <div key={s.id}
+                    draggable
+                    onDragStart={()=>setDragIdx(idx)}
+                    onDragOver={e=>{e.preventDefault();setDragOverIdx(idx);}}
+                    onDrop={e=>{e.preventDefault();if(dragIdx!==null){reorderStem(dragIdx,idx);setDragIdx(null);setDragOverIdx(null);}}}
+                    onDragEnd={()=>{setDragIdx(null);setDragOverIdx(null);}}
+                    onClick={()=>setSelId(s.id)}
                     onContextMenu={e=>{e.preventDefault();setCtxMenu({x:e.clientX,y:e.clientY,stemId:s.id});setSelId(s.id);}}
                     onDoubleClick={()=>setEditStem(s)}
-                    style={{height:TH,padding:'5px 8px',borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',gap:5,background:selId===s.id?'rgba(192,38,211,0.08)':'transparent',cursor:'pointer'}}>
+                    style={{height:TH,padding:'5px 8px',borderBottom:`0.5px solid ${dragOverIdx===idx?s.color:T.border}`,display:'flex',alignItems:'center',gap:5,background:dragOverIdx===idx?`${s.color}18`:selId===s.id?'rgba(192,38,211,0.08)':'transparent',cursor:'grab',opacity:dragIdx===idx?0.5:1,transition:'border-color 0.1s,background 0.1s'}}>
                     <span style={{width:3,height:26,borderRadius:2,background:s.color,flexShrink:0}}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:10,fontWeight:500,color:T.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
@@ -1031,17 +1049,7 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
                 </div>
               </div>
             )}
-            {tab==='gen'&&(
-              <div style={{padding:12,display:'flex',flexDirection:'column',gap:9}}>
-                <div style={{fontSize:10,color:T.text2,lineHeight:1.5}}>Genera y agrega pistas al DAW con IA.</div>
-                <button onClick={()=>onNavigate?onNavigate('create'):null} style={{width:'100%',height:36,borderRadius:8,background:`linear-gradient(135deg,${T.fuchsia},${T.pink})`,border:'none',color:'#fff',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✦ Crear canción completa</button>
-                <button onClick={()=>onNavigate?onNavigate('separate'):null} style={{width:'100%',height:34,borderRadius:7,background:'rgba(124,58,237,0.1)',border:`0.5px solid rgba(124,58,237,0.35)`,color:T.violet,fontSize:10,cursor:'pointer',fontFamily:'inherit'}}>✂ Separar stems con Demucs</button>
-                <button onClick={toggleRecord} style={{width:'100%',height:34,borderRadius:7,background:recActive?'rgba(239,68,68,0.1)':'rgba(255,255,255,0.04)',border:`0.5px solid ${recActive?T.red:T.border}`,color:recActive?T.red:T.text2,fontSize:10,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>
-                  <span style={{width:6,height:6,borderRadius:'50%',background:recActive?T.red:T.text3,display:'inline-block'}}/>
-                  {recActive?'Detener grabación':'🎤 Grabar desde micrófono'}
-                </button>
-              </div>
-            )}
+
             {tab==='stems'&&(
               <div style={{padding:10,display:'flex',flexDirection:'column',gap:6}}>
                 <div style={{fontSize:8,color:T.text3,letterSpacing:.5,textTransform:'uppercase',marginBottom:2}}>Stems cargados ({stems.length}/12)</div>
@@ -1101,7 +1109,7 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
       {/* Context menu */}
       {ctxMenu&&(
         <ContextMenu x={ctxMenu.x} y={ctxMenu.y} stemId={ctxMenu.stemId}
-          onSeparate={()=>{if(onNavigate)onNavigate('separate');}}
+
           onRename={()=>{setRenamingId(ctxMenu.stemId);const s=stems.find(st=>st.id===ctxMenu.stemId);if(s)setRenameVal(s.name);}}
           onClose={()=>setCtxMenu(null)}/>
       )}

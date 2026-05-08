@@ -57,9 +57,7 @@ export default function Header({ user, onLogout, onCreditsUpdate, onNavigate }: 
   // Nav items — siempre visibles
   const NAV_ITEMS = [
     { label: 'Cargar Stems',    mode: 'upload',      icon: '⬆' },
-    { label: 'Separar Stems',   mode: 'separator',   icon: '🎚️' },
     { label: 'MixingStudio AI', mode: 'daw',         icon: '✦', highlight: true },
-    { label: 'Crear con IA',    mode: 'generator',   icon: '✨' },
   ];
 
   const S = {
