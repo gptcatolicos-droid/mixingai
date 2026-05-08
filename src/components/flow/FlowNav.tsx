@@ -17,10 +17,7 @@ interface FlowNavProps {
 const NAV = [
   { id:'home',     label:'Inicio',          glyph:'⌂' },
   { id:'stems',    label:'Cargar Stems',    glyph:'↑' },
-  { id:'separate', label:'Separar Stems',   glyph:'✂' },
   { id:'studio',   label:'MixingStudio AI', glyph:'✦', primary:true },
-  { id:'create',   label:'Crear con IA',    glyph:'+' },
-  { id:'blog',     label:'Blog' },
 ];
 
 export default function FlowNav({ active, onNavigate, user, onLogout }: FlowNavProps) {

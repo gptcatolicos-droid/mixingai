@@ -567,6 +567,8 @@ export default function StudioDAW({uploadedFiles,user,initialPreset=PRESETS[0],r
 
   const exportMix=async()=>{
     if(stems.length===0||exporting)return;
+    // Parar reproduccion antes de exportar
+    if(playing) stopAll();
     setExporting(true);
     try{
       const dur=Math.max(...stems.map(s=>s.buffer.duration));
