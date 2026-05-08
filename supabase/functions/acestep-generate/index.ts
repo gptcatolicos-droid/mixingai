@@ -15,7 +15,7 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
     const SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
 
-    if (!FAL_KEY) throw new Error('FAL_API_KEY no configurado en Supabase secrets');
+    if (!FAL_KEY) throw new Error('FAL_API_KEY no configurado');
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer '))
@@ -43,13 +43,66 @@ serve(async (req) => {
     const credits = profile?.credits ?? 10;
     const isPro = profile?.plan === 'unlimited' || ['danipalacio@gmail.com'].includes(user.email ?? '');
 
+    const body = await req.json();
+    const { action, request_id: existingId, prompt, lyrics, genres, selectedStyle } = body;
+
+    // ACCION: poll — verificar estado desde el frontend
+    if (action === 'poll' && existingId) {
+      const statusResp = await fetch(
+        `https://queue.fal.run/fal-ai/minimax-music/requests/${existingId}/status`,
+        { headers: { 'Authorization': `Key ${FAL_KEY}` } }
+      );
+      const statusText = await statusResp.text();
+      let statusData: any = {};
+      try { statusData = JSON.parse(statusText); } catch(e) {}
+
+      if (statusData.status === 'COMPLETED') {
+        const resultResp = await fetch(
+          `https://queue.fal.run/fal-ai/minimax-music/requests/${existingId}`,
+          { headers: { 'Authorization': `Key ${FAL_KEY}` } }
+        );
+        const resultText = await resultResp.text();
+        let result: any = {};
+        try { result = JSON.parse(resultText); } catch(e) {}
+        const audioUrl = result.audio?.url ?? result.data?.audio?.url ?? null;
+
+        if (audioUrl) {
+          // Descontar creditos al completar
+          if (!isPro) {
+            await supabase.from('profiles').update({ credits: credits - 10 }).eq('id', user.id);
+          }
+          try {
+            await supabase.from('ai_generations').insert({
+              user_id: user.id, prompt: body.prompt ?? '', genres, status: 'done',
+              audio_url: audioUrl, created_at: new Date().toISOString(),
+            });
+          } catch(_) {}
+        }
+
+        return new Response(JSON.stringify({
+          success: true, status: 'COMPLETED', audioUrl,
+          creditsRemaining: isPro ? 999999 : credits - 10,
+        }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+
+      if (statusData.status === 'FAILED') {
+        return new Response(JSON.stringify({
+          success: false, status: 'FAILED',
+          error: `MiniMax fallo: ${statusData.error ?? 'error desconocido'}`,
+        }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+
+      return new Response(JSON.stringify({
+        success: true, status: statusData.status ?? 'IN_PROGRESS', request_id: existingId,
+      }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
+    // ACCION: submit — iniciar generacion
     if (!isPro && credits < 10)
       return new Response(JSON.stringify({ error: 'Creditos insuficientes', creditsRemaining: credits }), {
         status: 402, headers: { ...cors, 'Content-Type': 'application/json' },
       });
 
-    const body = await req.json();
-    const { prompt, lyrics, genres, selectedStyle } = body;
     if (!prompt)
       return new Response(JSON.stringify({ error: 'Se requiere prompt' }), {
         status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
@@ -64,103 +117,42 @@ serve(async (req) => {
       prompt: stylePrompt,
       is_instrumental: isInstrumental,
     };
-
     if (!isInstrumental) {
       falInput.lyrics = hasLyrics
         ? lyrics.trim().slice(0, 1000)
         : `[Verse]\nA song about ${prompt.slice(0, 60)}\n[Chorus]\n${prompt.slice(0, 40)}`;
     }
 
-    console.log('[minimax] Submitting to FAL:', JSON.stringify(falInput).slice(0, 200));
-
     const submitResp = await fetch('https://queue.fal.run/fal-ai/minimax-music/v2.6', {
       method: 'POST',
-      headers: {
-        'Authorization': `Key ${FAL_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(falInput),
     });
 
-    // Leer el body como texto primero para debug
     const submitText = await submitResp.text();
-    console.log('[minimax] FAL submit response:', submitResp.status, submitText.slice(0, 300));
+    if (!submitResp.ok) throw new Error(`FAL error ${submitResp.status}: ${submitText}`);
 
-    if (!submitResp.ok) {
-      throw new Error(`FAL error ${submitResp.status}: ${submitText}`);
-    }
-
-    let submitJson: any;
-    try {
-      submitJson = JSON.parse(submitText);
-    } catch(e) {
-      throw new Error(`FAL devolvio respuesta invalida: ${submitText.slice(0, 200)}`);
+    let submitJson: any = {};
+    try { submitJson = JSON.parse(submitText); } catch(e) {
+      throw new Error(`FAL respuesta invalida: ${submitText.slice(0, 200)}`);
     }
 
     const request_id = submitJson.request_id;
-    // FAL devuelve URLs exactas — usarlas directamente evita bugs de version en la URL
-    const status_url = submitJson.status_url as string | undefined;
-    const response_url = submitJson.response_url as string | undefined;
-    if (!request_id) throw new Error(`FAL no devolvio request_id: ${submitText.slice(0, 200)}`);
+    const fal_key_public = FAL_KEY; // Lo pasamos al frontend para que haga polling
+    if (!request_id) throw new Error(`Sin request_id: ${submitText.slice(0, 200)}`);
 
-    console.log('[minimax] request_id:', request_id);
-    console.log('[minimax] status_url:', status_url);
-
-    let audioUrl: string | null = null;
-    for (let i = 0; i < 54; i++) {
-      await new Promise(r => setTimeout(r, 5000));
-
-      // Usar la URL exacta que FAL devolvio (sin /v2.6/ hardcodeado)
-      const pollUrl = status_url ?? `https://queue.fal.run/fal-ai/minimax-music/requests/${request_id}/status`;
-      const statusResp = await fetch(pollUrl, {
-        headers: { 'Authorization': `Key ${FAL_KEY}` }
-      });
-      const statusText = await statusResp.text();
-      let statusData: any = {};
-      try { statusData = JSON.parse(statusText); } catch(e) {}
-
-      console.log(`[minimax] poll ${i}: ${statusData.status} raw: ${statusText.slice(0,100)}`);
-
-      if (statusData.status === 'COMPLETED') {
-        const resultUrl = response_url ?? `https://queue.fal.run/fal-ai/minimax-music/requests/${request_id}`;
-        const resultResp = await fetch(resultUrl, {
-          headers: { 'Authorization': `Key ${FAL_KEY}` }
-        });
-        const resultText = await resultResp.text();
-        console.log('[minimax] result:', resultText.slice(0, 300));
-        let result: any = {};
-        try { result = JSON.parse(resultText); } catch(e) {}
-        audioUrl = result.audio?.url ?? result.data?.audio?.url ?? result.data?.audio_url ?? null;
-        break;
-      }
-
-      if (statusData.status === 'FAILED') {
-        throw new Error(`MiniMax fallo: ${statusData.error ?? statusText.slice(0,200)}`);
-      }
-    }
-
-    if (!audioUrl) throw new Error('Timeout: la generacion tardo mas de 4 minutos. Intenta de nuevo.');
-
-    if (!isPro) {
-      await supabase.from('profiles').update({ credits: credits - 10 }).eq('id', user.id);
-    }
-
-    try {
-      await supabase.from('ai_generations').insert({
-        user_id: user.id, prompt, genres, status: 'done',
-        audio_url: audioUrl, created_at: new Date().toISOString(),
-      });
-    } catch (_) {}
-
+    // Devolver request_id Y fal_key al frontend para polling directo
     return new Response(JSON.stringify({
-      success: true, audioUrl, mimeType: 'audio/mp3',
-      creditsRemaining: isPro ? 999999 : credits - 10,
+      success: true,
+      status: 'IN_PROGRESS',
+      request_id,
+      fal_key: FAL_KEY, // Frontend usara esto para polling directo
     }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
 
   } catch (err: any) {
     console.error('[minimax-generate] ERROR:', err?.message ?? err);
-    return new Response(JSON.stringify({
-      error: err?.message ?? 'Error interno',
-    }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: err?.message ?? 'Error interno' }), {
+      status: 500, headers: { ...cors, 'Content-Type': 'application/json' },
+    });
   }
 });

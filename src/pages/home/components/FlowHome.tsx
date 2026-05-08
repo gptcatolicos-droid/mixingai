@@ -45,19 +45,6 @@ const TABS = [
       stems:[{l:'Vocals',c:'#ec4899'},{l:'Drums',c:'#10b981'},{l:'Bass',c:'#f59e0b'},{l:'Other',c:'#3b82f6'}],
     }
   },
-  {
-    id:'instruments', icon:'⊟', label:'Agregar instrumentos con IA',
-    color:'#a855f7', colorDim:'rgba(168,85,247,0.1)',
-    cost:'5 créditos / instrumento',
-    title:'Agregar instrumentos con IA',
-    sub:'Elige instrumento · describe estilo · listo',
-    desc:'Selecciona batería, bajo, piano, guitarra, sintetizador o cualquier instrumento. La IA genera el stem y lo añade automáticamente como track nuevo en tu DAW.',
-    cta:'Agregar instrumento',
-    preview:{
-      label:'AGREGAR INSTRUMENTOS — PREVIEW',
-      insts:['🥁 Drums','🎸 Guitar','🎹 Piano','🎺 Brass','🎻 Strings','🎷 Sax'],
-    }
-  },
 ];
 
 // Mini bar chart for preview

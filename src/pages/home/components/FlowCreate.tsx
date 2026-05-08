@@ -64,52 +64,77 @@ export default function FlowCreate({ user, onNavigate, onTrackReady, onCreditsUp
     const token = await getValidToken();
     if (!token || token === '__SUPER_USER__') { setError('Sesión expirada. Recarga la página.'); return; }
 
-    setError(''); setGenerating(true); setProgress(3);
+    setError(''); setGenerating(true); setProgress(5);
     setProgressMsg('Enviando a MiniMax Music IA…');
 
-    const msgs = ['Componiendo melodía…','Generando armonías…','Añadiendo voces…','Mezclando pistas…','Masterizando…'];
-    let mi = 0;
-    progRef.current = setInterval(() => {
-      setProgress(p => Math.min(p + 2, 92));
-      setProgressMsg(msgs[mi % msgs.length]); mi++;
-    }, 8000);
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'apikey': SUPABASE_ANON,
+    };
 
     try {
       const genreObj = GENRES.find(g => g.id === genre);
       const stylePrompt = [genreObj?.name, prompt.trim()].filter(Boolean).join(', ');
 
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/acestep-generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'apikey': SUPABASE_ANON,
-        },
+      // PASO 1: Submit — solo inicia la generacion, responde rapido
+      const submitResp = await fetch(`${SUPABASE_URL}/functions/v1/acestep-generate`, {
+        method: 'POST', headers,
         body: JSON.stringify({
           prompt: stylePrompt,
           lyrics: (!isInstrumental && lyrics.trim()) ? lyrics.trim() : undefined,
           genres: genreObj ? [genreObj.name] : undefined,
           selectedStyle: isInstrumental ? 'instrumental' : 'vocals',
         }),
-        signal: (() => { const ac = new AbortController(); setTimeout(() => ac.abort(), 420_000); return ac.signal; })(),
       });
 
-      stopProg();
-
-      const data = await resp.json();
-      if (!resp.ok || !data.audioUrl) {
-        setError(data.error ?? `Error ${resp.status}`);
+      const submitData = await submitResp.json();
+      if (!submitResp.ok || !submitData.success) {
+        setError(submitData.error ?? `Error ${submitResp.status}`);
         setGenerating(false); return;
       }
 
-      setProgress(100); setProgressMsg('¡Lista! Abriendo en el DAW…');
-      onCreditsUpdate?.(data.creditsRemaining ?? (user?.credits ?? 0) - 10);
-      if (onTrackReady) onTrackReady(data.audioUrl, prompt.slice(0, 40));
-      setTimeout(() => onNavigate('studio'), 1000);
+      const { request_id } = submitData;
+      if (!request_id) { setError('No se obtuvo ID de proceso'); setGenerating(false); return; }
+
+      setProgress(15); setProgressMsg('MiniMax componiendo tu canción…');
+
+      // PASO 2: Polling desde el frontend — cada 8 seg, max 8 min
+      const msgs = ['Componiendo melodía…','Generando armonías…','Añadiendo voces…','Mezclando pistas…','Masterizando…','Casi lista…'];
+      let mi = 0; let attempts = 0; const maxAttempts = 60;
+
+      while (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 8000));
+        attempts++;
+        const prog = Math.min(15 + (attempts / maxAttempts) * 80, 92);
+        setProgress(Math.round(prog));
+        setProgressMsg(msgs[mi % msgs.length]); mi++;
+
+        const pollResp = await fetch(`${SUPABASE_URL}/functions/v1/acestep-generate`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ action: 'poll', request_id, prompt: stylePrompt, genres: genreObj ? [genreObj.name] : undefined }),
+        });
+        const pollData = await pollResp.json();
+
+        if (pollData.status === 'COMPLETED' && pollData.audioUrl) {
+          setProgress(100); setProgressMsg('¡Lista! Abriendo en el DAW…');
+          onCreditsUpdate?.(pollData.creditsRemaining ?? (user?.credits ?? 0) - 10);
+          if (onTrackReady) onTrackReady(pollData.audioUrl, prompt.slice(0, 40));
+          setTimeout(() => onNavigate('studio'), 1000);
+          return;
+        }
+
+        if (pollData.status === 'FAILED') {
+          setError(pollData.error ?? 'La generación falló en MiniMax');
+          setGenerating(false); return;
+        }
+      }
+
+      setError('Tardó demasiado (más de 8 minutos). Intenta de nuevo.');
+      setGenerating(false);
 
     } catch (err: any) {
-      stopProg();
-      setError(err?.name === 'AbortError' ? 'Tardó demasiado. Intenta de nuevo.' : err?.message ?? 'Error');
+      setError(err?.message ?? 'Error desconocido');
       setGenerating(false);
     }
   };
