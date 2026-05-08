@@ -215,5 +215,12 @@ export default function ProjectDashboard() {
   }
 
   // Home - tablero
-  return <FlowHome user={user!} onNavigate={handleNavigate} onLogout={handleLogout} />;
+  return <FlowHome user={user!} onLogout={handleLogout} onNavigate={(id, files, presetId) => {
+    if (files && files.length > 0) {
+      const preset = PRESETS.find(p => p.id === presetId) ?? PRESETS[0];
+      openDAW(files, preset);
+    } else {
+      handleNavigate(id);
+    }
+  }} />;
 }

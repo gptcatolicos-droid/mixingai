@@ -24,9 +24,9 @@ const PRESETS = [
   { id:'rock', name:'Rock', desc:'Potente y agresivo', color:'#f87171', bars:[11,8,13,10,14,9,12,8,11,13,10,9,12,8,14] },
   { id:'hiphop', name:'Hip Hop', desc:'808 profundo, voces adelante', color:'#fbbf24', bars:[14,6,12,5,14,6,11,5,13,6,12,5,14,6,11] },
   { id:'gospel', name:'Gospel', desc:'Coro potente, warmth', color:'#facc15', bars:[8,11,9,13,10,14,11,12,9,13,10,11,8,12,9] },
-  { id:'edm', name:'Dance/EDM', desc:'Sub bass, hi-hats', color:'#60a5fa', bars:[13,5,14,5,13,5,14,6,13,5,14,5,13,5,14] },
+  { id:'dance', name:'Dance/EDM', desc:'Sub bass, hi-hats', color:'#60a5fa', bars:[13,5,14,5,13,5,14,6,13,5,14,5,13,5,14] },
   { id:'balada', name:'Balada', desc:'Suave, emocional', color:'#c084fc', bars:[6,8,7,9,8,10,9,11,10,9,8,10,7,9,8] },
-  { id:'acoustic', name:'Acústico', desc:'Natural, sin compresión', color:'#fb923c', bars:[7,9,8,10,9,8,10,9,8,10,9,8,7,9,8] },
+  { id:'acustico', name:'Acústico', desc:'Natural, sin compresión', color:'#fb923c', bars:[7,9,8,10,9,8,10,9,8,10,9,8,7,9,8] },
   { id:'reggaeton', name:'Reggaeton', desc:'Dembow, perreo', color:'#34d399', bars:[12,5,13,5,12,5,13,5,12,5,13,5,12,5,13] },
 ];
 
