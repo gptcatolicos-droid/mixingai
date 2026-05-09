@@ -495,8 +495,8 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
 
           <div style={{ textAlign:'center' }}>
             <div style={{ display:'flex', gap:'12px', justifyContent:'center', flexWrap:'wrap', marginBottom:'12px' }}>
-              <button onClick={openDAW} style={{ background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)', border:'none', color:'#fff', padding:'18px 40px', borderRadius:'14px', fontSize:'17px', fontWeight:800, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 0 40px rgba(192,38,211,0.5)', letterSpacing:'-0.3px' }}>
-                🎛️ DAW Profesional
+              <button onClick={openStudioPro} style={{ background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)', border:'none', color:'#fff', padding:'18px 40px', borderRadius:'14px', fontSize:'17px', fontWeight:800, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 0 40px rgba(192,38,211,0.5)', letterSpacing:'-0.3px' }}>
+                🎛 Studio Pro DAW
               </button>
               <button onClick={openMixer} style={{ background:'transparent', border:'2px solid rgba(192,38,211,0.5)', color:'#EC4899', padding:'18px 40px', borderRadius:'14px', fontSize:'17px', fontWeight:700, cursor:'pointer', fontFamily:'inherit', letterSpacing:'-0.3px' }}>
                 🎚️ Mixer Rápido
