@@ -15,7 +15,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 let pendingExportData: any = null;
-import StudioDAW from './StudioDAW';
+import StudioPro from './StudioPro';
 import MixEditor from './MixEditor';
 import ExportScreen from './ExportScreen';
 import NewProjectScreen from './NewProjectScreen';
@@ -119,8 +119,8 @@ export default function ProjectDashboard() {
     if (id === 'blog')     { navigate('/blog');          return; }
     if (id === 'billing')  { navigate('/billing');       return; }
     const screenMap: Record<string, Screen> = {
-      home: 'home', studio: 'studio', mixer: 'mixer', create: 'create',
-      separate: 'separate', stems: 'stems', mixsong: 'mixsong',
+      home: 'home', studio: 'studio', mixer: 'mixer', timeline: 'studio',
+      create: 'create', separate: 'separate', stems: 'stems', mixsong: 'mixsong',
     };
     if (screenMap[id]) setScreen(screenMap[id]);
   };
@@ -158,13 +158,14 @@ export default function ProjectDashboard() {
       setActivePreset(preset);
       setUploadedFiles(files);
       setProjectId(newId());
-      setScreen(mode === 'mixer' ? 'mixer' : 'studio');
+      if (mode === 'mixer') setScreen('mixer');
+      else setScreen('studio');
     }} />;
   }
 
-  // DAW = StudioDAW con todo incluido
+  // DAW = StudioPro (merged Timeline + Mixer + AI + Plugins)
   if (screen === 'studio') {
-    return <StudioDAW
+    return <StudioPro
       projectId={projectId}
       user={user!}
       uploadedFiles={uploadedFiles}

@@ -51,7 +51,7 @@ export default function FlowHome({ user, onNavigate, onLogout }: Props) {
     }
   };
 
-  const handleOpenDAW = () => {
+  const handleOpenStudioPro = () => {
     onNavigate('studio', files.length > 0 ? files : undefined, selectedPreset, 'daw');
   };
   const handleOpenMixer = () => {
@@ -196,17 +196,18 @@ export default function FlowHome({ user, onNavigate, onLogout }: Props) {
               ))}
             </div>
 
-            {/* CTA */}
-            <button onClick={handleOpenDAW}
-              style={{ width:'100%', height:56, borderRadius:14, border:'none', background:'linear-gradient(135deg,#7c3aed,#a855f7,#e879f9)', color:'#fff', fontSize:17, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 0 40px rgba(168,85,247,0.5)', letterSpacing:-0.3 }}>
-              🎛️ Abrir en DAW Profesional
+            {/* CTA — StudioPro (primary) */}
+            <button onClick={handleOpenStudioPro}
+              style={{ width:'100%', height:56, borderRadius:14, border:'none', background:'linear-gradient(135deg,#4c1d95,#7c3aed,#8b5cf6)', color:'#fff', fontSize:17, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 0 40px rgba(139,92,246,0.55)', letterSpacing:-0.3, display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+              <span style={{ background:'rgba(255,255,255,0.15)', borderRadius:6, padding:'2px 8px', fontSize:10, fontWeight:800, letterSpacing:0.5 }}>PRO</span>
+              🎛 Studio Pro — DAW + IA + Plugins
             </button>
-            {files.length > 0 && (
-              <button onClick={handleOpenMixer}
-                style={{ width:'100%', height:44, borderRadius:12, border:'1px solid rgba(232,121,249,0.35)', background:'rgba(232,121,249,0.06)', color:'#e879f9', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-                🎚️ Abrir en Mixer Rápido
-              </button>
-            )}
+
+            {/* Mixer Rápido */}
+            <button onClick={handleOpenMixer}
+              style={{ width:'100%', height:48, borderRadius:12, border:'1px solid rgba(232,121,249,0.3)', background:'rgba(232,121,249,0.06)', color:'#e879f9', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              🎚️ Mixer Rápido
+            </button>
             <div style={{ textAlign:'center', fontSize:12, color:T.text3 }}>
               {files.length > 0 ? `${files.length} stem${files.length > 1 ? 's' : ''} listo${files.length > 1 ? 's' : ''} · Preset: ${preset.name}` : 'Puedes cargar stems dentro del DAW también'}
             </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import HomeHero from './components/HomeHero';
 import ProjectDashboard from './components/ProjectDashboard';
-import StudioDAW from './components/StudioDAW';
+import StudioPro from './components/StudioPro';
 import MixEditor from './components/MixEditor';
 import ExportScreen from './components/ExportScreen';
 import { MixPreset, PRESETS } from './components/PresetScreen';
@@ -39,10 +39,11 @@ export default function HomePage() {
   // Logged-in users → ProjectDashboard (has its own full flow)
   if (user) return <ProjectDashboard />;
 
-  const handleStartMixer = (preset: MixPreset, files: File[], mode?: 'mixer' | 'daw') => {
+  const handleStartMixer = (preset: MixPreset, files: File[], mode?: 'mixer' | 'daw' | 'timeline') => {
     setSelectedPreset(preset);
     setUploadedFiles(files);
-    setScreen(mode === 'mixer' ? 'mixer' : 'daw');
+    if (mode === 'mixer') setScreen('mixer');
+    else setScreen('daw');
   };
 
   const handleExport = (data: ExportData) => {
@@ -53,7 +54,7 @@ export default function HomePage() {
 
   if (screen === 'daw') {
     return (
-      <StudioDAW
+      <StudioPro
         projectId={projectId}
         user={GUEST_USER}
         uploadedFiles={uploadedFiles}
@@ -79,9 +80,6 @@ export default function HomePage() {
         onCreditsUpdate={() => {}}
         onExport={handleExport}
         initialPreset={selectedPreset}
-        reverbOn={selectedPreset.reverbWet > 0}
-        delayOn={selectedPreset.delayWet > 0}
-        stereoOn={selectedPreset.stereoWidth > 0.5}
         onSwitchToDAW={() => setScreen('daw')}
       />
     );

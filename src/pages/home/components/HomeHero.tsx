@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MixPreset, PRESETS } from './PresetScreen';
 import { blogArticles } from '../../../mocks/blogArticles';
 
-interface HomeHeroProps { onStartMixer: (preset: MixPreset, files: File[], mode?: 'mixer'|'daw') => void; }
+interface HomeHeroProps { onStartMixer: (preset: MixPreset, files: File[], mode?: 'mixer'|'daw'|'timeline') => void; }
 
 // ─── Design tokens (dark studio look) ─────────────────────────────────────
 const T = {
@@ -44,14 +44,25 @@ const IAEQ_PRESETS_DEMO = [
 ];
 const EQ_LABELS=['Pre','30Hz','60Hz','170Hz','310Hz','600Hz','1kHz','3kHz','6kHz','12kHz','14kHz','16kHz'];
 
-// ─── 4 modos ──────────────────────────────────────────────────────────────
+// ─── Modos disponibles ────────────────────────────────────────────────────
 const MODES = [
+  {
+    id: 'timeline',
+    icon: '🎬',
+    color: '#8b5cf6',
+    title: 'Timeline DAW',
+    sub: 'Arrangement · Waveforms reales · Transport sample-accurate',
+    desc: 'Timeline profesional estilo Logic Pro. Arrastra y mueve clips de audio con waveforms reales, zoom con ⌘+Scroll, playback sample-accurate y control completo de cada track.',
+    badge: '¡NUEVO!',
+    free: true,
+    preview: [0.4,0.6,0.8,0.95,0.85,0.7,0.55,0.75,0.88,0.65,0.45,0.6,0.78,0.92,0.82,0.68],
+  },
   {
     id: 'daw',
     icon: '🎛️',
     color: '#EC4899',
-    title: 'DAW Profesional',
-    sub: 'Timeline · Waveforms · EQ por stem · Efectos',
+    title: 'Studio DAW',
+    sub: 'Stems · EQ por stem · Efectos · Exportar',
     desc: 'Sube hasta 12 stems y mézclalos con control total. Timeline visual, waveforms reales, EQ de 3 bandas por stem, reverb, delay y widener. Exporta WAV 24-bit a -14 LUFS listo para Spotify.',
     badge: 'Gratis',
     free: true,
@@ -148,7 +159,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
   }, []);
 
   const goRegister = () => navigate('/auth/register');
-  const openDAW = () => onStartMixer(PRESETS[0], [], 'daw');
+  const openStudioPro = () => onStartMixer(PRESETS[0], [], 'daw');
   const openMixer = () => onStartMixer(PRESETS[0], [], 'mixer');
 
   const S = {
@@ -198,8 +209,11 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
 
         {/* CTAs */}
         <div style={{ display:'flex', gap:'14px', flexWrap:'wrap', justifyContent:'center', marginBottom:'60px' }}>
-          <button onClick={openDAW} style={{ ...S.ctaBtn, padding:'20px 52px', fontSize:'20px', letterSpacing:'-0.3px' }}>
-            🎚️ Abrir el DAW — Gratis
+          <button onClick={openStudioPro} style={{ ...S.ctaBtn, padding:'20px 52px', fontSize:'20px', letterSpacing:'-0.3px', background:'linear-gradient(135deg,#8b5cf6,#6d28d9,#4c1d95)', boxShadow:'0 0 40px rgba(139,92,246,0.55)' }}>
+            🎛 Studio Pro DAW
+          </button>
+          <button onClick={openMixer} style={{ ...S.ctaBtn, padding:'20px 40px', fontSize:'18px', letterSpacing:'-0.3px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', boxShadow:'none' }}>
+            🎚️ Mixer Rápido
           </button>
           <a href="#modos" style={{ background:'transparent', border:'1px solid rgba(192,38,211,0.3)', color:'#9B7EC8', padding:'16px 32px', borderRadius:'980px', fontSize:'16px', fontWeight:600, cursor:'pointer', fontFamily:'inherit', textDecoration:'none', display:'flex', alignItems:'center' }}>
             Ver los 4 modos ↓
