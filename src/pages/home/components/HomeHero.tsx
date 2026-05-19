@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MixPreset, PRESETS } from './PresetScreen';
 import { blogArticles } from '../../../mocks/blogArticles';
+import { blogArticles2026 } from '../../../mocks/blogArticles2026';
 
 interface HomeHeroProps { onStartMixer: (preset: MixPreset, files: File[], mode?: 'mixer'|'daw') => void; }
 
@@ -44,26 +45,15 @@ const IAEQ_PRESETS_DEMO = [
 ];
 const EQ_LABELS=['Pre','30Hz','60Hz','170Hz','310Hz','600Hz','1kHz','3kHz','6kHz','12kHz','14kHz','16kHz'];
 
-// ─── 4 modos ──────────────────────────────────────────────────────────────
+// ─── Modo de mezcla ──────────────────────────────────────────────────────────
 const MODES = [
-  {
-    id: 'daw',
-    icon: '🎛️',
-    color: '#EC4899',
-    title: 'DAW Profesional',
-    sub: 'Timeline · Waveforms · EQ por stem · Efectos',
-    desc: 'Sube hasta 12 stems y mézclalos con control total. Timeline visual, waveforms reales, EQ de 3 bandas por stem, reverb, delay y widener. Exporta WAV 24-bit a -14 LUFS listo para Spotify.',
-    badge: 'Gratis',
-    free: true,
-    preview: [0.3,0.5,0.7,0.9,0.8,0.6,0.5,0.7,0.8,0.6,0.4,0.5,0.7,0.9,0.8,0.6],
-  },
   {
     id: 'mixer',
     icon: '🎚️',
     color: '#C026D3',
-    title: 'Mixer Rápido',
+    title: 'Mixer Profesional con IA',
     sub: 'Presets de género · EQ master · LUFS meter',
-    desc: 'Para mezclas rápidas y profesionales. Elige un preset de género (Pop, Rock, Gospel, Reggaeton...), ajusta el master EQ y exporta en segundos. Perfecto cuando no necesitas edición detallada.',
+    desc: 'Para mezclas rápidas y profesionales. Elige un preset de género (Pop, Rock, Gospel, Reggaeton...), ajusta el master EQ y exporta en segundos. Perfecto para resultados profesionales sin complejidad.',
     badge: 'Gratis',
     free: true,
     preview: [0.9,0.7,0.8,0.9,0.7,0.8,0.9,0.7,0.8,0.9,0.7,0.8,0.9,0.7,0.8,0.9],
@@ -72,17 +62,16 @@ const MODES = [
 
 // ─── Credits model ─────────────────────────────────────────────────────────
 const CREDIT_ACTIONS = [
-  { icon: '🎛️', action: 'DAW Profesional', cost: 0,  color: '#EC4899' },
-  { icon: '🎚️', action: 'Mixer Rápido', cost: 0, color: '#C026D3' },
+  { icon: '🎚️', action: 'Mixer Profesional con IA', cost: 0, color: '#C026D3' },
   { icon: '💾', action: 'Exportar WAV 24-bit', cost: 0,  color: '#7C3AED' },
-  { icon: '🎯', action: '9 Presets de género', cost: 0,  color: '#a259ff' },
-  { icon: '⬇️', action: 'Exportar WAV 24-bit', cost: 1,  color: '#4ade80' },
+  { icon: '🎯', action: '9 Presets de género profesionales', cost: 0,  color: '#a259ff' },
+  { icon: '⬇️', action: 'Descargas ilimitadas', cost: 0,  color: '#4ade80' },
 ];
 
 // ─── Pricing features ─────────────────────────────────────────────────────
 const FREE_FEATURES = [
-  '✓ 2 canciones completas gratis',
-  '✓ Acceso a los 4 modos de trabajo',
+  '✓ Mezclas profesionales ilimitadas',
+  '✓ Mixer profesional con IA',
   '✓ Exporta WAV 24-bit',
   '✓ Todos los presets de género',
   '✓ IA EQ preview por dispositivo',
@@ -91,8 +80,7 @@ const PRO_FEATURES = [
   '✦ Sin límites · Para siempre',
   '🎛️ Mezclar stems — 1 crédito c/u',
   '✦ Generar canciones IA — 10 créditos c/u',
-  '🎚️ Mixer Rápido — mezcla en segundos',
-  '🎛️ DAW Profesional — control total',
+  '🎚️ Mixer Profesional — mezcla en segundos',
   '⬇️ Exportar WAV 24-bit — 1 crédito c/u',
   '📵 Sin marca de agua',
 ];
@@ -131,7 +119,6 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
   const [activeMode, setActiveMode] = useState(0);
   const statsRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const recentArticles = blogArticles.slice(0,3);
 
   useEffect(() => {
     document.body.classList.add('page-home');
@@ -721,18 +708,97 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         </div>
       </div>
 
-      {/* ───── BLOG ───── */}
+      {/* ───── PREMIO GLOBAL RECOGNITION AWARD ───── */}
+      <div style={{ background:'linear-gradient(135deg,rgba(36,22,54,0.95),rgba(124,58,237,0.2))', borderTop:`1px solid rgba(192,38,211,0.3)`, borderBottom:`1px solid rgba(192,38,211,0.3)`, padding:'80px 20px', position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:'600px', height:'600px', background:'radial-gradient(circle, rgba(217,70,239,0.15) 0%, transparent 70%)', borderRadius:'50%', filter:'blur(60px)', pointerEvents:'none' }}/>
+        
+        <div style={{ maxWidth:'1100px', margin:'0 auto', position:'relative', zIndex:1 }}>
+          <div style={{ textAlign:'center', marginBottom:'48px' }}>
+            <div style={{ display:'inline-block', padding:'8px 20px', background:'rgba(217,70,239,0.15)', border:`1px solid rgba(217,70,239,0.3)`, borderRadius:'980px', marginBottom:'16px', fontSize:'12px', fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:'#D946EF' }}>
+              🏆 Premio Global 2026
+            </div>
+            <h2 style={{ fontSize:'clamp(32px,5vw,48px)', fontWeight:900, letterSpacing:'-1px', marginBottom:'16px', lineHeight:1.1 }}>
+              Reconocidos con el <span style={GRAD}>Global Recognition Award</span>
+            </h2>
+            <p style={{ fontSize:'18px', color:T.text2, maxWidth:'700px', margin:'0 auto 40px', lineHeight:1.6 }}>
+              MixingMusic.AI ha sido galardonado entre el top <strong style={{color:'#D946EF'}}>5.8%</strong> de 15,000 participantes globales por innovación en producción musical con inteligencia artificial
+            </p>
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))', gap:'24px', marginBottom:'40px' }}>
+            <img src="/awards/winner3.png" alt="Global Recognition Award 2026 Winner" style={{ width:'100%', height:'auto', borderRadius:'16px', boxShadow:'0 20px 60px rgba(0,0,0,0.4)', border:`1px solid rgba(217,70,239,0.2)` }} />
+            <img src="/awards/winner2.jpg" alt="Global Recognition Award Certificate" style={{ width:'100%', height:'auto', borderRadius:'16px', boxShadow:'0 20px 60px rgba(0,0,0,0.4)', border:`1px solid rgba(217,70,239,0.2)` }} />
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))', gap:'20px', marginBottom:'40px' }}>
+            {[
+              { icon:'🌍', title:'Reconocimiento Internacional', desc:'Evaluación rigurosa por panel independiente de expertos' },
+              { icon:'📊', title:'Top 5.8% Global', desc:'Solo 870 de 15,000 participantes recibieron este honor' },
+              { icon:'✨', title:'Innovación + Impacto', desc:'Calificaciones perfectas 5/5 en todas las dimensiones evaluadas' },
+              { icon:'🎯', title:'Modelo Rasch', desc:'Metodología científica de medición objetiva y comparación justa' }
+            ].map((item,i) => (
+              <div key={i} style={{ ...S.card, padding:'24px', textAlign:'center' }}>
+                <div style={{ fontSize:'32px', marginBottom:'12px' }}>{item.icon}</div>
+                <h3 style={{ fontSize:'16px', fontWeight:700, color:T.text, marginBottom:'8px' }}>{item.title}</h3>
+                <p style={{ fontSize:'13px', color:T.text2, lineHeight:1.6 }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ textAlign:'center' }}>
+            <button onClick={() => navigate('/blog/mixingmusic-ai-gana-premio-global-recognition-2026')} style={{ ...S.ctaBtn, padding:'16px 36px', fontSize:'16px', display:'inline-flex', alignItems:'center', gap:'8px' }}>
+              📰 Leer el anuncio completo
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ───── ÚLTIMAS NOTICIAS Y BLOG ───── */}
       <div style={{ background:'rgba(15,10,26,0.5)', padding:'80px 20px' }}>
         <div style={{ maxWidth:'1100px', margin:'0 auto' }}>
-          <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:'40px', flexWrap:'wrap', gap:'16px' }}>
+          
+          {/* Destacado del Premio */}
+          <div style={{ marginBottom:'60px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'24px' }}>
+              <div style={{ width:'4px', height:'24px', background:'linear-gradient(135deg,#D946EF,#A855F7)', borderRadius:'980px' }}/>
+              <h2 style={{ fontSize:'28px', fontWeight:800 }}>
+                <span style={GRAD}>Última Noticia</span>
+              </h2>
+            </div>
+            <div style={{ ...S.card, padding:'0', overflow:'hidden', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0', cursor:'pointer' }} onClick={() => navigate('/blog/mixingmusic-ai-gana-premio-global-recognition-2026')}>
+              <img src="/awards/winner3.png" alt="Premio Global Recognition Award" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              <div style={{ padding:'32px' }}>
+                <div style={{ display:'inline-block', padding:'6px 14px', background:'rgba(217,70,239,0.15)', border:`1px solid rgba(217,70,239,0.3)`, borderRadius:'980px', marginBottom:'16px', fontSize:'11px', fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:'#D946EF' }}>
+                  🏆 PREMIO GLOBAL
+                </div>
+                <h3 style={{ fontSize:'24px', fontWeight:800, color:T.text, lineHeight:1.3, marginBottom:'12px' }}>
+                  MixingMusic.AI gana el Global Recognition Award 2026
+                </h3>
+                <p style={{ fontSize:'15px', color:T.text2, lineHeight:1.7, marginBottom:'20px' }}>
+                  Reconocidos entre el top 5.8% de 15,000 participantes globales por nuestra innovación en producción musical con IA. Calificaciones perfectas en todas las dimensiones evaluadas.
+                </p>
+                <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+                  <span style={{ fontSize:'13px', color:'#9B7EC8' }}>⏱ 8 min lectura</span>
+                  <span style={{ fontSize:'13px', color:'#9B7EC8' }}>📅 19 mayo 2026</span>
+                  <span style={{ color:'#D946EF', fontWeight:700, marginLeft:'auto' }}>Leer artículo →</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Artículos Recientes */}
+          <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:'32px', flexWrap:'wrap', gap:'16px' }}>
             <div>
-              <h2 style={{ ...S.sectionTitle, marginBottom:'8px' }}>Aprende con nuestro <span style={GRAD}>blog de mezcla</span></h2>
-              <p style={{ fontSize:'15px', color:T.text2 }}>Guías, tutoriales y noticias del mundo del audio profesional</p>
+              <h3 style={{ fontSize:'24px', fontWeight:800, color:T.text, marginBottom:'8px' }}>
+                Artículos <span style={GRAD}>Recientes</span>
+              </h3>
+              <p style={{ fontSize:'15px', color:T.text2 }}>Guías, tutoriales y análisis del mundo del audio con IA</p>
             </div>
             <button onClick={() => navigate('/blog')} style={{ color:'#C026D3', fontSize:'14px', fontWeight:600, textDecoration:'none', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit' }}>Ver todos los artículos →</button>
           </div>
+          
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))', gap:'20px' }}>
-            {recentArticles.map((article,i) => (
+            {[...blogArticles2026, ...blogArticles].slice(1, 7).map((article,i) => (
               <div key={i} onClick={() => navigate(`/blog/${article.slug}`)}
                 style={{ ...S.card, textDecoration:'none', display:'block', transition:'transform 0.15s', cursor:'pointer' }}
                 onMouseEnter={e => (e.currentTarget.style.transform='translateY(-4px)')}
