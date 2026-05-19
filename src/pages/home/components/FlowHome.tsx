@@ -1,5 +1,5 @@
 /**
- * FlowHome.tsx v21 — Home simplificado: solo DAW, gratis, sin precios
+ * FlowHome.tsx v21 — Home simplificado: solo Mixer, gratis, sin precios
  */
 import { useState, useRef } from 'react';
 import FlowNav from '@/components/flow/FlowNav';
@@ -51,7 +51,7 @@ export default function FlowHome({ user, onNavigate, onLogout }: Props) {
     }
   };
 
-  const handleOpenDAW = () => {
+  const handleOpenMixer = () => {
     onNavigate('studio', files.length > 0 ? files : undefined, selectedPreset, 'daw');
   };
   const handleOpenMixer = () => {
@@ -181,7 +181,7 @@ export default function FlowHome({ user, onNavigate, onLogout }: Props) {
 
             {/* Qué incluye */}
             <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:16, padding:20 }}>
-              <div style={{ fontSize:13, fontWeight:600, marginBottom:12 }}>¿Qué incluye el DAW?</div>
+              <div style={{ fontSize:13, fontWeight:600, marginBottom:12 }}>¿Qué incluye el Mixer?</div>
               {[
                 ['🎚️', 'Mezcla hasta 12 stems en paralelo'],
                 ['🎛️', 'EQ de 3 bandas por stem'],
@@ -197,9 +197,9 @@ export default function FlowHome({ user, onNavigate, onLogout }: Props) {
             </div>
 
             {/* CTA */}
-            <button onClick={handleOpenDAW}
+            <button onClick={handleOpenMixer}
               style={{ width:'100%', height:56, borderRadius:14, border:'none', background:'linear-gradient(135deg,#7c3aed,#a855f7,#e879f9)', color:'#fff', fontSize:17, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 0 40px rgba(168,85,247,0.5)', letterSpacing:-0.3 }}>
-              🎛️ Abrir en DAW Profesional
+              🎛️ Abrir en Mixer Profesional
             </button>
             {files.length > 0 && (
               <button onClick={handleOpenMixer}
@@ -208,7 +208,7 @@ export default function FlowHome({ user, onNavigate, onLogout }: Props) {
               </button>
             )}
             <div style={{ textAlign:'center', fontSize:12, color:T.text3 }}>
-              {files.length > 0 ? `${files.length} stem${files.length > 1 ? 's' : ''} listo${files.length > 1 ? 's' : ''} · Preset: ${preset.name}` : 'Puedes cargar stems dentro del DAW también'}
+              {files.length > 0 ? `${files.length} stem${files.length > 1 ? 's' : ''} listo${files.length > 1 ? 's' : ''} · Preset: ${preset.name}` : 'Puedes cargar stems dentro del Mixer también'}
             </div>
 
             {/* Gratis badge */}

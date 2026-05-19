@@ -1,3 +1,4 @@
+@import './styles/tokens.css';
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
 @tailwind base;
@@ -118,3 +119,4 @@ a, button { -webkit-tap-highlight-color: transparent; }
     grid-template-columns: 1fr;
   }
 }
+@import './styles/mixer-design.css';
