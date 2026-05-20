@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import HomeHero from './components/HomeHero';
 import ProjectDashboard from './components/ProjectDashboard';
+import StudioDAW from './components/StudioDAW';
 import MixEditor from './components/MixEditor';
 import ExportScreen from './components/ExportScreen';
 import { MixPreset, PRESETS } from './components/PresetScreen';
@@ -16,7 +17,7 @@ interface ExportData {
   iaEqPreset?: string;
 }
 
-type Screen = 'home' | 'mixer' | 'export';
+type Screen = 'home' | 'daw' | 'mixer' | 'export';
 
 let pendingExportData: ExportData | null = null;
 
@@ -41,7 +42,7 @@ export default function HomePage() {
   const handleStartMixer = (preset: MixPreset, files: File[], mode?: 'mixer' | 'daw') => {
     setSelectedPreset(preset);
     setUploadedFiles(files);
-    setScreen('mixer'); // Always go to mixer, never DAW
+    setScreen(mode === 'mixer' ? 'mixer' : 'daw');
   };
 
   const handleExport = (data: ExportData) => {
@@ -50,6 +51,23 @@ export default function HomePage() {
     setScreen('export');
   };
 
+  if (screen === 'daw') {
+    return (
+      <StudioDAW
+        projectId={projectId}
+        user={GUEST_USER}
+        uploadedFiles={uploadedFiles}
+        onBack={() => setScreen('home')}
+        onCreditsUpdate={() => {}}
+        onExport={handleExport}
+        initialPreset={selectedPreset}
+        reverbOn={selectedPreset.reverbWet > 0}
+        delayOn={selectedPreset.delayWet > 0}
+        stereoOn={selectedPreset.stereoWidth > 0.5}
+        onSwitchToMixer={() => setScreen('mixer')}
+      />
+    );
+  }
 
   if (screen === 'mixer') {
     return (

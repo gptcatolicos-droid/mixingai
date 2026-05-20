@@ -135,7 +135,8 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
   }, []);
 
   const goRegister = () => navigate('/auth/register');
-  const goUpload = () => onStartMixer(PRESETS[0], [], 'mixer');
+  const openDAW = () => onStartMixer(PRESETS[0], [], 'daw');
+  const openMixer = () => onStartMixer(PRESETS[0], [], 'mixer');
 
   const S = {
     section: { padding:'80px 20px', maxWidth:'1100px', margin:'0 auto' } as React.CSSProperties,
@@ -184,11 +185,11 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
 
         {/* CTAs */}
         <div style={{ display:'flex', gap:'14px', flexWrap:'wrap', justifyContent:'center', marginBottom:'60px' }}>
-          <button onClick={goUpload} style={{ ...S.ctaBtn, padding:'20px 52px', fontSize:'20px', letterSpacing:'-0.3px' }}>
-            🎚️ Abrir MixingMusic Mixer — Gratis
+          <button onClick={openDAW} style={{ ...S.ctaBtn, padding:'20px 52px', fontSize:'20px', letterSpacing:'-0.3px' }}>
+            🎚️ Abrir el DAW — Gratis
           </button>
           <a href="#modos" style={{ background:'transparent', border:'1px solid rgba(192,38,211,0.3)', color:'#9B7EC8', padding:'16px 32px', borderRadius:'980px', fontSize:'16px', fontWeight:600, cursor:'pointer', fontFamily:'inherit', textDecoration:'none', display:'flex', alignItems:'center' }}>
-            Más funciones ↓
+            Ver los 4 modos ↓
           </a>
         </div>
 
@@ -236,7 +237,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
               Tu mezcla profesional<br/><span style={GRAD}>en el navegador</span>
             </h2>
             <p style={{ fontSize:'17px', color:T.text2, maxWidth:'520px', margin:'0 auto', lineHeight:1.6 }}>
-              Mixer profesional con EQ, efectos, LUFS en tiempo real y 9 presets de género. Exporta WAV 24-bit a -14 LUFS sin marca de agua.
+              DAW profesional con timeline y waveforms reales, o Mixer rápido para mezclas inmediatas. Ambos exportan WAV 24-bit a -14 LUFS.
             </p>
           </div>
 
@@ -349,25 +350,117 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
               ✦ NUEVO — MixingStudio AI
             </div>
             <h2 style={{ fontSize:'clamp(30px,5vw,54px)', fontWeight:900, lineHeight:1.05, letterSpacing:'-1.5px', marginBottom:'16px' }}>
-              El mixer profesional<br/><span style={GRAD}>con IA más completo</span>
+              El DAW online con IA<br/><span style={GRAD}>más completo en español</span>
             </h2>
             <p style={{ fontSize:'17px', color:T.text2, maxWidth:'580px', margin:'0 auto', lineHeight:1.6 }}>
-              Mezcla stems, aplica EQ profesional, añade efectos y exporta en WAV 24-bit a -14 LUFS. Todo en un solo lugar. Sin instalar nada.
+              Genera canciones, graba desde tu micrófono, agrega instrumentos con IA y mezcla todo en un solo lugar. Sin instalar nada.
             </p>
           </div>
 
+          {/* DAW preview visual */}
+          <div style={{ background:'rgba(15,10,26,0.95)', border:'1px solid rgba(192,38,211,0.2)', borderRadius:'20px', overflow:'hidden', boxShadow:'0 40px 80px rgba(0,0,0,0.6)', marginBottom:'48px' }}>
+            {/* DAW topbar */}
+            <div style={{ background:'rgba(26,16,40,0.9)', padding:'12px 20px', borderBottom:'1px solid rgba(192,38,211,0.15)', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
+              <div style={{ display:'flex', gap:'6px' }}>
+                {['#EF4444','#FBBF24','#4ade80'].map(c => <div key={c} style={{ width:'10px', height:'10px', borderRadius:'50%', background:c }}></div>)}
+              </div>
+              <div style={{ display:'flex', gap:'8px' }}>
+                {['Edit','Mix','Master'].map((t,i) => (
+                  <div key={t} style={{ fontSize:'12px', fontWeight:600, padding:'5px 14px', borderRadius:'6px', background:i===0?'rgba(192,38,211,0.2)':'transparent', border:i===0?'1px solid rgba(192,38,211,0.4)':'none', color:i===0?'#EC4899':'#9B7EC8' }}>{t}</div>
+                ))}
+              </div>
+              <div style={{ marginLeft:'auto', display:'flex', gap:'8px', alignItems:'center' }}>
+                <div style={{ fontFamily:'monospace', fontSize:'13px', color:'#F8F0FF', background:'rgba(8,4,16,0.5)', padding:'4px 12px', borderRadius:'6px' }}>00:00:42 / 02:25</div>
+                <div style={{ display:'flex', gap:'4px' }}>
+                  {['⏮','▶','⏹','⏺'].map(ic => <div key={ic} style={{ width:'28px', height:'28px', borderRadius:'6px', background:ic==='▶'?'linear-gradient(135deg,#EC4899,#C026D3)':'rgba(255,255,255,0.05)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', cursor:'pointer', color:'#fff' }}>{ic}</div>)}
+                </div>
+              </div>
+            </div>
+            {/* Tracks */}
+            <div style={{ display:'grid', gridTemplateColumns:'180px 1fr', minHeight:'280px' }}>
+              {/* Track list */}
+              <div style={{ borderRight:'1px solid rgba(192,38,211,0.1)', padding:'8px 0' }}>
+                {[
+                  {name:'VOCALS',color:'#EC4899',vol:72},
+                  {name:'DRUMS',color:'#10B981',vol:80},
+                  {name:'BASS',color:'#F97316',vol:65},
+                  {name:'SYNTH IA',color:'#378ADD',vol:55},
+                  {name:'GUITAR IA',color:'#FBBF24',vol:40},
+                  {name:'+ Generar con IA',color:'#6e3ff3',vol:0,isNew:true},
+                ].map((track) => (
+                  <div key={track.name} style={{ padding:'8px 12px', borderBottom:'1px solid rgba(255,255,255,0.04)', display:'flex', alignItems:'center', gap:'8px', opacity:track.name==='+ Generar con IA'?0.7:1 }}>
+                    <div style={{ width:'6px', height:'6px', borderRadius:'50%', background:track.color, flexShrink:0 }}></div>
+                    <span style={{ fontSize:'10px', fontWeight:700, color:track.isNew?track.color:'#9B7EC8', flex:1, letterSpacing:'0.3px' }}>{track.name}</span>
+                    {!track.isNew && <>
+                      <div style={{ width:'40px', height:'3px', background:'rgba(255,255,255,0.1)', borderRadius:'2px', position:'relative' }}>
+                        <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${track.vol}%`, background:track.color, borderRadius:'2px' }}></div>
+                      </div>
+                      <span style={{ fontSize:'9px', color:'#6e6e73', fontFamily:'monospace' }}>M</span>
+                    </>}
+                  </div>
+                ))}
+              </div>
+              {/* Timeline */}
+              <div style={{ position:'relative', overflow:'hidden' }}>
+                {/* Ruler */}
+                <div style={{ height:'22px', background:'rgba(8,4,16,0.5)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', padding:'0 8px', gap:'0' }}>
+                  {Array.from({length:16}).map((_,i) => (
+                    <div key={i} style={{ flex:1, fontSize:'8px', color:'rgba(155,126,200,0.5)', fontFamily:'monospace', textAlign:'center' }}>{i*2+1}</div>
+                  ))}
+                </div>
+                {/* Playhead */}
+                <div style={{ position:'absolute', top:0, bottom:0, left:'22%', width:'1.5px', background:'#EC4899', zIndex:5, pointerEvents:'none' }}>
+                  <div style={{ position:'absolute', top:0, left:'50%', transform:'translateX(-50%)', width:'8px', height:'8px', background:'#EC4899', borderRadius:'0 0 2px 2px', clipPath:'polygon(0 0,100% 0,50% 100%)' }}></div>
+                </div>
+                {/* Clips */}
+                {[
+                  {top:32,left:'0%',width:'38%',color:'#6e3ff3',label:'Vocals — Verse'},
+                  {top:32,left:'42%',width:'28%',color:'#6e3ff3',label:'Vocals — Chorus'},
+                  {top:78,left:'0%',width:'95%',color:'#10B981',label:'Drums — Full'},
+                  {top:124,left:'0%',width:'95%',color:'#F97316',label:'Bass — Full'},
+                  {top:170,left:'0%',width:'45%',color:'#378ADD',label:'Synth Pad IA'},
+                  {top:170,left:'48%',width:'48%',color:'#378ADD',label:'Synth Lead IA'},
+                  {top:216,left:'20%',width:'75%',color:'#FBBF24',label:'Guitar IA'},
+                ].map((clip,i) => (
+                  <div key={i} style={{ position:'absolute', top:`${clip.top}px`, left:clip.left, width:clip.width, height:'38px', background:`${clip.color}cc`, borderRadius:'4px', display:'flex', alignItems:'center', padding:'0 8px', overflow:'hidden' }}>
+                    <div style={{ position:'absolute', inset:0, background:'rgba(255,255,255,0.08)', borderRadius:'4px' }}>
+                      <div style={{ height:'100%', display:'flex', alignItems:'center', gap:'1px', padding:'4px' }}>
+                        {Array.from({length:20}).map((_,j) => <div key={j} style={{ flex:1, background:'rgba(255,255,255,0.3)', borderRadius:'1px', height:`${20+Math.sin(j*0.8+i)*40}%` }}></div>)}
+                      </div>
+                    </div>
+                    <span style={{ fontSize:'9px', fontWeight:700, color:'#fff', position:'relative', zIndex:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{clip.label}</span>
+                  </div>
+                ))}
+                {/* AI Generate zone */}
+                <div style={{ position:'absolute', top:'258px', left:'8px', right:'8px', height:'36px', border:'1.5px dashed rgba(110,63,243,0.5)', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', cursor:'pointer' }} onClick={goRegister}>
+                  <span style={{ fontSize:'12px', color:'#6e3ff3' }}>✦</span>
+                  <span style={{ fontSize:'11px', fontWeight:600, color:'#6e3ff3' }}>Generar instrumento con IA o grabar desde micrófono</span>
+                </div>
+              </div>
+            </div>
+            {/* Bottom bar */}
+            <div style={{ background:'rgba(8,4,16,0.7)', padding:'10px 20px', borderTop:'1px solid rgba(192,38,211,0.1)', display:'flex', alignItems:'center', gap:'20px', flexWrap:'wrap' }}>
+              <span style={{ fontSize:'11px', color:'#9B7EC8' }}>BPM <span style={{ color:'#F8F0FF', fontFamily:'monospace', fontWeight:600 }}>120</span></span>
+              <span style={{ fontSize:'11px', color:'#9B7EC8' }}>Snap <span style={{ color:'#F8F0FF', fontFamily:'monospace', fontWeight:600 }}>1/4</span></span>
+              <span style={{ fontSize:'11px', color:'#9B7EC8' }}>LUFS <span style={{ color:'#4ade80', fontFamily:'monospace', fontWeight:600 }}>-10.2</span></span>
+              <div style={{ marginLeft:'auto', display:'flex', gap:'8px' }}>
+                <button onClick={goRegister} style={{ background:'rgba(192,38,211,0.15)', border:'1px solid rgba(192,38,211,0.35)', color:'#EC4899', padding:'6px 16px', borderRadius:'8px', fontSize:'12px', fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>🎤 Grabar mic</button>
+                <button onClick={goRegister} style={{ background:'linear-gradient(135deg,#EC4899,#C026D3)', border:'none', color:'#fff', padding:'6px 16px', borderRadius:'8px', fontSize:'12px', fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Exportar mezcla</button>
+              </div>
+            </div>
+          </div>
 
           {/* Feature pills */}
           <div style={{ display:'flex', flexWrap:'wrap', gap:'10px', justifyContent:'center', marginBottom:'40px' }}>
             {[
-              '🎚️ Mezcla profesional',
-              '🎛️ EQ de 3 bandas',
-              '✨ Efectos (Reverb, Delay, Widener)',
+              '🎛️ Mezcla multi-pista',
+              '✦ Genera canciones con IA',
+              '🎚️ Separa stems con Demucs',
+              '🎹 Agrega instrumentos IA',
+              '🎤 Graba desde tu micrófono',
               '📊 LUFS en tiempo real',
-              '🎯 9 presets de género',
               '⬇️ Exporta WAV 24-bit',
-              '📵 Sin marca de agua',
-              '✦ Gratis para siempre',
+              '🎸 9 presets de género',
             ].map(f => (
               <div key={f} style={{ background:'rgba(26,16,40,0.8)', border:'1px solid rgba(192,38,211,0.2)', borderRadius:'980px', padding:'8px 18px', fontSize:'13px', fontWeight:500, color:T.text2 }}>{f}</div>
             ))}
@@ -375,8 +468,11 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
 
           <div style={{ textAlign:'center' }}>
             <div style={{ display:'flex', gap:'12px', justifyContent:'center', flexWrap:'wrap', marginBottom:'12px' }}>
-              <button onClick={goUpload} style={{ background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)', border:'none', color:'#fff', padding:'18px 40px', borderRadius:'14px', fontSize:'17px', fontWeight:800, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 0 40px rgba(192,38,211,0.5)', letterSpacing:'-0.3px' }}>
-                🎚️ Abrir Mixer — Gratis
+              <button onClick={openDAW} style={{ background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)', border:'none', color:'#fff', padding:'18px 40px', borderRadius:'14px', fontSize:'17px', fontWeight:800, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 0 40px rgba(192,38,211,0.5)', letterSpacing:'-0.3px' }}>
+                🎛️ DAW Profesional
+              </button>
+              <button onClick={openMixer} style={{ background:'transparent', border:'2px solid rgba(192,38,211,0.5)', color:'#EC4899', padding:'18px 40px', borderRadius:'14px', fontSize:'17px', fontWeight:700, cursor:'pointer', fontFamily:'inherit', letterSpacing:'-0.3px' }}>
+                🎚️ Mixer Rápido
               </button>
             </div>
             <div style={{ fontSize:'12px', color:T.text3 }}>Sin instalar nada · Funciona en el navegador · Gratis para siempre</div>
@@ -475,9 +571,9 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:'20px' }}>
             {[
-              { num:'1', icon:'🎵', color:'#EC4899', title:'Sube tus stems', sub:'WAV · MP3 · FLAC · hasta 12 pistas', desc:'Arrastra tus stems al Mixer. Sin registro, sin tarjeta. Empieza a mezclar en segundos.', badge:'100% Gratis' },
-              { num:'2', icon:'🎛️', color:'#C026D3', title:'Mezcla con presets', sub:'EQ · Efectos · 9 géneros', desc:'Elige un preset de género (Pop, Rock, Gospel, etc.), ajusta el EQ master, agrega reverb/delay. Todos los ajustes en tiempo real.', badge:'9 presets incluidos' },
-              { num:'3', icon:'🎚️', color:'#7C3AED', title:'Exporta profesional', sub:'-14 LUFS · WAV 24-bit · Spotify ready', desc:'Exporta en WAV 24-bit normalizado a -14 LUFS, listo para Spotify, YouTube o Apple Music. Suena profesional en cualquier dispositivo.', badge:'WAV 24-bit' },
+              { num:'1', icon:'🎵', color:'#EC4899', title:'Sube tus stems', sub:'WAV · MP3 · FLAC · hasta 12 pistas', desc:'Arrastra tus stems directo al DAW o al Mixer. Sin registro, sin tarjeta. Empieza a mezclar en segundos.', badge:'100% Gratis' },
+              { num:'2', icon:'🎛️', color:'#C026D3', title:'Mezcla y ajusta', sub:'EQ · Compresor · Reverb · Presets', desc:'Elige DAW Profesional para control total con timeline, o Mixer Rápido para resultados inmediatos. 9 presets de género incluidos.', badge:'9 presets de género' },
+              { num:'3', icon:'🎚️', color:'#7C3AED', title:'Exporta y publica', sub:'-14 LUFS · WAV 24-bit · Spotify ready', desc:'Exporta en WAV 24-bit normalizado a -14 LUFS, listo para subir a Spotify, YouTube o Apple Music. Suena profesional en cualquier dispositivo.', badge:'WAV 24-bit' },
             ].map((step,i) => (
               <div key={i} style={{ background:'rgba(26,16,40,0.9)', border:`1px solid ${step.color}22`, borderRadius:'20px', padding:'28px', borderTop:`3px solid ${step.color}`, position:'relative', overflow:'hidden' }}>
                 <div style={{ position:'absolute', top:'-20px', right:'-10px', fontSize:'100px', fontWeight:900, color:`${step.color}06`, lineHeight:1, userSelect:'none' }}>{step.num}</div>
