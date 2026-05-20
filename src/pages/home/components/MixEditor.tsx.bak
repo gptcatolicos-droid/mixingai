@@ -75,6 +75,7 @@ interface MixEditorProps {
   initialPreset?: MixPreset;
   reverbOn?: boolean; delayOn?: boolean; stereoOn?: boolean;
   onNavigate?: (id: string) => void;
+  onSwitchToDAW?: () => void;
 }
 
 // =============================================
@@ -237,7 +238,7 @@ const C = {
   progressBar: (pct:number) => ({height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'8px',width:`${pct}%`,transition:'width 0.3s ease'}),
 };
 
-export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCreditsUpdate, onExport, initialPreset, reverbOn=false, delayOn=false, stereoOn=false, onNavigate }: MixEditorProps) {
+export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCreditsUpdate, onExport, initialPreset, reverbOn=false, delayOn=false, stereoOn=false, onNavigate, onSwitchToDAW }: MixEditorProps) {
   const [stems, setStems] = useState<Stem[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -874,6 +875,11 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
               <i className="ri-equalizer-fill" style={{fontSize:'14px'}}></i>
               ✦ Exportar Mezcla con IA
             </button>
+            {onSwitchToDAW && (
+              <button onClick={onSwitchToDAW} style={{...C.ghostBtn,fontSize:'12px',padding:'8px 14px',background:'rgba(168,85,247,0.1)',border:'1px solid rgba(168,85,247,0.3)',color:'#a855f7',display:'flex',alignItems:'center',gap:6}}>
+                🎛️ Cambiar a DAW
+              </button>
+            )}
             <button onClick={onBack} style={{...C.ghostBtn,fontSize:'12px',padding:'8px 14px'}}>← Volver</button>
           </div>
         </div>

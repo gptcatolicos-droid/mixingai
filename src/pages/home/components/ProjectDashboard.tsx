@@ -1,12 +1,12 @@
 /**
  * ProjectDashboard.tsx — Router principal
  * 
- * El Mixer (MixEditor) es el centro de todo.
- * Todo abre en el Mixer. El mezclador viejo ya no se usa como pantalla separada.
+ * El DAW (MixEditor) es el centro de todo.
+ * Todo abre en el DAW. El mezclador viejo ya no se usa como pantalla separada.
  * 
  * FLUJO:
  * home        → FlowHome (5 cards)
- * studio      → MixEditor (Mixer principal, puede estar vacío)
+ * studio      → MixEditor (DAW principal, puede estar vacío)
  * separate    → StemSeparator → al terminar → MixEditor con 4 stems
  * stems       → NewProjectScreen (subir stems) → MixEditor directo (sin preset screen separada)
  * mixsong     → NewProjectScreen → MixEditor
@@ -15,6 +15,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 let pendingExportData: any = null;
+import StudioPro from './StudioPro';
 import MixEditor from './MixEditor';
 import ExportScreen from './ExportScreen';
 import NewProjectScreen from './NewProjectScreen';
@@ -53,7 +54,7 @@ function FlowLanding({ onNavigate }: { onNavigate: (id:string)=>void }) {
           Crea música con IA<br/>en tu navegador
         </h1>
         <p style={{ fontSize:17, color:T.text2, maxWidth:540, margin:'20px 0 36px', lineHeight:1.5 }}>
-          Genera canciones, separa stems, mezcla y masteriza. Todo en el Mixer con IA.
+          Genera canciones, separa stems, mezcla y masteriza. Todo en el DAW con IA.
         </p>
         <div style={{ display:'flex', gap:12 }}>
           <Link to="/auth/register" style={{ height:48, padding:'0 28px', borderRadius:999, border:'none', background:`linear-gradient(135deg,${T.fuchsia},${T.pink})`, color:'#fff', fontSize:15, fontWeight:600, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:8, boxShadow:`0 0 32px ${T.fuchsia}66`, textDecoration:'none' }}>
@@ -64,7 +65,7 @@ function FlowLanding({ onNavigate }: { onNavigate: (id:string)=>void }) {
           </Link>
         </div>
         <div style={{ display:'flex', gap:22, marginTop:32, fontSize:12, color:T.text3 }}>
-          <span>✓ 10 créditos gratis</span><span>✓ Sin tarjeta</span><span>✓ Mixer en tu navegador</span>
+          <span>✓ 10 créditos gratis</span><span>✓ Sin tarjeta</span><span>✓ DAW en tu navegador</span>
         </div>
       </div>
     </div>
@@ -111,39 +112,39 @@ export default function ProjectDashboard() {
     window.location.href = '/';
   };
 
-  // Navegar — todo va al Mixer
+  // Navegar — todo va al DAW
   const handleNavigate = (id: string) => {
     if (id === 'login')    { navigate('/auth/login');    return; }
     if (id === 'register') { navigate('/auth/register'); return; }
     if (id === 'blog')     { navigate('/blog');          return; }
     if (id === 'billing')  { navigate('/billing');       return; }
     const screenMap: Record<string, Screen> = {
-      home: 'home', studio: 'studio', mixer: 'mixer', create: 'create',
-      separate: 'separate', stems: 'stems', mixsong: 'mixsong',
+      home: 'home', studio: 'studio', mixer: 'mixer', timeline: 'studio',
+      create: 'create', separate: 'separate', stems: 'stems', mixsong: 'mixsong',
     };
     if (screenMap[id]) setScreen(screenMap[id]);
   };
 
-  // Abrir el Mixer con archivos
-  const openMixer = (files: File[] = [], preset: MixPreset = PRESETS[0]) => {
+  // Abrir el DAW con archivos
+  const openDAW = (files: File[] = [], preset: MixPreset = PRESETS[0]) => {
     setProjectId(newId());
     setUploadedFiles(files);
     setActivePreset(preset);
     setScreen('studio');
   };
 
-  // Stems separados (4 tracks) → Mixer
-  const handleStemsReady = (files: File[]) => openMixer(files, PRESETS[0]);
+  // Stems separados (4 tracks) → DAW
+  const handleStemsReady = (files: File[]) => openDAW(files, PRESETS[0]);
 
-  // Track generado con IA → Mixer
+  // Track generado con IA → DAW
   const handleTrackReady = (url: string, title: string) => {
     fetch(url).then(r => r.blob()).then(blob => {
-      openMixer([new File([blob], `${title}.wav`, { type:'audio/wav' })], PRESETS[0]);
+      openDAW([new File([blob], `${title}.wav`, { type:'audio/wav' })], PRESETS[0]);
     }).catch(() => setScreen('studio'));
   };
 
-  // Stems cargados manualmente → Mixer directo (sin pantalla de preset separada)
-  const handleUploadComplete = (files: File[]) => openMixer(files, PRESETS[0]);
+  // Stems cargados manualmente → DAW directo (sin pantalla de preset separada)
+  const handleUploadComplete = (files: File[]) => openDAW(files, PRESETS[0]);
 
   // Export
   const handleExport = (data: ExportData) => {
@@ -157,13 +158,14 @@ export default function ProjectDashboard() {
       setActivePreset(preset);
       setUploadedFiles(files);
       setProjectId(newId());
-      setScreen(mode === 'mixer' ? 'mixer' : 'studio');
+      if (mode === 'mixer') setScreen('mixer');
+      else setScreen('studio');
     }} />;
   }
 
-  // Mixer = StudioMixer con todo incluido
+  // DAW = StudioPro (merged Timeline + Mixer + AI + Plugins)
   if (screen === 'studio') {
-    return <StudioMixer
+    return <StudioPro
       projectId={projectId}
       user={user!}
       uploadedFiles={uploadedFiles}
@@ -191,11 +193,11 @@ export default function ProjectDashboard() {
       onExport={handleExport}
       initialPreset={activePreset}
       onNavigate={handleNavigate}
-      onSwitchToMixer={() => setScreen('studio')}
+      onSwitchToDAW={() => setScreen('studio')}
     />;
   }
 
-  // Separar stems → Mixer
+  // Separar stems → DAW
   if (screen === 'separate') {
     return <StemSeparator
       user={user!}
@@ -205,7 +207,7 @@ export default function ProjectDashboard() {
     />;
   }
 
-  // Cargar stems → Mixer directo
+  // Cargar stems → DAW directo
   if (screen === 'stems' || screen === 'mixsong') {
     return <NewProjectScreen
       user={user!}
@@ -215,7 +217,7 @@ export default function ProjectDashboard() {
     />;
   }
 
-  // Crear con IA → Mixer
+  // Crear con IA → DAW
   if (screen === 'create') {
     return <FlowCreate
       user={user!}

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import HomeHero from './components/HomeHero';
 import ProjectDashboard from './components/ProjectDashboard';
-import StudioDAW from './components/StudioDAW';
-import MixEditor from './components/MixEditor';
+import MixerClaudeDesign from './components/MixerClaudeDesign';
 import ExportScreen from './components/ExportScreen';
 import { MixPreset, PRESETS } from './components/PresetScreen';
+import { useFreeSongLimit } from '../../hooks/useFreeSongLimit';
 
 interface ExportData {
   audioBuffer: AudioBuffer;
@@ -17,7 +17,7 @@ interface ExportData {
   iaEqPreset?: string;
 }
 
-type Screen = 'home' | 'daw' | 'mixer' | 'export';
+type Screen = 'home' | 'mixer' | 'export';
 
 let pendingExportData: ExportData | null = null;
 
@@ -30,19 +30,26 @@ export default function HomePage() {
       return s ? JSON.parse(s) : null;
     } catch { return null; }
   });
+  
+  const freeSongLimit = useFreeSongLimit();
   const [screen, setScreen] = useState<Screen>('home');
   const [selectedPreset, setSelectedPreset] = useState<MixPreset>(PRESETS[0]);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [exportData, setExportData] = useState<ExportData | null>(null);
   const [projectId] = useState(() => Date.now().toString());
 
-  // Logged-in users → ProjectDashboard (has its own full flow)
   if (user) return <ProjectDashboard />;
 
-  const handleStartMixer = (preset: MixPreset, files: File[], mode?: 'mixer' | 'daw') => {
+  const handleStartMixer = (preset: MixPreset, files: File[]) => {
+    if (freeSongLimit.isExhausted && !user) {
+      window.location.href = '/auth/register';
+      return;
+    }
+    
     setSelectedPreset(preset);
     setUploadedFiles(files);
-    setScreen(mode === 'mixer' ? 'mixer' : 'daw');
+    setScreen('mixer');
+    freeSongLimit.incrementCount();
   };
 
   const handleExport = (data: ExportData) => {
@@ -51,38 +58,14 @@ export default function HomePage() {
     setScreen('export');
   };
 
-  if (screen === 'daw') {
-    return (
-      <StudioDAW
-        projectId={projectId}
-        user={GUEST_USER}
-        uploadedFiles={uploadedFiles}
-        onBack={() => setScreen('home')}
-        onCreditsUpdate={() => {}}
-        onExport={handleExport}
-        initialPreset={selectedPreset}
-        reverbOn={selectedPreset.reverbWet > 0}
-        delayOn={selectedPreset.delayWet > 0}
-        stereoOn={selectedPreset.stereoWidth > 0.5}
-        onSwitchToMixer={() => setScreen('mixer')}
-      />
-    );
-  }
-
   if (screen === 'mixer') {
     return (
-      <MixEditor
+      <MixerClaudeDesign
         projectId={projectId}
-        user={GUEST_USER}
         uploadedFiles={uploadedFiles}
         onBack={() => setScreen('home')}
-        onCreditsUpdate={() => {}}
         onExport={handleExport}
         initialPreset={selectedPreset}
-        reverbOn={selectedPreset.reverbWet > 0}
-        delayOn={selectedPreset.delayWet > 0}
-        stereoOn={selectedPreset.stereoWidth > 0.5}
-        onSwitchToDAW={() => setScreen('daw')}
       />
     );
   }
@@ -104,5 +87,5 @@ export default function HomePage() {
     );
   }
 
-  return <HomeHero onStartMixer={handleStartMixer} />;
+  return <HomeHero onStartMixer={handleStartMixer} freeSongsRemaining={freeSongLimit.remaining} />;
 }
