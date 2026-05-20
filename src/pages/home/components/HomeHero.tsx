@@ -89,7 +89,7 @@ const PRO_FEATURES = [
 const TESTIMONIALS = [
   { name:'Carlos M.', role:'Productor Gospel', country:'🇨🇴', text:'Subí 10 stems de mi coro y en 3 minutos tenía una mezcla lista para radio. Increíble.', stars:5 },
   { name:'Valeria R.', role:'Cantautora', country:'🇲🇽', text:'Con el generador de IA escribí el prompt y me salió una base completa. Nunca pensé que sería tan fácil.', stars:5 },
-  { name:'DJ Fontana', role:'DJ / Productor EDM', country:'🇦🇷', text:'El preset Dance/EDM está brutal. Los -10 LUFS suenan perfecto en Spotify desde el primer intento.', stars:5 },
+  { name:'DJ Fontana', role:'DJ / Productor EDM', country:'🇦🇷', text:'El preset Dance/EDM está brutal. Los -16 LUFS suenan perfecto en Spotify desde el primer intento.', stars:5 },
   { name:'Pastor Reyes', role:'Director Musical', country:'🇵🇪', text:'Separé el coro de la música con un clic. La calidad de Demucs es increíble para una herramienta web.', stars:5 },
   { name:'Ana Sofía T.', role:'Artista Indie', country:'🇨🇱', text:'Agregué un piano a mi canción con IA. Elegí el estilo, lo generó y quedó perfectamente integrado.', stars:5 },
   { name:'Marcos L.', role:'Ingeniero de Audio', country:'🇧🇷', text:'Los LUFS integrados son reales. El limiter hace su trabajo. Para una herramienta gratuita es sorprendente.', stars:5 },
@@ -97,7 +97,7 @@ const TESTIMONIALS = [
 
 const STATS = [
   { num:'47,832', label:'Canciones producidas', icon:'🎵' },
-  { num:'-10 LUFS', label:'Estándar Spotify garantizado', icon:'🎛️' },
+  { num:'-16 LUFS', label:'Estándar Spotify garantizado', icon:'🎛️' },
   { num:'4', label:'Modos de producción con IA', icon:'✦' },
   { num:'Gratis', label:'Sin límites ni registro', icon:'🎁' },
 ];
@@ -108,7 +108,7 @@ const FAQ_ITEMS = [
   { q:'¿Qué es ACE-Step y cómo genera música?', a:'ACE-Step es un modelo de IA open-source de Meta especializado en generación de audio musical. Corre en GPU propia de MixingMusic.AI (no dependemos de Suno ni de APIs externas). Puedes darle un prompt de texto, subir una letra o un audio de referencia para que imite el estilo.' },
   { q:'¿La separación de stems es privada?', a:'Sí, 100%. La separación usa Demucs de Meta, que corre directamente en tu navegador con WebAssembly. Tu audio nunca sale de tu dispositivo — no se envía a ningún servidor.' },
   { q:'¿Qué formatos acepta?', a:'WAV, MP3, FLAC, AAC y M4A. Hasta 12 stems simultáneos para mezclar. Para generación y separación, cualquier canción de hasta 20 minutos.' },
-  { q:'¿Qué significa -10 LUFS?', a:'LUFS es el estándar de volumen para streaming. Spotify normaliza a -10 LUFS, YouTube a -13 LUFS. Nuestra IA exporta siempre en el rango correcto para que tu canción no pierda volumen al subirse a plataformas.' },
+  { q:'¿Qué significa -16 LUFS?', a:'LUFS es el estándar de volumen para streaming. Spotify normaliza a -16 LUFS, YouTube a -13 LUFS. Nuestra IA exporta siempre en el rango correcto para que tu canción no pierda volumen al subirse a plataformas.' },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────
@@ -209,7 +209,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
             ))}
           </div>
           <div style={{ padding:'12px 20px', background:'rgba(8,4,16,0.5)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <span style={{ fontSize:'11px', color:'#9B7EC8' }}>✦ Gospel activo · -10 LUFS · Safe ✓</span>
+            <span style={{ fontSize:'11px', color:'#9B7EC8' }}>✦ Gospel activo · -16 LUFS · Safe ✓</span>
             <button onClick={goRegister} style={{ background:'linear-gradient(135deg,#EC4899,#C026D3)', border:'none', color:'#fff', padding:'7px 16px', borderRadius:'980px', fontSize:'11px', fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Usar gratis →</button>
           </div>
         </div>
@@ -384,6 +384,50 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         </div>
       </div>
 
+      {/* ───── AWARD SECTION ───── */}
+      <div style={{ padding:'80px 20px', background:'linear-gradient(135deg,rgba(139,92,246,0.08),rgba(192,38,211,0.06))' }}>
+        <div style={{ maxWidth:'1100px', margin:'0 auto' }}>
+          <div style={{ textAlign:'center', marginBottom:'48px' }}>
+            <div style={{ fontSize:'14px', fontWeight:700, color:'#EC4899', marginBottom:'16px' }}>🏆 PREMIADO A NIVEL GLOBAL</div>
+            <h2 style={S.sectionTitle}>2026 Global<br/><span style={GRAD}>Recognition Award</span></h2>
+            <p style={{ ...S.sectionSub }}>Reconocimiento internacional por innovación en inteligencia artificial aplicada a la producción musical</p>
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))', gap:'24px', marginBottom:'48px' }}>
+            {[
+              { icon:'🌍', title:'Reconocimiento Internacional', sub:'Evaluación rigurosa por expertos de la industria' },
+              { icon:'⭐', title:'Top 5.8%', sub:'de 15,000 participantes globales' },
+              { icon:'✨', title:'Innovación + Impacto', sub:'Tecnología que transforma la forma de crear música' },
+              { icon:'👥', title:'Artistas sin límites', sub:'Acceso, oportunidades, más música' },
+            ].map((item,i) => (
+              <div key={i} style={{ background:'rgba(26,16,40,0.6)', border:'1px solid rgba(192,38,211,0.2)', borderRadius:'16px', padding:'24px', textAlign:'center' }}>
+                <div style={{ fontSize:'32px', marginBottom:'12px' }}>{item.icon}</div>
+                <h3 style={{ fontSize:'16px', fontWeight:700, color:T.text, marginBottom:'8px' }}>{item.title}</h3>
+                <p style={{ fontSize:'13px', color:T.text2, lineHeight:1.6 }}>{item.sub}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Presets Grid */}
+          <div style={{ marginBottom:'48px' }}>
+            <h3 style={{ fontSize:'20px', fontWeight:800, color:T.text, marginBottom:'24px', textAlign:'center' }}>Presets Profesionales de Género</h3>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(100px,1fr))', gap:'16px' }}>
+              {['Pop', 'Rock', 'Hip Hop', 'Reggaeton', 'Dance/EDM', 'Clásica', 'Balada', 'Acústico', 'Gospel'].map((preset,i) => (
+                <div key={preset} style={{ background:'rgba(26,16,40,0.8)', border:'1px solid rgba(192,38,211,0.2)', borderRadius:'12px', padding:'16px', textAlign:'center', cursor:'pointer', transition:'all 0.2s', hover:{borderColor:'rgba(192,38,211,0.5)'} }}>
+                  <div style={{ height:'60px', marginBottom:'8px', display:'flex', alignItems:'flex-end', justifyContent:'space-between', padding:'0 4px', gap:'2px' }}>
+                    {[0.3, 0.5, 0.7, 0.6, 0.4, 0.8, 0.5, 0.6].map((h,j) => (
+                      <div key={j} style={{ flex:1, height:`${h*60}px`, background:`linear-gradient(180deg, ${TRACK_COLORS[i % TRACK_COLORS.length]}, transparent)`, borderRadius:'2px' }} />
+                    ))}
+                  </div>
+                  <div style={{ fontSize:'14px', fontWeight:700, color:T.text, marginBottom:'4px' }}>{preset}</div>
+                  <div style={{ fontSize:'11px', color:'#6e3ff3' }}>B&R: 8dB 3.8k</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ───── PRICING ───── */}
       <div style={{ padding:'100px 20px', background:'linear-gradient(135deg,rgba(26,12,46,0.97),rgba(36,18,58,0.95))' }}>
         <div style={{ maxWidth:'960px', margin:'0 auto' }}>
@@ -507,7 +551,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         <div style={{ maxWidth:'900px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'36px' }}>
             <h2 style={S.sectionTitle}>IA EQ — escucha tu mezcla <span style={GRAD}>en cualquier dispositivo</span></h2>
-            <p style={{ ...S.sectionSub, marginBottom:0 }}>12 bandas · presets por dispositivo · se exporta con tu mezcla a -10 LUFS</p>
+            <p style={{ ...S.sectionSub, marginBottom:0 }}>12 bandas · presets por dispositivo · se exporta con tu mezcla a -16 LUFS</p>
           </div>
           <div style={{ background:'rgba(13,8,22,0.95)', border:`1px solid rgba(192,38,211,0.2)`, borderRadius:'20px', padding:'24px', overflow:'hidden' }}>
             <div style={{ display:'flex', flexWrap:'wrap', gap:'7px', marginBottom:'20px' }}>
@@ -756,6 +800,43 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
           🎛️ Empezar gratis ahora
         </button>
         <div style={{ marginTop:'16px', fontSize:'12px', color:T.text3 }}>Sin tarjeta · Sin registro · Sin límites</div>
+      </div>
+
+      {/* ───── BLOG SECTION ───── */}
+      <div style={{ padding:'80px 20px', background:'rgba(8,4,16,0.4)' }}>
+        <div style={{ maxWidth:'1100px', margin:'0 auto' }}>
+          <div style={{ textAlign:'center', marginBottom:'48px' }}>
+            <h2 style={S.sectionTitle}>Artículos Recientes<br/><span style={GRAD}>sobre mezcla e IA</span></h2>
+            <p style={{ ...S.sectionSub }}>Descubre técnicas, tendencias y stories de productores que usan MixingMusic.AI</p>
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))', gap:'24px' }}>
+            {(blogArticles2026.slice(0, 4)).map((article, i) => (
+              <a key={i} href={`/blog/${article.slug}`} style={{ textDecoration:'none', color:'inherit' }}>
+                <div style={{ background:'rgba(26,16,40,0.8)', border:'1px solid rgba(192,38,211,0.2)', borderRadius:'14px', overflow:'hidden', cursor:'pointer', transition:'all 0.3s', transform:'translateY(0)', hover:{transform:'translateY(-4px)', borderColor:'rgba(192,38,211,0.4)'} }}>
+                  <div style={{ height:'140px', background:`linear-gradient(135deg, ${TRACK_COLORS[i % TRACK_COLORS.length]}, transparent)`, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'32px' }}>
+                    {article.categoryName === 'Noticias' ? '📰' : article.categoryName === 'Tecnología' ? '🔬' : article.categoryName === 'Análisis Técnico' ? '📊' : '✨'}
+                  </div>
+                  <div style={{ padding:'16px' }}>
+                    <div style={{ fontSize:'11px', fontWeight:700, color:TRACK_COLORS[i % TRACK_COLORS.length], marginBottom:'8px' }}>{article.categoryName}</div>
+                    <h3 style={{ fontSize:'14px', fontWeight:700, color:T.text, marginBottom:'8px', lineHeight:1.4 }}>{article.title}</h3>
+                    <p style={{ fontSize:'12px', color:T.text2, marginBottom:'12px', lineHeight:1.5 }}>{article.excerpt}</p>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:'11px', color:T.text3 }}>
+                      <span>{article.readTime} min lectura</span>
+                      <span>→</span>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+
+          <div style={{ textAlign:'center', marginTop:'40px' }}>
+            <a href="/blog" style={{ display:'inline-block', padding:'14px 36px', background:'linear-gradient(135deg,#EC4899,#C026D3)', border:'none', borderRadius:'12px', color:'#fff', fontWeight:700, textDecoration:'none', cursor:'pointer' }}>
+              Ver todos los artículos →
+            </a>
+          </div>
+        </div>
       </div>
 
       {/* ───── FOOTER ───── */}

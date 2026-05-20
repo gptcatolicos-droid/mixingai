@@ -997,9 +997,9 @@ export const blogArticles2026 = [
 
 <h3>La estrategia del target único</h3>
 
-<p>En 2026, la recomendación de la industria es simple: <strong>masteriza a -10 LUFS integrado con -1 dBTP true peak</strong>.</p>
+<p>En 2026, la recomendación de la industria es simple: <strong>masteriza a -16 LUFS integrado con -1 dBTP true peak</strong>.</p>
 
-<p><strong>¿Por qué -10 LUFS?</strong></p>
+<p><strong>¿Por qué -16 LUFS?</strong></p>
 <ul>
 <li>Más fuerte que cualquier target de plataforma</li>
 <li>Plataformas solo bajan volumen, nunca suben</li>
@@ -1110,9 +1110,9 @@ export const blogArticles2026 = [
 <ol>
 <li>Establece ceiling a -1 dBTP</li>
 <li>Sube el input gain gradualmente</li>
-<li>Monitorea integrated LUFS hasta alcanzar -10 LUFS</li>
+<li>Monitorea integrated LUFS hasta alcanzar -16 LUFS</li>
 <li>Verifica que gain reduction no exceda 4-6 dB</li>
-<li>Si necesitas más de 6 dB de reduction, tu mezcla es muy dinámica para -10 LUFS (considera -12 o -14 LUFS)</li>
+<li>Si necesitas más de 6 dB de reduction, tu mezcla es muy dinámica para -16 LUFS (considera -12 o -14 LUFS)</li>
 </ol>
 
 <h3>Errores comunes en 2026</h3>
@@ -1139,7 +1139,7 @@ export const blogArticles2026 = [
 <ol>
 <li><strong>Mediciones técnicas:</strong>
   <ul>
-    <li>Integrated LUFS: -8 a -12 LUFS (ideal: -10 LUFS)</li>
+    <li>Integrated LUFS: -8 a -12 LUFS (ideal: -16 LUFS)</li>
     <li>True Peak: nunca excede -1 dBTP</li>
     <li>Dynamic Range: apropiado para el género</li>
   </ul>
@@ -1174,7 +1174,7 @@ export const blogArticles2026 = [
 <p>La IA ha transformado el mastering haciéndolo accesible:</p>
 
 <h4>MixingMusic.AI</h4>
-<p>Mastering automático a -10 LUFS con análisis de género y optimización espectral. Gratis.</p>
+<p>Mastering automático a -16 LUFS con análisis de género y optimización espectral. Gratis.</p>
 
 <h4>LANDR</h4>
 <p>Servicio pionero, mejorado con modelos de deep learning. ~$10/master.</p>
@@ -1208,7 +1208,7 @@ export const blogArticles2026 = [
 
 <p>El mastering en 2026 se reduce a tres números:</p>
 <ul>
-<li><strong>-10 LUFS</strong> integrated</li>
+<li><strong>-16 LUFS</strong> integrated</li>
 <li><strong>-1 dBTP</strong> true peak ceiling</li>
 <li><strong>DR 6-12</strong> según género</li>
 </ul>
@@ -1962,12 +1962,12 @@ Solución: Oídos primero, analyzer como confirmación</p>
 </ul>
 
 <h4>Transparencia en limiting</h4>
-<p><strong>Objetivo:</strong> Alcanzar -10 LUFS sin distorsión audible</p>
+<p><strong>Objetivo:</strong> Alcanzar -16 LUFS sin distorsión audible</p>
 
 <p><strong>Test de transparencia:</strong></p>
 <ol>
 <li>Exporta master con limiter</li>
-<li>Reduce volume -10 dB</li>
+<li>Reduce volume -16 dB</li>
 <li>Compara con pre-master a mismo volume</li>
 <li>Si escuchas distorsión/pumping, limiter es muy agresivo</li>
 </ol>
@@ -2030,7 +2030,7 @@ Solución: Oídos primero, analyzer como confirmación</p>
 <ul>
 <li><strong>Vocal:</strong> 1176 fast (4:1, 4-6 dB GR)</li>
 <li><strong>Bus drums:</strong> SSL comp (2:1, 2-3 dB GR)</li>
-<li><strong>Master:</strong> Soft knee comp (2:1, 1-2 dB GR) → Limiting a -10 LUFS</li>
+<li><strong>Master:</strong> Soft knee comp (2:1, 1-2 dB GR) → Limiting a -16 LUFS</li>
 </ul>
 
 <h4>Rock/Metal</h4>
@@ -2115,7 +2115,7 @@ Solución: Oídos primero, analyzer como confirmación</p>
 <ul>
 <li>Compress para musicality y control</li>
 <li>Preserve dinámica (target DR 7-10)</li>
-<li>-10 LUFS es estándar</li>
+<li>-16 LUFS es estándar</li>
 <li>Platforms normalize anyway</li>
 </ul>
 

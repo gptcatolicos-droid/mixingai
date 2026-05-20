@@ -218,32 +218,60 @@ export default function MixEditor({ stems, user, onBack, onExport }: MixEditorPr
       </div>
 
       {/* Main Workspace */}
-      <div className="main">
-        <div className="workspace">
-          {/* Presets */}
-          <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(192,38,211,0.1)', background: 'rgba(8,4,16,0.5)' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: '#9B7EC8', marginBottom: '8px' }}>PRESETS — TOCA PARA APLICAR</div>
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-              {['Pop', 'Rock', 'Hip Hop', 'Reggaeton', 'Clásica'].map(g => (
-                <button key={g} style={{ padding: '8px 16px', background: 'rgba(192,38,211,0.15)', border: '1px solid rgba(192,38,211,0.3)', borderRadius: '8px', fontSize: '12px', fontWeight: 600, color: '#EC4899', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  📊 {g}
+      <div className="main" style={{ display: 'flex', flex: 1, overflow: 'hidden', background: 'rgba(8,4,16,0.3)' }}>
+        <div className="workspace" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+          {/* Presets Section */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(192,38,211,0.1)', background: 'rgba(8,4,16,0.8)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#9B7EC8', marginBottom: '12px' }}>PRESETS — TOCA PARA APLICAR Y ESCUCHAR EN TIEMPO REAL</div>
+            <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
+              {['Pop', 'Rock', 'Hip Hop', 'Reggaeton', 'Dance/EDM', 'Clásica', 'Balada', 'Acústico', 'Gospel'].map((g, i) => (
+                <button key={g} style={{ 
+                  padding: '10px 16px', 
+                  background: i === 0 ? 'rgba(192,38,211,0.25)' : 'rgba(26,16,40,0.8)',
+                  border: `1px solid ${i === 0 ? 'rgba(192,38,211,0.5)' : 'rgba(192,38,211,0.2)'}`,
+                  borderRadius: '8px', 
+                  fontSize: '12px', 
+                  fontWeight: 600, 
+                  color: i === 0 ? '#EC4899' : '#9B7EC8',
+                  cursor: 'pointer', 
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <div style={{ width: '40px', height: '30px', background: `linear-gradient(180deg, ${TRACK_COLORS[i % TRACK_COLORS.length]}, transparent)`, borderRadius: '3px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '2px', fontSize: '8px' }}>
+                    {[0.3, 0.5, 0.7, 0.6].map((h, j) => <div key={j} style={{ width: '4px', height: `${h*28}px`, background: TRACK_COLORS[i % TRACK_COLORS.length], borderRadius: '1px' }} />)}
+                  </div>
+                  <span>{g}</span>
+                  <span style={{ fontSize: '9px', color: '#6e3ff3' }}>{(Math.random()*3).toFixed(1)}dB</span>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Mix Bus Master */}
-          <div style={{ padding: '20px', borderBottom: '1px solid rgba(192,38,211,0.1)', background: 'rgba(26,16,40,0.5)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#F5F7FA', marginBottom: '12px' }}>🎛️ MIX BUS MASTER</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
-              {/* EQ */}
+          <div style={{ padding: '20px', borderBottom: '1px solid rgba(192,38,211,0.1)', background: 'rgba(26,16,40,0.6)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#F5F7FA', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '16px' }}>🎛️</span>
+              MIX BUS MASTER
+              <span style={{ fontSize: '11px', background: 'rgba(192,38,211,0.2)', padding: '2px 8px', borderRadius: '4px', color: '#EC4899' }}>✦ Pop</span>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '24px' }}>
+              {/* EQ Section */}
               <div>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9B7EC8', marginBottom: '8px' }}>EQ — AJUSTA PARA ESCUCHAR</div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9B7EC8', marginBottom: '12px' }}>EQ — AJUSTA PARA ESCUCHAR</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {['Bass', 'Mid', 'High'].map(band => (
-                    <div key={band} style={{ flex: 1 }}>
-                      <div style={{ height: '80px', background: 'rgba(8,4,16,0.4)', borderRadius: '4px', border: '1px solid rgba(192,38,211,0.1)', marginBottom: '4px' }} />
-                      <div style={{ fontSize: '10px', color: '#9B7EC8', textAlign: 'center' }}>{band}</div>
+                    <div key={band}>
+                      <div style={{ fontSize: '10px', color: '#9B7EC8', marginBottom: '4px' }}>{band}</div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ flex: 1, height: '4px', background: 'rgba(192,38,211,0.2)', borderRadius: '2px', position: 'relative' }}>
+                          <div style={{ position: 'absolute', left: '50%', top: '0', width: '60%', height: '100%', background: 'linear-gradient(90deg, #EC4899, #C026D3)', borderRadius: '2px' }} />
+                        </div>
+                        <span style={{ fontSize: '11px', color: '#EC4899', fontWeight: 600, minWidth: '30px' }}>+2dB</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -251,40 +279,73 @@ export default function MixEditor({ stems, user, onBack, onExport }: MixEditorPr
 
               {/* Effects */}
               <div>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9B7EC8', marginBottom: '8px' }}>EFECTOS</div>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9B7EC8', marginBottom: '12px' }}>EFECTOS</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {['Reverb', 'Delay', 'Widener'].map(fx => (
-                    <label key={fx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#F5F7FA' }}>
-                      <input type="checkbox" defaultChecked style={{ cursor: 'pointer' }} />
-                      {fx}
-                    </label>
+                  {['Reverb', 'Delay', 'Widener'].map((fx, idx) => (
+                    <div key={fx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input type="checkbox" defaultChecked={idx < 2} style={{ cursor: 'pointer', width: '16px', height: '16px' }} />
+                      <span style={{ fontSize: '11px', color: '#F5F7FA' }}>{fx}</span>
+                      <span style={{ fontSize: '9px', color: '#6e3ff3', marginLeft: 'auto' }}>{idx === 0 ? '0% Espacio' : idx === 1 ? '0% UA beat' : '50% Estéreo'}</span>
+                    </div>
                   ))}
                 </div>
               </div>
 
               {/* Compression */}
               <div>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9B7EC8', marginBottom: '8px' }}>COMPRESIÓN</div>
-                <div style={{ background: 'rgba(8,4,16,0.4)', padding: '8px', borderRadius: '4px', border: '1px solid rgba(192,38,211,0.1)' }}>
-                  <div style={{ fontSize: '11px', color: '#F5F7FA', marginBottom: '4px' }}>Medium</div>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9B7EC8', marginBottom: '12px' }}>COMPRESIÓN</div>
+                <div style={{ background: 'rgba(8,4,16,0.5)', padding: '12px', borderRadius: '6px', border: '1px solid rgba(192,38,211,0.15)' }}>
+                  <div style={{ fontSize: '11px', color: '#F5F7FA', marginBottom: '8px', fontWeight: 600 }}>Medium</div>
                   <div style={{ fontSize: '10px', color: '#9B7EC8' }}>Thr: -18dB -6.1</div>
+                  <div style={{ fontSize: '10px', color: '#9B7EC8', marginTop: '4px' }}>GR Meter</div>
                 </div>
               </div>
 
               {/* LUFS */}
               <div>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9B7EC8', marginBottom: '8px' }}>LUFS</div>
-                <div style={{ background: 'rgba(8,4,16,0.4)', padding: '8px', borderRadius: '4px', border: '1px solid rgba(192,38,211,0.1)', textAlign: 'center' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#4ade80', marginBottom: '2px' }}>-10.0</div>
-                  <div style={{ fontSize: '9px', color: '#9B7EC8' }}>Spotify -10</div>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9B7EC8', marginBottom: '12px' }}>LUFS</div>
+                <div style={{ background: 'rgba(8,4,16,0.5)', padding: '12px', borderRadius: '6px', border: '1px solid rgba(192,38,211,0.15)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#4ade80', marginBottom: '4px' }}>-16.0</div>
+                  <div style={{ fontSize: '9px', color: '#9B7EC8' }}>Spotify -16</div>
+                  <div style={{ fontSize: '9px', color: '#9B7EC8', marginTop: '2px' }}>YouTube -16</div>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* IA EQ Section */}
+          <div style={{ padding: '20px', borderBottom: '1px solid rgba(192,38,211,0.1)', background: 'rgba(26,16,40,0.4)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#F5F7FA', marginBottom: '12px' }}>🎚️ IA EQ — DEFAULT</div>
+            <div style={{ fontSize: '10px', color: '#9B7EC8', marginBottom: '12px' }}>Acción en tiempo real - se ajusta cada la mezcla - 20 LUFS</div>
+            
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', overflowX: 'auto', paddingBottom: '4px' }}>
+              {['Default', 'Car', 'iPhone', 'MacBook', 'Headphones', 'TV', 'Home Theater', 'Bluetooth', 'Studio Monitors', 'Gaming Headset', 'Tablet'].map(dev => (
+                <button key={dev} style={{ padding: '6px 14px', background: dev === 'Default' ? 'rgba(192,38,211,0.25)' : 'rgba(26,16,40,0.8)', border: `1px solid ${dev === 'Default' ? 'rgba(192,38,211,0.4)' : 'rgba(192,38,211,0.1)'}`, borderRadius: '6px', fontSize: '10px', color: dev === 'Default' ? '#EC4899' : '#9B7EC8', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  {dev}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px', marginBottom: '12px' }}>
+              {['Pro', '300', '500', '1000', '3000', '6000', '9k0', '3k0', '6k0', '9kHz', '12kHz', '16kHz'].map((freq, i) => (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ width: '100%', height: '40px', background: 'rgba(192,38,211,0.1)', borderRadius: '3px', border: '1px solid rgba(192,38,211,0.15)', position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '2px' }}>
+                    <div style={{ width: '80%', height: `${30 + Math.sin(i) * 20}px`, background: `linear-gradient(180deg, #8B5CF6, #6e3ff3)`, borderRadius: '2px' }} />
+                  </div>
+                  <span style={{ fontSize: '9px', color: '#9B7EC8' }}>{freq}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ fontSize: '10px', color: '#6e3ff3', textAlign: 'center' }}>
+              <span style={{ display: 'inline-block', width: '8px', height: '8px', background: '#6e3ff3', borderRadius: '50%', marginRight: '4px' }} />
+              Live
+            </div>
+          </div>
+
           {/* Track Cards */}
-          <div style={{ padding: '20px', overflowY: 'auto', flex: 1, background: 'rgba(8,4,16,0.3)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+          <div style={{ padding: '20px', overflowY: 'auto', flex: 1, background: 'rgba(8,4,16,0.2)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
               {tracks.map((track, idx) => (
                 <TrackCard key={track.id} track={track} idx={idx} selected={selected === track.id} onSelect={() => setSelected(track.id)} />
               ))}

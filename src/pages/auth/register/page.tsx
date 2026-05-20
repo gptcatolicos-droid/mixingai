@@ -166,7 +166,7 @@ const RegisterPage: React.FC = () => {
             <div style={{ fontSize:'12px', color:'rgba(248,240,255,0.65)', lineHeight:1.9 }}>
               <div>✦ 1 mezcla gratis al registrarte — sin tarjeta</div>
               <div>✦ Mezclador IA + 9 presets de género musical</div>
-              <div>✦ IA EQ 12 bandas · WAV 24-bit a -10 LUFS</div>
+              <div>✦ IA EQ 12 bandas · WAV 24-bit a -16 LUFS</div>
               <div>✦ Mezclas ilimitadas por $3.99 pago único</div>
             </div>
           </div>

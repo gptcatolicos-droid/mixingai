@@ -147,7 +147,7 @@ export default function AIGenerator({ user, onBack, onCreditsUpdate, onTrackRead
       { pct: 58, text: 'Sintetizando instrumentos y timbre…' },
       { pct: 70, text: 'Añadiendo dinámica y efectos…' },
       { pct: 82, text: 'Mezclando stems generados…' },
-      { pct: 90, text: 'Aplicando master -10 LUFS…' },
+      { pct: 90, text: 'Aplicando master -16 LUFS…' },
     ];
 
     let stepIdx = 0;
