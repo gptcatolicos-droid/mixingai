@@ -1,3 +1,7 @@
+/* Claude Design System - V45 */
+@import './styles/claude-tokens.css';
+@import './styles/claude-design.css';
+
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
 @tailwind base;
@@ -118,3 +122,7 @@ a, button { -webkit-tap-highlight-color: transparent; }
     grid-template-columns: 1fr;
   }
 }
+
+/* Claude Design System - V45 */
+@import './styles/claude-tokens.css';
+@import './styles/claude-design.css';
