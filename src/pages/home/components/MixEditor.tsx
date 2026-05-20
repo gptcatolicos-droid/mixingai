@@ -1,56 +1,56 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import UpgradeModal from './UpgradeModal';
-import Header from '@/components/feature/Header';
 import UploadModal from '@/components/feature/UploadModal';
-import { drawFFTAnalyzer, drawMiniFFT } from '@/utils/drawFFT';
-import { drawWaveform, handleWaveformClick } from '@/utils/drawWaveform';
+import { drawFFTAnalyzer } from '@/utils/drawFFT';
+import { drawWaveform } from '@/utils/drawWaveform';
+import { MixPreset, PRESETS } from './mixTypes';
+import '@/styles/mixer-tokens.css';
+import '@/styles/mixer-studio.css';
 
+/* ─── Types ─── */
 interface User {
   id: string; firstName: string; lastName: string; email: string;
   country: string; credits: number; provider?: string; createdAt: string;
   username?: string; avatar?: string;
 }
+
+interface StemPlugins {
+  compressor: boolean;
+  reverb: boolean;
+  delay: boolean;
+  tape: boolean;
+  noiseReduction: boolean;
+}
+
 interface Stem {
   id: string; name: string; file: File; buffer: AudioBuffer;
   gainNode: GainNode; panNode: StereoPannerNode; analyserNode: AnalyserNode;
   eqLow: BiquadFilterNode; eqMid: BiquadFilterNode; eqHigh: BiquadFilterNode;
-  sourceNode?: AudioBufferSourceNode; volume: number; pan: number;
-  muted: boolean; fftData: Uint8Array; waveformPeaks: Float32Array;
+  compressorNode: DynamicsCompressorNode;
+  reverbNode: ConvolverNode; reverbWet: GainNode; reverbDry: GainNode;
+  delayNode: DelayNode; delayWet: GainNode; delayFeedback: GainNode;
+  tapeShaper: WaveShaperNode;
+  noiseGate: BiquadFilterNode;
+  sourceNode?: AudioBufferSourceNode;
+  volume: number; pan: number; muted: boolean;
+  fftData: Uint8Array; waveformPeaks: Float32Array;
   instrument: string; icon: string; selected: boolean;
   stemPresetId: string | null;
+  plugins: StemPlugins;
 }
 
-const detectInstrument = (filename: string): { instrument: string; icon: string } => {
-  const n = filename.toLowerCase().replace(/[_\-\.]/g,' ');
-  if (/voz|voc|vocal|lead|singer|coro|choir|bgv|bg voc|backing/.test(n)) return { instrument:'Voz', icon:'🎤' };
-  if (/kick|bombo|drum|perc|beat|snare|hi.hat|hihat|cymbal|rimshot/.test(n)) return { instrument:'Batería', icon:'🥁' };
-  if (/bass|bajo|808|sub/.test(n)) return { instrument:'Bajo', icon:'🎸' };
-  if (/guitar|guitarra|gtr|electric|acoustic/.test(n)) return { instrument:'Guitarra', icon:'🎸' };
-  if (/piano|keys|keyboard|teclado|synth|pad|organ/.test(n)) return { instrument:'Teclado', icon:'🎹' };
-  if (/brass|trumpet|trompeta|horn|tromb|sax/.test(n)) return { instrument:'Viento', icon:'🎺' };
-  if (/string|violin|viola|cello|orquesta/.test(n)) return { instrument:'Cuerda', icon:'🎻' };
-  if (/fx|effect|efecto|noise|amb|reverb/.test(n)) return { instrument:'FX', icon:'🎛️' };
-  return { instrument:'Pista', icon:'🎵' };
-};
-
-import { MixPreset, PRESETS } from './PresetScreen';
-
-// =============================================
-// IA EQ — 12 BANDS (same as Audio Lab)
-// =============================================
 interface IAEQPreset { id: string; name: string; bands: number[]; }
 const IAEQ_PRESETS: IAEQPreset[] = [
-  { id:'default',  name:'Default',          bands:[0,0,0,0,0,0,0,0,0,0,0,0] },
-  { id:'car',      name:'Car',              bands:[0,3,4,2,1,0,-1,0,1,2,2,1] },
-  { id:'iphone',   name:'iPhone',           bands:[0,-2,-1,0,1,2,2,1,0,-1,-2,-3] },
-  { id:'macbook',  name:'MacBook',          bands:[0,-3,-2,0,1,2,2,1,-1,-2,-3,-4] },
-  { id:'headphones',name:'Headphones',      bands:[0,2,3,1,0,-1,0,1,2,3,3,2] },
-  { id:'tv',       name:'TV',               bands:[0,-4,-3,-1,0,2,3,2,1,0,-1,-2] },
-  { id:'theater',  name:'Home Theater',     bands:[0,5,4,3,1,0,-1,0,1,3,2,1] },
-  { id:'bt',       name:'Bluetooth',        bands:[0,4,5,3,1,-1,-2,-1,0,1,1,0] },
-  { id:'studio',   name:'Studio Monitors',  bands:[0,0,0,0,0,0,0,0,0,0,0,0] },
-  { id:'gaming',   name:'Gaming Headset',   bands:[0,3,2,1,0,0,1,2,3,4,3,2] },
-  { id:'tablet',   name:'Tablet',           bands:[0,-2,-2,0,1,2,2,1,0,-1,-2,-3] },
+  { id:'default',  name:'Default',        bands:[0,0,0,0,0,0,0,0,0,0,0,0] },
+  { id:'car',      name:'Car',            bands:[0,3,4,2,1,0,-1,0,1,2,2,1] },
+  { id:'iphone',   name:'iPhone',         bands:[0,-2,-1,0,1,2,2,1,0,-1,-2,-3] },
+  { id:'macbook',  name:'MacBook',        bands:[0,-3,-2,0,1,2,2,1,-1,-2,-3,-4] },
+  { id:'headphones',name:'Headphones',    bands:[0,2,3,1,0,-1,0,1,2,3,3,2] },
+  { id:'tv',       name:'TV',             bands:[0,-4,-3,-1,0,2,3,2,1,0,-1,-2] },
+  { id:'theater',  name:'Home Theater',   bands:[0,5,4,3,1,0,-1,0,1,3,2,1] },
+  { id:'bt',       name:'Bluetooth',      bands:[0,4,5,3,1,-1,-2,-1,0,1,1,0] },
+  { id:'studio',   name:'Studio Monitors',bands:[0,0,0,0,0,0,0,0,0,0,0,0] },
+  { id:'gaming',   name:'Gaming Headset', bands:[0,3,2,1,0,0,1,2,3,4,3,2] },
+  { id:'tablet',   name:'Tablet',         bands:[0,-2,-2,0,1,2,2,1,0,-1,-2,-3] },
 ];
 const IAEQ_BANDS = [
   { label:'Pre',   freq:null,  type:'gain'      as const },
@@ -67,6 +67,34 @@ const IAEQ_BANDS = [
   { label:'16kHz', freq:16000, type:'highshelf' as const },
 ];
 
+const detectInstrument = (filename: string): { instrument: string; icon: string } => {
+  const n = filename.toLowerCase().replace(/[_\-\.]/g,' ');
+  if (/voz|voc|vocal|lead|singer|coro|choir|bgv|bg voc|backing/.test(n)) return { instrument:'Voz', icon:'🎤' };
+  if (/kick|bombo|drum|perc|beat|snare|hi.hat|hihat|cymbal|rimshot/.test(n)) return { instrument:'Batería', icon:'🥁' };
+  if (/bass|bajo|808|sub/.test(n)) return { instrument:'Bajo', icon:'🎸' };
+  if (/guitar|guitarra|gtr|electric|acoustic/.test(n)) return { instrument:'Guitarra', icon:'🎸' };
+  if (/piano|keys|keyboard|teclado|synth|pad|organ/.test(n)) return { instrument:'Teclado', icon:'🎹' };
+  if (/brass|trumpet|trompeta|horn|tromb|sax/.test(n)) return { instrument:'Viento', icon:'🎺' };
+  if (/string|violin|viola|cello|orquesta/.test(n)) return { instrument:'Cuerda', icon:'🎻' };
+  if (/fx|effect|efecto|noise|amb/.test(n)) return { instrument:'FX', icon:'🎛️' };
+  return { instrument:'Pista', icon:'🎵' };
+};
+
+function makeTapeCurve(): Float32Array {
+  const n = 257, curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / (n - 1) - 1;
+    curve[i] = (Math.PI + 100) * x / (Math.PI + 100 * Math.abs(x));
+  }
+  return curve;
+}
+
+function makeIdentityCurve(): Float32Array {
+  const n = 257, curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) curve[i] = (i * 2) / (n - 1) - 1;
+  return curve;
+}
+
 interface MixEditorProps {
   projectId: string; user: User; uploadedFiles: File[];
   onBack: () => void; onCreditsUpdate: (n: number) => void;
@@ -75,174 +103,179 @@ interface MixEditorProps {
   reverbOn?: boolean; delayOn?: boolean; stereoOn?: boolean;
 }
 
-// =============================================
-// PAYWALL MODAL — registration required, real payments
-// =============================================
+/* ─── Paywall Modal — untouched ─── */
 function PaywallModal({ onClose, onSuccess }: { onClose:()=>void; onSuccess:()=>void }) {
   const [step, setStep] = useState<'choose'|'processing'|'done'>('choose');
   const [method, setMethod] = useState<'paypal'|'mp'|null>(null);
   const [mpError, setMpError] = useState('');
-
-  // Check if user is registered
-  const getUser = () => {
-    try { const s = localStorage.getItem('audioMixerUser'); return s ? JSON.parse(s) : null; } catch { return null; }
-  };
-
-  const markPro = () => {
-    try {
-      const stored = localStorage.getItem('audioMixerUser');
-      const u = stored ? JSON.parse(stored) : {};
-      u.is_pro = true; u.plan = 'unlimited';
-      localStorage.setItem('audioMixerUser', JSON.stringify(u));
-      localStorage.removeItem('mixingai_used_free');
-    } catch {}
-  };
-
+  const getUser = () => { try { const s = localStorage.getItem('audioMixerUser'); return s ? JSON.parse(s) : null; } catch { return null; } };
+  const markPro = () => { try { const stored = localStorage.getItem('audioMixerUser'); const u = stored ? JSON.parse(stored) : {}; u.is_pro = true; u.plan = 'unlimited'; localStorage.setItem('audioMixerUser', JSON.stringify(u)); localStorage.removeItem('mixingai_used_free'); } catch {} };
   const pay = async (m: 'paypal'|'mp') => {
-    const u = getUser();
-    setMethod(m); setStep('processing'); setMpError('');
-
-    if (m === 'paypal') {
-      window.location.href = 'https://www.paypal.com/ncp/payment/HDU4UAXJCNVXW';
-      return;
-    }
-
-    // ── MercadoPago — llamada directa a la API (sin Edge Function) ──
+    const u = getUser(); setMethod(m); setStep('processing'); setMpError('');
+    if (m === 'paypal') { window.location.href = 'https://www.paypal.com/ncp/payment/HDU4UAXJCNVXW'; return; }
     try {
       const MP_TOKEN = (import.meta as any).env?.VITE_MP_ACCESS_TOKEN;
-      if (!MP_TOKEN) throw new Error('MercadoPago no configurado. Contacta support@mixingmusic.ai');
-
+      if (!MP_TOKEN) throw new Error('MercadoPago no configurado');
       const userEmail = u?.email || 'cliente@mixingmusic.ai';
-      const userId    = u?.id    || u?.email || 'guest';
-
+      const userId = u?.id || u?.email || 'guest';
       const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${MP_TOKEN}`,
-        },
-        body: JSON.stringify({
-          items: [{
-            id: 'unlimited_mixes',
-            title: 'MixingMusic.AI — Mezclas Ilimitadas',
-            description: 'Acceso ilimitado al mezclador IA + IA EQ 12 bandas',
-            quantity: 1,
-            unit_price: 3.99,
-            currency_id: 'USD',
-          }],
-          payer: { email: userEmail },
-          external_reference: userId,
-          back_urls: {
-            success: `${window.location.origin}/payment-confirmation?status=success&provider=mp`,
-            failure: `${window.location.origin}/payment-confirmation?status=failed&provider=mp`,
-            pending: `${window.location.origin}/payment-confirmation?status=pending&provider=mp`,
-          },
-          auto_return: 'approved',
-          statement_descriptor: 'MIXINGMUSIC',
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MP_TOKEN}` },
+        body: JSON.stringify({ items: [{ id:'unlimited_mixes', title:'MixingMusic.AI — Mezclas Ilimitadas', description:'Acceso ilimitado al mezclador IA', quantity:1, unit_price:3.99, currency_id:'USD' }], payer:{ email:userEmail }, external_reference:userId, back_urls:{ success:`${window.location.origin}/payment-confirmation?status=success&provider=mp`, failure:`${window.location.origin}/payment-confirmation?status=failed&provider=mp`, pending:`${window.location.origin}/payment-confirmation?status=pending&provider=mp` }, auto_return:'approved', statement_descriptor:'MIXINGMUSIC' }),
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        const errMsg = data?.message || data?.error || JSON.stringify(data);
-        throw new Error(errMsg);
-      }
-
+      if (!res.ok) throw new Error(data?.message || data?.error || JSON.stringify(data));
       const mpUrl = data?.init_point || data?.sandbox_init_point;
-      if (mpUrl) {
-        window.location.href = mpUrl;
-      } else {
-        throw new Error('MercadoPago no devolvió URL de pago');
-      }
-    } catch (e: any) {
-      setMpError(e.message || 'Error al conectar con Mercado Pago');
-      setStep('choose');
-    }
+      if (mpUrl) { window.location.href = mpUrl; } else { throw new Error('MercadoPago no devolvió URL'); }
+    } catch (e: any) { setMpError(e.message || 'Error'); setStep('choose'); }
   };
-
-  const S = {
-    overlay: {position:'fixed' as const,inset:0,background:'rgba(8,4,16,0.96)',backdropFilter:'blur(14px)',zIndex:1100,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'},
-    box: {background:'linear-gradient(135deg,rgba(26,16,40,0.99),rgba(15,10,26,0.99))',border:'1px solid rgba(192,38,211,0.35)',borderRadius:'24px',padding:'36px 32px',maxWidth:'420px',width:'100%',textAlign:'center' as const,boxShadow:'0 0 60px rgba(192,38,211,0.25)'},
-    btnPP: {width:'100%',background:'#0070BA',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'15px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginBottom:'10px',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'},
-    btnMP: {width:'100%',background:'linear-gradient(135deg,#009EE3,#00B1EA)',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'15px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'},
-    btnOk: {width:'100%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'15px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'},
-  };
-
+  const ov: React.CSSProperties = { position:'fixed', inset:0, background:'rgba(5,1,10,0.96)', backdropFilter:'blur(14px)', zIndex:1100, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' };
+  const bx: React.CSSProperties = { background:'var(--panel-1)', border:'1px solid rgba(217,70,239,0.35)', borderRadius:'24px', padding:'36px 32px', maxWidth:'420px', width:'100%', textAlign:'center', boxShadow:'0 0 60px rgba(217,70,239,0.2)' };
   return (
-    <div style={S.overlay}>
-      <div style={S.box}>
-
-        {/* CHOOSE PAYMENT */}
+    <div style={ov}>
+      <div style={bx}>
         {step==='choose' && <>
           <div style={{fontSize:'36px',marginBottom:'14px'}}>🎛️</div>
-          <h2 style={{fontSize:'22px',fontWeight:800,color:'#F8F0FF',marginBottom:'6px'}}>Mezclas Ilimitadas</h2>
-          <p style={{fontSize:'13px',color:'rgba(155,126,200,0.8)',marginBottom:'4px'}}>Tu primera mezcla fue gratis.</p>
-          <p style={{fontSize:'13px',color:'rgba(155,126,200,0.8)',marginBottom:'24px'}}>
-            Desbloquea mezclas ilimitadas + IA EQ por solo{' '}
-            <span style={{color:'#EC4899',fontSize:'22px',fontWeight:800}}>$3.99</span>
-          </p>
+          <h2 style={{fontSize:'22px',fontWeight:700,color:'var(--text-primary)',marginBottom:'6px'}}>Mezclas Ilimitadas</h2>
+          <p style={{fontSize:'13px',color:'var(--text-secondary)',marginBottom:'4px'}}>Tu primera mezcla fue gratis.</p>
+          <p style={{fontSize:'13px',color:'var(--text-secondary)',marginBottom:'24px'}}>Solo <span style={{color:'var(--accent)',fontSize:'22px',fontWeight:800}}>$3.99</span></p>
           {mpError && <p style={{fontSize:'12px',color:'#f87171',marginBottom:'12px',background:'rgba(239,68,68,0.08)',padding:'8px 12px',borderRadius:'8px'}}>{mpError}</p>}
-          <button style={S.btnPP} onClick={()=>pay('paypal')}>
-            <span style={{background:'#fff',borderRadius:'4px',padding:'2px 6px',color:'#003087',fontWeight:900,fontSize:'14px'}}>P</span>
-            Pagar con PayPal
+          <button style={{width:'100%',background:'#0070BA',border:'none',color:'#fff',padding:'14px',borderRadius:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer',marginBottom:'10px',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'}} onClick={()=>pay('paypal')}>
+            <span style={{background:'#fff',borderRadius:'4px',padding:'2px 6px',color:'#003087',fontWeight:900,fontSize:'13px'}}>P</span> Pagar con PayPal
           </button>
-          <button style={S.btnMP} onClick={()=>pay('mp')}>
-            <span style={{fontSize:'18px'}}>💳</span>
-            Pagar con Mercado Pago
+          <button style={{width:'100%',background:'linear-gradient(135deg,#009EE3,#00B1EA)',border:'none',color:'#fff',padding:'14px',borderRadius:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'}} onClick={()=>pay('mp')}>
+            <span style={{fontSize:'18px'}}>💳</span> Pagar con Mercado Pago
           </button>
-          <button onClick={onClose} style={{marginTop:'14px',background:'none',border:'none',color:'rgba(155,126,200,0.4)',fontSize:'12px',cursor:'pointer',fontFamily:'inherit'}}>
-            Cancelar
-          </button>
+          <button onClick={onClose} style={{marginTop:'14px',background:'none',border:'none',color:'var(--text-muted)',fontSize:'12px',cursor:'pointer'}}>Cancelar</button>
         </>}
-
-        {/* PROCESSING */}
         {step==='processing' && <>
           <div style={{fontSize:'32px',marginBottom:'16px'}}>⏳</div>
-          <h2 style={{fontSize:'18px',fontWeight:700,color:'#F8F0FF',marginBottom:'8px'}}>Redirigiendo al pago...</h2>
-          <p style={{fontSize:'13px',color:'rgba(155,126,200,0.7)',marginBottom:'20px'}}>
-            Conectando con {method==='paypal'?'PayPal':'Mercado Pago'}...
-          </p>
-          <div style={{height:'4px',background:'rgba(192,38,211,0.15)',borderRadius:'2px',overflow:'hidden'}}>
-            <div style={{height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3)',animation:'pay-prog 2s ease forwards',borderRadius:'2px'}}></div>
+          <h2 style={{fontSize:'18px',fontWeight:700,color:'var(--text-primary)',marginBottom:'8px'}}>Redirigiendo...</h2>
+          <p style={{fontSize:'13px',color:'var(--text-secondary)',marginBottom:'20px'}}>Conectando con {method==='paypal'?'PayPal':'Mercado Pago'}...</p>
+          <div style={{height:'4px',background:'rgba(217,70,239,0.15)',borderRadius:'2px',overflow:'hidden'}}>
+            <div style={{height:'100%',background:'var(--accent-grad)',animation:'pay-prog 2s ease forwards',borderRadius:'2px'}}></div>
           </div>
           <style>{`@keyframes pay-prog{from{width:0}to{width:95%}}`}</style>
         </>}
-
-        {/* DONE (fallback if redirect doesn't happen) */}
         {step==='done' && <>
           <div style={{fontSize:'32px',marginBottom:'16px'}}>✅</div>
-          <h2 style={{fontSize:'18px',fontWeight:700,color:'#4ade80',marginBottom:'8px'}}>¡Pago exitoso!</h2>
-          <p style={{fontSize:'13px',color:'rgba(155,126,200,0.7)',marginBottom:'20px'}}>Ya tienes mezclas ilimitadas.</p>
-          <button style={S.btnOk} onClick={()=>{ markPro(); onSuccess(); }}>Continuar →</button>
+          <h2 style={{fontSize:'18px',fontWeight:700,color:'var(--green)',marginBottom:'8px'}}>¡Pago exitoso!</h2>
+          <p style={{fontSize:'13px',color:'var(--text-secondary)',marginBottom:'20px'}}>Ya tienes mezclas ilimitadas.</p>
+          <button style={{width:'100%',background:'var(--accent-grad)',border:'none',color:'#fff',padding:'14px',borderRadius:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer'}} onClick={()=>{ markPro(); onSuccess(); }}>Continuar →</button>
         </>}
-
       </div>
     </div>
   );
 }
 
-const C = {
-  page: {minHeight:'100vh',background:'transparent'},
-  card: {background:'rgba(26,16,40,0.82)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'16px',padding:'16px'},
-  label: {fontSize:'10px',fontWeight:600,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px',display:'block'},
-  mono: {fontFamily:"'DM Mono',monospace"},
-  grad: {background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'},
-  glowBtn: (disabled=false) => ({background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'10px 18px',borderRadius:'980px',fontSize:'13px',fontWeight:600,cursor:disabled?'not-allowed':'pointer',boxShadow:'0 0 16px rgba(192,38,211,0.4)',fontFamily:'inherit',opacity:disabled?0.4:1,display:'inline-flex',alignItems:'center',gap:'6px'}),
-  ghostBtn: {background:'transparent',border:'1px solid rgba(192,38,211,0.25)',color:'#9B7EC8',padding:'10px 16px',borderRadius:'980px',fontSize:'13px',cursor:'pointer',fontFamily:'inherit',display:'inline-flex',alignItems:'center',gap:'6px'},
-  track: {height:'4px',background:'rgba(36,22,54,0.75)',borderRadius:'2px',position:'relative' as const,marginTop:'4px'},
-  trackFill: (pct:number) => ({height:'100%',background:'linear-gradient(90deg,#EC4899,#7C3AED)',borderRadius:'2px',width:`${pct}%`,pointerEvents:'none' as const}),
-  progressBar: (pct:number) => ({height:'100%',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'8px',width:`${pct}%`,transition:'width 0.3s ease'}),
+/* ─── Stem Waveform Canvas ─── */
+function StemWave({ peaks, color, currentTime, duration }: { peaks: Float32Array; color: string; currentTime: number; duration: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d'); if (!ctx) return;
+    const w = canvas.width, h = canvas.height, mid = h / 2;
+    ctx.clearRect(0, 0, w, h);
+    const playedPct = duration > 0 ? currentTime / duration : 0;
+    const playedW = Math.floor(playedPct * w);
+    for (let i = 0; i < peaks.length; i++) {
+      const x = Math.floor((i / peaks.length) * w);
+      const amp = peaks[i] * (mid - 2);
+      const isPlayed = x < playedW;
+      ctx.fillStyle = isPlayed ? color : 'rgba(180,180,220,0.22)';
+      ctx.fillRect(x, mid - amp, 1, amp * 2 || 1);
+    }
+    if (playedW > 0 && playedW < w) {
+      ctx.fillStyle = color;
+      ctx.fillRect(playedW, 0, 1, h);
+    }
+  }, [peaks, currentTime, duration, color]);
+  return <canvas ref={ref} width={600} height={44} style={{ width:'100%', height:'44px', display:'block' }} />;
+}
+
+/* ─── Track color palette — hex reales (canvas no entiende CSS vars) ─── */
+const TC = ['#E36AB0','#6DCE7A','#E08254','#5B9BF4','#D9C566','#B07CF0','#4FD4D4','#9B7AE8','#E36AB0','#6DCE7A','#E08254','#5B9BF4'];
+
+/* ─── SVG Icons ─── */
+const Ico = {
+  spark: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>,
+  play:  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>,
+  stop:  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>,
+  back:  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>,
+  dl:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg>,
+  eq:    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M4 14v6M4 4v6"/><path d="M12 18v2M12 4v8"/><path d="M20 10v10M20 4v2"/><circle cx="4" cy="12" r="1.5"/><circle cx="12" cy="16" r="1.5"/><circle cx="20" cy="8" r="1.5"/></svg>,
+  plug:  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M9 3v4M15 3v4M5 7h14v6a5 5 0 01-5 5h-4a5 5 0 01-5-5V7z"/></svg>,
+  mute:  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>,
+  vol:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>,
+  more:  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>,
+  upload:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
 };
 
+/* ─── Toggle ─── */
+function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
+  return (
+    <button onClick={onChange} style={{ position:'relative', width:'36px', height:'20px', borderRadius:'10px', border:'none', cursor:'pointer', padding:0, background: on ? 'var(--accent)' : 'var(--panel-2)', transition:'background 200ms', boxShadow: on ? '0 0 8px var(--accent-glow)' : 'none', flexShrink:0 }}>
+      <span style={{ position:'absolute', top:'2px', left: on ? '18px' : '2px', width:'16px', height:'16px', borderRadius:'50%', background:'#fff', transition:'left 200ms', boxShadow:'0 1px 4px rgba(0,0,0,0.4)' }} />
+    </button>
+  );
+}
+
+/* ─── HSlider — click + drag ─── */
+function HSlider({ value, min, max, onChange, color='#D946EF' }: { value:number; min:number; max:number; onChange:(v:number)=>void; color?:string }) {
+  const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+  const ref = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+
+  const calcValue = (clientX: number) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return value;
+    return Math.max(min, Math.min(max, min + ((clientX - r.left) / r.width) * (max - min)));
+  };
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => { if (dragging.current) onChange(calcValue(e.clientX)); };
+    const onUp   = () => { dragging.current = false; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [min, max, onChange]);
+
+  return (
+    <div ref={ref}
+      style={{ position:'relative', height:'4px', background:'rgba(255,255,255,0.08)', borderRadius:'2px', cursor:'pointer', userSelect:'none' }}
+      onMouseDown={e => { dragging.current = true; onChange(calcValue(e.clientX)); }}
+      onClick={e => onChange(calcValue(e.clientX))}>
+      <div style={{ height:'100%', width:`${pct}%`, background:`linear-gradient(90deg, ${color}, #A855F7)`, borderRadius:'2px', pointerEvents:'none' }} />
+      <div style={{ position:'absolute', top:'50%', left:`${pct}%`, transform:'translate(-50%,-50%)', width:'12px', height:'12px', borderRadius:'50%', background:color, boxShadow:`0 0 8px ${color}80`, pointerEvents:'none' }} />
+    </div>
+  );
+}
+
+/* ─── Plugin Button ─── */
+function PlugBtn({ label, active, onClick }: { label:string; active:boolean; onClick:()=>void }) {
+  return (
+    <button onClick={onClick} className="stem-act-btn" style={{
+      background: active ? 'rgba(217,70,239,0.18)' : 'var(--panel-2)',
+      borderColor: active ? 'rgba(217,70,239,0.5)' : 'var(--border)',
+      color: active ? 'var(--accent)' : 'var(--text-secondary)',
+      boxShadow: active ? '0 0 8px rgba(217,70,239,0.2)' : 'none',
+      fontWeight: active ? 600 : 500,
+    }}>
+      {active ? '✦ ' : ''}{label}
+    </button>
+  );
+}
+
+/* ════════════════════════════════════════════════
+   MAIN COMPONENT
+════════════════════════════════════════════════ */
 export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCreditsUpdate, onExport, initialPreset, reverbOn=false, delayOn=false, stereoOn=false }: MixEditorProps) {
+
+  /* ─── State ─── */
   const [stems, setStems] = useState<Stem[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [masterVolume, setMasterVolume] = useState(0);
-  const [lufsIntegrated, setLufsIntegrated] = useState(-23.0);
-  const [lufsMomentary, setLufsMomentary] = useState(-23.0);
   const [bassGain, setBassGain] = useState(initialPreset?.bass ?? 0);
   const [midGain, setMidGain] = useState(initialPreset?.mid ?? 0);
   const [highGain, setHighGain] = useState(initialPreset?.high ?? 0);
@@ -256,23 +289,18 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const [reverbActive, setReverbActive] = useState(reverbOn);
   const [delayActive, setDelayActive] = useState(delayOn);
   const [widenerActive, setWidenerActive] = useState(stereoOn);
-  const [selectedStems, setSelectedStems] = useState<Set<string>>(new Set());
-  const [editingVolumeId, setEditingVolumeId] = useState<string|null>(null);
-  const [editingVolumeVal, setEditingVolumeVal] = useState('');
   const [momentaryLufs, setMomentaryLufs] = useState(-60.0);
   const [integratedLufs, setIntegratedLufs] = useState(-60.0);
   const [activePreset, setActivePreset] = useState<MixPreset|undefined>(initialPreset);
   const [allFiles, setAllFiles] = useState<File[]>(uploadedFiles);
   const [openStemPresetId, setOpenStemPresetId] = useState<string|null>(null);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [bulkDbInput, setBulkDbInput] = useState('');
-
-  // IA EQ state
   const [iaEqPreset, setIaEqPreset] = useState<IAEQPreset>(IAEQ_PRESETS[0]);
   const [iaEqBands, setIaEqBands] = useState<number[]>([...IAEQ_PRESETS[0].bands]);
-  const iaEqNodesRef = useRef<(BiquadFilterNode|GainNode)[]>([]);
+  const [activeIaTab, setActiveIaTab] = useState('default');
 
+  /* ─── Refs ─── */
+  const iaEqNodesRef = useRef<(BiquadFilterNode|GainNode)[]>([]);
   const audioContextRef = useRef<AudioContext|null>(null);
   const masterGainRef = useRef<GainNode|null>(null);
   const mixAnalyserRef = useRef<AnalyserNode|null>(null);
@@ -291,43 +319,31 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const lufsHistoryRef = useRef<number[]>([]);
   const mixFFTCanvasRef = useRef<HTMLCanvasElement>(null);
   const timelineCanvasRef = useRef<HTMLCanvasElement>(null);
-  // IA EQ insert point in audio graph
-  const iaEqInsertRef = useRef<{input:AudioNode,output:AudioNode}|null>(null);
 
   useEffect(() => { if (allFiles.length > 0) initializeAudioEngine(); }, [allFiles]);
   useEffect(() => { setAllFiles(uploadedFiles); }, [uploadedFiles]);
 
+  /* ─── IA EQ chain ─── */
   const buildIAEQChain = (ctx: AudioContext, input: AudioNode): AudioNode => {
     const nodes: (BiquadFilterNode|GainNode)[] = [];
     const pg = ctx.createGain();
     pg.gain.value = Math.pow(10, iaEqBands[0] / 20);
-    nodes.push(pg);
-    input.connect(pg);
-    let prev: AudioNode = pg;
+    nodes.push(pg); input.connect(pg); let prev: AudioNode = pg;
     for (let i = 1; i < IAEQ_BANDS.length; i++) {
-      const bd = IAEQ_BANDS[i];
-      const f = ctx.createBiquadFilter();
-      f.type = bd.type as any;
-      f.frequency.value = bd.freq!;
-      f.Q.value = 1.0;
-      f.gain.value = iaEqBands[i] ?? 0;
-      nodes.push(f);
-      prev.connect(f);
-      prev = f;
+      const bd = IAEQ_BANDS[i]; const f = ctx.createBiquadFilter();
+      f.type = bd.type as any; f.frequency.value = bd.freq!; f.Q.value = 1.0; f.gain.value = iaEqBands[i] ?? 0;
+      nodes.push(f); prev.connect(f); prev = f;
     }
-    iaEqNodesRef.current = nodes;
-    return prev;
+    iaEqNodesRef.current = nodes; return prev;
   };
 
   const updateLiveIAEQ = (bands: number[]) => {
-    const nodes = iaEqNodesRef.current;
-    if (!nodes.length) return;
+    const nodes = iaEqNodesRef.current; if (!nodes.length) return;
     (nodes[0] as GainNode).gain.value = Math.pow(10, bands[0] / 20);
-    for (let i = 1; i < Math.min(bands.length, nodes.length); i++) {
-      (nodes[i] as BiquadFilterNode).gain.value = bands[i];
-    }
+    for (let i = 1; i < Math.min(bands.length, nodes.length); i++) (nodes[i] as BiquadFilterNode).gain.value = bands[i];
   };
 
+  /* ─── Audio Engine ─── */
   const initializeAudioEngine = async () => {
     try {
       setIsLoading(true); setLoadingStep('Inicializando motor de audio...'); setLoadingProgress(10);
@@ -344,8 +360,6 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       highFilter.type='highshelf'; highFilter.frequency.value=8000; highFilter.gain.value=highGain;
       mixAnalyser.fftSize=2048; mixAnalyser.smoothingTimeConstant=0.8;
       masterGain.connect(bassFilter); bassFilter.connect(midFilter); midFilter.connect(highFilter);
-
-      // Reverb
       const reverbNode = audioContext.createConvolver();
       const reverbGain = audioContext.createGain();
       const dryGain = audioContext.createGain();
@@ -354,28 +368,16 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       for (let c=0;c<2;c++){const d=reverbBuf.getChannelData(c);for(let i=0;i<reverbLen;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/reverbLen,3.5);}
       reverbNode.buffer = reverbBuf;
       const reverbWetVal = (initialPreset?.reverbWet ?? 0) * (reverbOn ? 1 : 0);
-      reverbGain.gain.value = reverbWetVal;
-      dryGain.gain.value = 1 - reverbWetVal * 0.4;
-
-      // Delay
+      reverbGain.gain.value = reverbWetVal; dryGain.gain.value = 1 - reverbWetVal * 0.4;
       const delayNode = audioContext.createDelay(1.0);
       const delayFeedback = audioContext.createGain();
       const delayGainNode = audioContext.createGain();
       delayNode.delayTime.value = 0.25; delayFeedback.gain.value = 0.3;
       delayGainNode.gain.value = (initialPreset?.delayWet ?? 0) * (delayOn ? 1 : 0);
-
-      // IA EQ insert: highFilter → iaEQ → dryGain/reverb/delay
       const iaEqOutput = buildIAEQChain(audioContext, highFilter);
-
-      iaEqOutput.connect(dryGain);
-      iaEqOutput.connect(reverbNode);
-      reverbNode.connect(reverbGain);
-      iaEqOutput.connect(delayNode);
-      delayNode.connect(delayFeedback); delayFeedback.connect(delayNode);
-      delayNode.connect(delayGainNode);
-      dryGain.connect(mixAnalyser);
-      reverbGain.connect(mixAnalyser);
-      delayGainNode.connect(mixAnalyser);
+      iaEqOutput.connect(dryGain); iaEqOutput.connect(reverbNode); reverbNode.connect(reverbGain);
+      iaEqOutput.connect(delayNode); delayNode.connect(delayFeedback); delayFeedback.connect(delayNode); delayNode.connect(delayGainNode);
+      dryGain.connect(mixAnalyser); reverbGain.connect(mixAnalyser); delayGainNode.connect(mixAnalyser);
       mixAnalyser.connect(audioContext.destination);
       masterGain.gain.value = Math.pow(10, masterVolume/20);
       masterGainRef.current=masterGain; mixAnalyserRef.current=mixAnalyser;
@@ -392,7 +394,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           return {file,buffer:buf};
         } catch { return null; }
       }));
-      setLoadingStep('Configurando mezclador...'); setLoadingProgress(80);
+      setLoadingStep('Configurando stems y plugins...'); setLoadingProgress(80);
       const valid = decoded.filter(Boolean) as {file:File,buffer:AudioBuffer}[];
       const stemsArr: Stem[] = []; let maxDur = 0;
       for (let i=0;i<valid.length;i++) {
@@ -401,12 +403,62 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         const panNode = audioContext.createStereoPanner();
         const analyserNode = audioContext.createAnalyser();
         analyserNode.fftSize=512; analyserNode.smoothingTimeConstant=0.7;
+
+        /* Per-stem EQ */
         const eqLow=audioContext.createBiquadFilter(); eqLow.type='lowshelf'; eqLow.frequency.value=80; eqLow.gain.value=0;
         const eqMid=audioContext.createBiquadFilter(); eqMid.type='peaking'; eqMid.frequency.value=1000; eqMid.gain.value=0; eqMid.Q.value=0.8;
         const eqHigh=audioContext.createBiquadFilter(); eqHigh.type='highshelf'; eqHigh.frequency.value=8000; eqHigh.gain.value=0;
-        gainNode.connect(eqLow); eqLow.connect(eqMid); eqMid.connect(eqHigh); eqHigh.connect(panNode); panNode.connect(analyserNode); analyserNode.connect(masterGain);
+
+        /* Per-stem Compressor (bypass by default: threshold=-60) */
+        const compressorNode = audioContext.createDynamicsCompressor();
+        compressorNode.threshold.value=-60; compressorNode.ratio.value=4; compressorNode.knee.value=20;
+        compressorNode.attack.value=0.005; compressorNode.release.value=0.1;
+
+        /* Per-stem Tape (WaveShaper, bypass por defecto: identidad) */
+        const tapeShaper = audioContext.createWaveShaper();
+        tapeShaper.curve = makeIdentityCurve();
+
+        /* Per-stem Noise Gate (highpass bypass: 20Hz) */
+        const noiseGate = audioContext.createBiquadFilter();
+        noiseGate.type='highpass'; noiseGate.frequency.value=20; noiseGate.Q.value=0.5;
+
+        /* Per-stem Reverb (wet=0 by default) */
+        const stemReverbNode = audioContext.createConvolver();
+        const stemRevBuf = audioContext.createBuffer(2, audioContext.sampleRate*1.5, audioContext.sampleRate);
+        for(let c=0;c<2;c++){const d=stemRevBuf.getChannelData(c);for(let j=0;j<stemRevBuf.length;j++)d[j]=(Math.random()*2-1)*Math.pow(1-j/stemRevBuf.length,3);}
+        stemReverbNode.buffer = stemRevBuf;
+        const reverbWetNode = audioContext.createGain(); reverbWetNode.gain.value=0;
+        const reverbDryNode = audioContext.createGain(); reverbDryNode.gain.value=1;
+
+        /* Per-stem Delay (wet=0 by default) */
+        const stemDelayNode = audioContext.createDelay(1.0); stemDelayNode.delayTime.value=0.25;
+        const delayWetNode = audioContext.createGain(); delayWetNode.gain.value=0;
+        const delayFbNode = audioContext.createGain(); delayFbNode.gain.value=0.3;
+
+        /* Chain: gainNode → eqLow → eqMid → eqHigh → compressor → tape → noiseGate
+                  → reverbDry → panNode → analyserNode → masterGain
+                  noiseGate → reverbNode → reverbWet → panNode
+                  noiseGate → delay → delayWet → panNode           */
+        gainNode.connect(eqLow); eqLow.connect(eqMid); eqMid.connect(eqHigh);
+        eqHigh.connect(compressorNode); compressorNode.connect(tapeShaper); tapeShaper.connect(noiseGate);
+        noiseGate.connect(reverbDryNode);
+        noiseGate.connect(stemReverbNode); stemReverbNode.connect(reverbWetNode);
+        noiseGate.connect(stemDelayNode); stemDelayNode.connect(delayFbNode); delayFbNode.connect(stemDelayNode); stemDelayNode.connect(delayWetNode);
+        reverbDryNode.connect(panNode); reverbWetNode.connect(panNode); delayWetNode.connect(panNode);
+        panNode.connect(analyserNode); analyserNode.connect(masterGain);
+
         const {instrument,icon} = detectInstrument(file.name);
-        stemsArr.push({id:`stem-${i}`,name:file.name,file,buffer,gainNode,panNode,analyserNode,eqLow,eqMid,eqHigh,volume:0,pan:0,muted:false,fftData:new Uint8Array(analyserNode.frequencyBinCount),waveformPeaks:generateWaveformPeaks(buffer,400),instrument,icon,selected:false,stemPresetId:null});
+        stemsArr.push({
+          id:`stem-${i}`, name:file.name, file, buffer, gainNode, panNode, analyserNode,
+          eqLow, eqMid, eqHigh, compressorNode, tapeShaper, noiseGate,
+          reverbNode: stemReverbNode, reverbWet: reverbWetNode, reverbDry: reverbDryNode,
+          delayNode: stemDelayNode, delayWet: delayWetNode, delayFeedback: delayFbNode,
+          volume:0, pan:0, muted:false,
+          fftData: new Uint8Array(analyserNode.frequencyBinCount),
+          waveformPeaks: generateWaveformPeaks(buffer, 400),
+          instrument, icon, selected:false, stemPresetId:null,
+          plugins: { compressor:false, reverb:false, delay:false, tape:false, noiseReduction:false },
+        });
         maxDur = Math.max(maxDur, buffer.duration);
       }
       setStems(stemsArr); setDuration(maxDur); startFFTAnimation();
@@ -415,6 +467,34 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     } catch(e) { console.error(e); setIsLoading(false); }
   };
 
+  /* ─── Plugin toggle (on/off via audio param changes) ─── */
+  const toggleStemPlugin = (stemId: string, plugin: keyof StemPlugins) => {
+    const ctx = audioContextRef.current;
+    setStems(prev => prev.map(s => {
+      if (s.id !== stemId) return s;
+      const next = !s.plugins[plugin];
+      const t = ctx?.currentTime ?? 0;
+      if (plugin === 'compressor') {
+        s.compressorNode.threshold.setTargetAtTime(next ? -18 : -60, t, 0.02);
+      }
+      if (plugin === 'reverb') {
+        s.reverbWet.gain.setTargetAtTime(next ? 0.3 : 0, t, 0.05);
+        s.reverbDry.gain.setTargetAtTime(next ? 0.8 : 1, t, 0.05);
+      }
+      if (plugin === 'delay') {
+        s.delayWet.gain.setTargetAtTime(next ? 0.25 : 0, t, 0.05);
+      }
+      if (plugin === 'tape') {
+        s.tapeShaper.curve = next ? makeTapeCurve() : makeIdentityCurve();
+      }
+      if (plugin === 'noiseReduction') {
+        s.noiseGate.frequency.setTargetAtTime(next ? 80 : 20, t, 0.02);
+      }
+      return { ...s, plugins: { ...s.plugins, [plugin]: next } };
+    }));
+  };
+
+  /* ─── Preset + EQ ─── */
   const applyPresetToAudio = (preset: MixPreset) => {
     const ctx = audioContextRef.current; if (!ctx) return;
     const t=ctx.currentTime, s=0.08;
@@ -432,46 +512,18 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
   const toggleReverb = () => {
     const v=!reverbOnRef.current; reverbOnRef.current=v;
-    const ctx=audioContextRef.current; if(!ctx||!activePreset) return;
-    const rvWet=activePreset.reverbWet*(v?1:0);
+    const ctx=audioContextRef.current; if(!ctx) return;
+    const rvWet=(activePreset?.reverbWet ?? 0.15)*(v?1:0);
     reverbGainRef.current?.gain.setTargetAtTime(rvWet,ctx.currentTime,0.05);
     dryGainRef.current?.gain.setTargetAtTime(1-rvWet*0.4,ctx.currentTime,0.05);
     setReverbActive(v);
   };
   const toggleDelay = () => {
     const v=!delayOnRef.current; delayOnRef.current=v;
-    const ctx=audioContextRef.current; if(!ctx||!activePreset) return;
-    delayGainRef.current?.gain.setTargetAtTime(activePreset.delayWet*(v?1:0),ctx.currentTime,0.05);
+    const ctx=audioContextRef.current; if(!ctx) return;
+    delayGainRef.current?.gain.setTargetAtTime((activePreset?.delayWet ?? 0.2)*(v?1:0),ctx.currentTime,0.05);
     setDelayActive(v);
   };
-
-  const generateWaveformPeaks = (buffer:AudioBuffer,samples:number):Float32Array => {
-    const peaks=new Float32Array(samples),cd=buffer.getChannelData(0),ss=Math.floor(cd.length/samples);
-    for(let i=0;i<samples;i++){let mx=0;for(let j=i*ss;j<Math.min((i+1)*ss,cd.length);j++)mx=Math.max(mx,Math.abs(cd[j]));peaks[i]=mx;}
-    return peaks;
-  };
-
-  const startFFTAnimation = useCallback(()=>{
-    const update=()=>{
-      const ma=mixAnalyserRef.current,fd=mixFftDataRef.current;
-      if(ma&&fd){
-        ma.getByteFrequencyData(fd);
-        setStems(prev=>prev.map(s=>{s.analyserNode.getByteFrequencyData(s.fftData);return{...s};}));
-        const wd=new Float32Array(ma.fftSize); ma.getFloatTimeDomainData(wd);
-        let rmsSum=0; for(let i=0;i<wd.length;i++) rmsSum+=wd[i]*wd[i];
-        const rms=Math.sqrt(rmsSum/wd.length);
-        const momentary=rms>0?Math.max(-60,20*Math.log10(rms)-0.691):-60;
-        setMomentaryLufs(momentary); lufsHistoryRef.current.push(momentary);
-        if(lufsHistoryRef.current.length>300) lufsHistoryRef.current.shift();
-        const integrated=lufsHistoryRef.current.reduce((a,b)=>a+b,0)/lufsHistoryRef.current.length;
-        setIntegratedLufs(Math.max(-60,Math.min(0,integrated)));
-        setLufsMomentary(momentary); setLufsIntegrated(integrated);
-        if(mixFFTCanvasRef.current) drawFFTAnalyzer({canvas:mixFFTCanvasRef.current,fftData:fd,style:'applemusic'});
-      }
-      animationFrameRef.current=requestAnimationFrame(update);
-    };
-    update();
-  },[]);
 
   const applyStemPreset=(stem:Stem,preset:MixPreset)=>{
     const ctx=audioContextRef.current; if(!ctx) return;
@@ -488,49 +540,36 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     stem.eqHigh.gain.setTargetAtTime(0,ctx.currentTime,0.05);
     setStems(prev=>prev.map(s=>s.id===stem.id?{...s,stemPresetId:null}:s));
   };
-  const applyBulkDb=(dbStr:string)=>{
-    const db=parseFloat(dbStr); if(isNaN(db)) return;
-    const clamped=Math.max(-60,Math.min(12,db));
-    setStems(prev=>prev.map(s=>{
-      if(!selectedStems.has(s.id)) return s;
-      const ctx=audioContextRef.current;
-      if(s.gainNode&&ctx) s.gainNode.gain.setTargetAtTime(Math.pow(10,clamped/20),ctx.currentTime,0.05);
-      return{...s,volume:clamped};
-    }));
+
+  /* ─── Waveform + FFT ─── */
+  const generateWaveformPeaks = (buffer:AudioBuffer,samples:number):Float32Array => {
+    const peaks=new Float32Array(samples),cd=buffer.getChannelData(0),ss=Math.floor(cd.length/samples);
+    for(let i=0;i<samples;i++){let mx=0;for(let j=i*ss;j<Math.min((i+1)*ss,cd.length);j++)mx=Math.max(mx,Math.abs(cd[j]));peaks[i]=mx;}
+    return peaks;
   };
-  const toggleStemSelect=(id:string,e:React.MouseEvent)=>{
-    e.stopPropagation();
-    setSelectedStems(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);return n;});
-  };
-  const selectAll=()=>setSelectedStems(new Set(stems.map(s=>s.id)));
-  const clearSelection=()=>setSelectedStems(new Set());
-  const updateSelectedVolume=(delta:number)=>{
-    setStems(prev=>prev.map(s=>{
-      if(!selectedStems.has(s.id)) return s;
-      const v=Math.max(-60,Math.min(12,s.volume+delta));
-      const ctx=audioContextRef.current;
-      if(s.gainNode&&ctx) s.gainNode.gain.setTargetAtTime(Math.pow(10,v/20),ctx.currentTime,0.05);
-      return{...s,volume:v};
-    }));
-  };
-  const startEditVolume=(stem:Stem)=>{setEditingVolumeId(stem.id);setEditingVolumeVal(stem.volume.toFixed(1));};
-  const commitEditVolume=(id:string)=>{
-    const val=parseFloat(editingVolumeVal);
-    if(!isNaN(val)) updateStemVolume(id,Math.max(-60,Math.min(12,val)));
-    setEditingVolumeId(null);
-  };
-  const adjustGlobalEQ=useCallback((band:'bass'|'mid'|'high',dir:'up'|'down')=>{
-    const ctx=audioContextRef.current; if(!ctx) return;
-    const adj=dir==='up'?1:-1;
-    if(band==='bass'){const v=Math.max(-12,Math.min(12,bassGain+adj));bassFilterRef.current?.gain.setTargetAtTime(v,ctx.currentTime,0.01);setBassGain(v);}
-    if(band==='mid'){const v=Math.max(-12,Math.min(12,midGain+adj));midFilterRef.current?.gain.setTargetAtTime(v,ctx.currentTime,0.01);setMidGain(v);}
-    if(band==='high'){const v=Math.max(-12,Math.min(12,highGain+adj));highFilterRef.current?.gain.setTargetAtTime(v,ctx.currentTime,0.01);setHighGain(v);}
-  },[bassGain,midGain,highGain]);
-  const setAllStemsGain=useCallback((db:number)=>{
-    const ctx=audioContextRef.current;
-    setStems(prev=>prev.map(s=>{if(ctx)s.gainNode.gain.setTargetAtTime(Math.pow(10,db/20),ctx.currentTime,0.01);return{...s,volume:db};}));
+  const startFFTAnimation = useCallback(()=>{
+    const update=()=>{
+      const ma=mixAnalyserRef.current,fd=mixFftDataRef.current;
+      if(ma&&fd){
+        ma.getByteFrequencyData(fd);
+        setStems(prev=>prev.map(s=>{s.analyserNode.getByteFrequencyData(s.fftData);return{...s};}));
+        const wd=new Float32Array(ma.fftSize); ma.getFloatTimeDomainData(wd);
+        let rmsSum=0; for(let i=0;i<wd.length;i++) rmsSum+=wd[i]*wd[i];
+        const rms=Math.sqrt(rmsSum/wd.length);
+        const momentary=rms>0?Math.max(-60,20*Math.log10(rms)-0.691):-60;
+        setMomentaryLufs(momentary); lufsHistoryRef.current.push(momentary);
+        if(lufsHistoryRef.current.length>300) lufsHistoryRef.current.shift();
+        const integrated=lufsHistoryRef.current.reduce((a,b)=>a+b,0)/lufsHistoryRef.current.length;
+        setIntegratedLufs(Math.max(-60,Math.min(0,integrated)));
+        
+        if(mixFFTCanvasRef.current) drawFFTAnalyzer({canvas:mixFFTCanvasRef.current,fftData:fd,style:'applemusic'});
+      }
+      animationFrameRef.current=requestAnimationFrame(update);
+    };
+    update();
   },[]);
 
+  /* ─── Transport ─── */
   const handlePlayPause=async()=>{
     const ctx=audioContextRef.current; if(!ctx||stems.length===0) return;
     if(ctx.state==='suspended') await ctx.resume();
@@ -558,6 +597,14 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     setIsPlaying(false); setCurrentTime(0); pausedTimeRef.current=0;
     if(timeUpdateIntervalRef.current) clearInterval(timeUpdateIntervalRef.current);
   };
+  const handleTimelineSeek=(e: React.MouseEvent<HTMLDivElement>)=>{
+    const r=e.currentTarget.getBoundingClientRect();
+    const t=((e.clientX-r.left)/r.width)*duration;
+    if(isPlaying){handleStop();setTimeout(()=>{pausedTimeRef.current=t;setCurrentTime(t);handlePlayPause();},50);}
+    else{pausedTimeRef.current=t;setCurrentTime(t);}
+  };
+
+  /* ─── Volume / Pan ─── */
   const updateMasterVolume=(db:number)=>{
     const ctx=audioContextRef.current,mg=masterGainRef.current;
     if(mg&&ctx) mg.gain.setTargetAtTime(Math.pow(10,db/20),ctx.currentTime,0.01);
@@ -573,7 +620,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const updateStemPan=(id:string,pan:number)=>{
     const ctx=audioContextRef.current;
     setStems(prev=>prev.map(s=>{
-      if(s.id===id){if(ctx)s.panNode.pan.setTargetAtTime(pan,ctx.currentTime,0.01);return{...s,pan};}
+      if(s.id===id){if(ctx)s.panNode.pan.setTargetAtTime(pan/50,ctx.currentTime,0.01);return{...s,pan};}
       return s;
     }));
   };
@@ -584,76 +631,56 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       return s;
     }));
   };
-  const handleTimelineSeek=(t:number)=>{
-    if(isPlaying){handleStop();setTimeout(()=>{pausedTimeRef.current=t;setCurrentTime(t);handlePlayPause();},50);}
-    else{pausedTimeRef.current=t;setCurrentTime(t);}
-  };
+  const adjustGlobalEQ=useCallback((band:'bass'|'mid'|'high',dir:'up'|'down')=>{
+    const ctx=audioContextRef.current; if(!ctx) return;
+    const adj=dir==='up'?1:-1;
+    if(band==='bass'){const v=Math.max(-12,Math.min(12,bassGain+adj));bassFilterRef.current?.gain.setTargetAtTime(v,ctx.currentTime,0.01);setBassGain(v);}
+    if(band==='mid'){const v=Math.max(-12,Math.min(12,midGain+adj));midFilterRef.current?.gain.setTargetAtTime(v,ctx.currentTime,0.01);setMidGain(v);}
+    if(band==='high'){const v=Math.max(-12,Math.min(12,highGain+adj));highFilterRef.current?.gain.setTargetAtTime(v,ctx.currentTime,0.01);setHighGain(v);}
+  },[bassGain,midGain,highGain]);
+
+  /* ─── Upload more ─── */
   const handleUploadMoreStems=async(newFiles:File[])=>{
     if(stems.length+newFiles.length>12){alert('Máximo 12 stems');return;}
     if(isPlaying){handleStop();await new Promise(r=>setTimeout(r,100));}
     setShowUploadModal(false); setAllFiles([...allFiles,...newFiles]);
   };
 
-  // ---- Access check ----
-  // Users with permanent unlimited access
+  /* ─── Access / Export ─── */
   const UNLIMITED_EMAILS = ['danipalacio@gmail.com'];
-
   const getDeviceFingerprint = (): string => {
-    // Lightweight stable fingerprint — no external lib needed
-    const nav = window.navigator;
-    const scr = window.screen;
-    const parts = [
-      nav.userAgent,
-      nav.language,
-      String(scr.width) + 'x' + String(scr.height),
-      String(scr.colorDepth),
-      Intl.DateTimeFormat().resolvedOptions().timeZone,
-      String(nav.hardwareConcurrency || ''),
-    ];
-    // Simple hash
-    let h = 0;
-    const str = parts.join('|');
-    for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; }
-    return 'fp_' + Math.abs(h).toString(36);
+    const nav = window.navigator, scr = window.screen;
+    const parts = [nav.userAgent,nav.language,`${scr.width}x${scr.height}`,String(scr.colorDepth),Intl.DateTimeFormat().resolvedOptions().timeZone,String(nav.hardwareConcurrency||'')];
+    let h=0; const str=parts.join('|'); for(let i=0;i<str.length;i++){h=((h<<5)-h)+str.charCodeAt(i);h|=0;}
+    return 'fp_'+Math.abs(h).toString(36);
   };
-
   const getAccessInfo = () => {
     try {
       const stored = localStorage.getItem('audioMixerUser');
       if (stored) {
         const u = JSON.parse(stored);
-        // Hardcoded unlimited users
         if (UNLIMITED_EMAILS.includes(u.email)) return { allowed:true, isPro:true };
-        // Admin / paid plan
-        if (u.is_pro || u.plan === 'unlimited') return { allowed:true, isPro:true };
-        // Registered free user — check if they already used their 1 free mix
-        // Key: we track free mix per user email, NOT per device fingerprint
-        const usedKey = `mixingai_used_free_${u.email}`;
-        const usedFree = localStorage.getItem(usedKey) === '1';
-        if (usedFree) return { allowed:false, isPro:false, reason:'freeDone', email: u.email };
-        return { allowed:true, isPro:false, email: u.email };
+        if (u.is_pro || u.plan==='unlimited') return { allowed:true, isPro:true };
+        const fp = getDeviceFingerprint();
+        const fpUsed = localStorage.getItem(`mixingai_fp_${fp}`)==='1';
+        const emailUsed = u.email && localStorage.getItem(`mixingai_used_free_${u.email}`)==='1';
+        if (!fpUsed && !emailUsed) return { allowed:true, isPro:false, email:u.email, fp };
+        return { allowed:false, isPro:false };
       }
-      // Guest (not registered) — check device fingerprint
-      const fp = getDeviceFingerprint();
-      const usedFreeGuest = localStorage.getItem('mixingai_used_free') === '1' ||
-                            localStorage.getItem(`mixingai_fp_${fp}`) === '1';
-      if (usedFreeGuest) return { allowed:false, isPro:false, reason:'freeDone', fp };
-      return { allowed:true, isPro:false, fp };
+      const fp=getDeviceFingerprint();
+      const fpUsed=localStorage.getItem(`mixingai_fp_${fp}`)==='1';
+      const legacyUsed=localStorage.getItem('mixingai_used_free')==='1';
+      if(!fpUsed&&!legacyUsed) return { allowed:true, isPro:false, fp };
+      return { allowed:false, isPro:false };
     } catch { return { allowed:true, isPro:false }; }
   };
-
   const handleExportClick = () => {
     const access = getAccessInfo();
     if (!access.allowed) { setShowPaywall(true); return; }
     if (!access.isPro) {
-      // Mark free mix as used — per user email if registered, per device if guest
       const a = access as any;
-      if (a.email) {
-        localStorage.setItem(`mixingai_used_free_${a.email}`, '1');
-      } else {
-        localStorage.setItem('mixingai_used_free', '1');
-        if (a.fp) localStorage.setItem(`mixingai_fp_${a.fp}`, '1');
-      }
+      if (a.email) localStorage.setItem(`mixingai_used_free_${a.email}`,'1');
+      else { localStorage.setItem('mixingai_used_free','1'); if(a.fp) localStorage.setItem(`mixingai_fp_${a.fp}`,'1'); }
     }
     handleExportMix();
   };
@@ -670,7 +697,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         none:c=>{c.threshold.value=-60;c.ratio.value=1;c.knee.value=40;c.attack.value=0.1;c.release.value=0.5;},
         low: c=>{c.threshold.value=-24;c.ratio.value=2;c.knee.value=20;c.attack.value=0.02;c.release.value=0.3;},
         medium:c=>{c.threshold.value=-18;c.ratio.value=4;c.knee.value=12;c.attack.value=0.005;c.release.value=0.1;},
-        high:c=>{c.threshold.value=-14;c.ratio.value=6;c.knee.value=8;c.attack.value=0.003;c.release.value=0.08;},
+        hard:c=>{c.threshold.value=-14;c.ratio.value=6;c.knee.value=8;c.attack.value=0.003;c.release.value=0.08;},
         max: c=>{c.threshold.value=-10;c.ratio.value=10;c.knee.value=4;c.attack.value=0.001;c.release.value=0.05;},
       };
       const compressor=offCtx.createDynamicsCompressor();
@@ -692,9 +719,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       const delayNodeOff=offCtx.createDelay(1.0); delayNodeOff.delayTime.value=0.25;
       const delayFeedOff=offCtx.createGain(); delayFeedOff.gain.value=0.3;
       const delayGainOff=offCtx.createGain(); delayGainOff.gain.value=activePresetData?.delayWet??0;
-
-      // IA EQ offline chain
-      setExportProgress(30); setExportStep('Aplicando IA EQ ' + iaEqPreset.name + '...');
+      setExportProgress(30); setExportStep('Aplicando IA EQ '+ iaEqPreset.name +'...');
       const iaPreGain=offCtx.createGain(); iaPreGain.gain.value=Math.pow(10,iaEqBands[0]/20);
       let iaPrev: AudioNode = iaPreGain;
       for(let i=1;i<IAEQ_BANDS.length;i++){
@@ -702,51 +727,43 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         f.type=bd.type as any; f.frequency.value=bd.freq!; f.Q.value=1.0; f.gain.value=iaEqBands[i]??0;
         iaPrev.connect(f); iaPrev=f;
       }
-      // Chain: mixBus → noiseRed → lowShelf → midPeak → highShelf → compressor → iaPreGain → [IA EQ bands] → iaPrev → dryGainOff/reverb/delay → limiter → dest
       mixBus.connect(noiseRed); noiseRed.connect(lowShelf); lowShelf.connect(midPeak); midPeak.connect(highShelf);
       highShelf.connect(compressor); compressor.connect(iaPreGain);
       iaPrev.connect(dryGainOff); iaPrev.connect(reverbNodeOff); reverbNodeOff.connect(reverbGainOff);
       iaPrev.connect(delayNodeOff); delayNodeOff.connect(delayFeedOff); delayFeedOff.connect(delayNodeOff); delayNodeOff.connect(delayGainOff);
       dryGainOff.connect(limiter); reverbGainOff.connect(limiter); delayGainOff.connect(limiter);
       limiter.connect(offCtx.destination);
-
       setExportProgress(45); setExportStep('Renderizando stems...'); await new Promise(r=>setTimeout(r,600));
       for(const stem of stems){
         if(stem.buffer&&!stem.muted){
           const src=offCtx.createBufferSource(),g=offCtx.createGain(),p=offCtx.createStereoPanner();
-          src.buffer=stem.buffer; g.gain.value=Math.pow(10,stem.volume/20); p.pan.value=stem.pan;
+          src.buffer=stem.buffer; g.gain.value=Math.pow(10,stem.volume/20); p.pan.value=stem.pan/50;
           src.connect(g); g.connect(p); p.connect(mixBus); src.start(0);
         }
       }
-      setExportProgress(70); setExportStep('Normalizando a -10 LUFS...'); await new Promise(r=>setTimeout(r,700));
+      setExportProgress(70); setExportStep('Normalizando a -16 LUFS...'); await new Promise(r=>setTimeout(r,700));
       const rendered=await offCtx.startRendering();
-      const normalized=normalizeTo10LUFS(rendered);
-      setExportProgress(92); setExportStep('Generando archivo WAV 24-bit...'); await new Promise(r=>setTimeout(r,500));
+      const normalized=normalizeTo16LUFS(rendered);
+      setExportProgress(92); setExportStep('Generando WAV 24-bit...'); await new Promise(r=>setTimeout(r,500));
       const peaks=generateWaveformPeaks(normalized,800);
       const wavBlob=bufferToWav(normalized,24);
       const wavUrl=URL.createObjectURL(wavBlob);
       setExportProgress(100); setExportStep('¡Listo!'); await new Promise(r=>setTimeout(r,700));
       setIsExporting(false); setExportProgress(0); setExportStep('');
       await new Promise(r=>setTimeout(r,50));
-      onExport({audioBuffer:normalized,audioUrl:wavUrl,waveformPeaks:peaks,finalLufs:-10.0,presetName:(activePreset||initialPreset)?.name,iaEqPreset:iaEqPreset.name});
+      onExport({audioBuffer:normalized,audioUrl:wavUrl,waveformPeaks:peaks,finalLufs:-16.0,presetName:(activePreset||initialPreset)?.name,iaEqPreset:iaEqPreset.name});
     } catch(e){console.error('Export error:',e);setIsExporting(false);}
   };
 
-  const normalizeTo10LUFS=(buffer:AudioBuffer):AudioBuffer=>{
-    const target=-10;
-    let rmsSum=0; const ch0=buffer.getChannelData(0);
+  const normalizeTo16LUFS=(buffer:AudioBuffer):AudioBuffer=>{
+    const target=-10; let rmsSum=0; const ch0=buffer.getChannelData(0);
     for(let i=0;i<ch0.length;i++) rmsSum+=ch0[i]*ch0[i];
     const rms=Math.sqrt(rmsSum/ch0.length);
     const currLufs=rms>0?20*Math.log10(rms)-0.691:-60;
-    const gain=Math.pow(10,(target-currLufs)/20);
-    let peak=0;
+    const gain=Math.pow(10,(target-currLufs)/20); let peak=0;
     for(let c=0;c<buffer.numberOfChannels;c++){const d=buffer.getChannelData(c);for(let i=0;i<d.length;i++){const a=Math.abs(d[i]*gain);if(a>peak)peak=a;}}
-    const ceiling=0.891;
-    const sg=peak>ceiling?gain*(ceiling/peak):gain;
-    for(let c=0;c<buffer.numberOfChannels;c++){
-      const d=buffer.getChannelData(c);
-      for(let i=0;i<d.length;i++){d[i]*=sg;if(d[i]>ceiling)d[i]=ceiling;else if(d[i]<-ceiling)d[i]=-ceiling;}
-    }
+    const ceiling=0.891; const sg=peak>ceiling?gain*(ceiling/peak):gain;
+    for(let c=0;c<buffer.numberOfChannels;c++){const d=buffer.getChannelData(c);for(let i=0;i<d.length;i++){d[i]*=sg;if(d[i]>ceiling)d[i]=ceiling;else if(d[i]<-ceiling)d[i]=-ceiling;}}
     return buffer;
   };
 
@@ -768,6 +785,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     return new Blob([ab],{type:'audio/wav'});
   };
 
+  /* ─── Timeline canvas ─── */
   useEffect(()=>{
     const canvas=timelineCanvasRef.current;
     if(!canvas||duration===0) return;
@@ -775,7 +793,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     stems.forEach(s=>{if(!s.muted)for(let i=0;i<400;i++)combined[i]+=s.waveformPeaks[i]||0;});
     let max=0; for(let i=0;i<400;i++)max=Math.max(max,combined[i]);
     if(max>0) for(let i=0;i<400;i++)combined[i]/=max;
-    drawWaveform({canvas,waveformPeaks:combined,currentTime,duration,style:'soundcloud',colors:{played:'#C026D3',unplayed:'rgba(124,58,237,0.2)',playhead:'#EC4899'}});
+    drawWaveform({canvas,waveformPeaks:combined,currentTime,duration,style:'soundcloud',colors:{played:'#D946EF',unplayed:'rgba(217,70,239,0.15)',playhead:'#D946EF'}});
   },[stems,currentTime,duration]);
 
   useEffect(()=>()=>{
@@ -784,517 +802,492 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     audioContextRef.current?.close();
   },[]);
 
+  /* ─── Click outside: cerrar menú de presets del stem ─── */
+  useEffect(()=>{
+    if(!openStemPresetId) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.stem-actions') && !target.closest('[data-preset-menu]')) {
+        setOpenStemPresetId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [openStemPresetId]);
+
   const fmt=(t:number)=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
 
+  /* ════ LOADING SCREEN ════ */
   if(isLoading) return(
-    <div style={C.page}><Header user={user} onLogout={()=>{}} onCreditsUpdate={onCreditsUpdate}/>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'80vh',padding:'24px'}}>
-        <div style={{...C.card,maxWidth:'380px',width:'100%',textAlign:'center',padding:'40px 24px'}}>
-          <div style={{width:'64px',height:'64px',margin:'0 auto 20px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'18px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 28px rgba(192,38,211,0.5)'}}>
-            <i className="ri-equalizer-line" style={{color:'#fff',fontSize:'26px'}}></i>
-          </div>
-          <h3 style={{fontSize:'20px',fontWeight:600,color:'#F8F0FF',marginBottom:'10px'}}>Cargando Mezclador</h3>
-          <p style={{color:'#9B7EC8',marginBottom:'20px',fontSize:'14px'}}>{loadingStep}</p>
-          <div style={{background:'rgba(36,22,54,0.75)',borderRadius:'8px',height:'6px',overflow:'hidden',marginBottom:'8px'}}>
-            <div style={C.progressBar(loadingProgress)}></div>
-          </div>
-          <div style={{...C.mono,color:'#C026D3',fontWeight:600}}>{loadingProgress}%</div>
+    <div style={{minHeight:'100vh',background:'var(--bg-0)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'24px',fontFamily:'Inter,system-ui,sans-serif'}}>
+      <div style={{fontSize:'48px'}}>🎛️</div>
+      <div style={{textAlign:'center'}}>
+        <h2 style={{fontSize:'18px',fontWeight:600,color:'var(--text-primary)',marginBottom:'8px'}}>{loadingStep}</h2>
+        <p style={{fontSize:'13px',color:'var(--text-muted)',marginBottom:'24px'}}>{allFiles.length} stems cargando...</p>
+        <div style={{width:'280px',height:'4px',background:'var(--panel-2)',borderRadius:'2px',overflow:'hidden'}}>
+          <div style={{height:'100%',width:`${loadingProgress}%`,background:'var(--accent-grad)',borderRadius:'2px',transition:'width 0.3s'}}/>
+        </div>
+        <p style={{fontSize:'12px',color:'var(--text-dim)',marginTop:'8px'}}>{loadingProgress}%</p>
+      </div>
+    </div>
+  );
+
+  /* ════ EXPORT OVERLAY ════ */
+  if(isExporting) return(
+    <div style={{minHeight:'100vh',background:'var(--bg-0)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'24px',fontFamily:'Inter,system-ui,sans-serif'}}>
+      <div style={{fontSize:'48px'}}>🎚️</div>
+      <div style={{textAlign:'center',maxWidth:'360px'}}>
+        <h2 style={{fontSize:'18px',fontWeight:600,color:'var(--text-primary)',marginBottom:'8px'}}>{exportStep}</h2>
+        <div style={{width:'320px',height:'6px',background:'var(--panel-2)',borderRadius:'3px',overflow:'hidden',margin:'0 auto 8px'}}>
+          <div style={{height:'100%',width:`${exportProgress}%`,background:'var(--accent-grad)',borderRadius:'3px',transition:'width 0.4s'}}/>
+        </div>
+        <p style={{fontSize:'12px',color:'var(--text-muted)'}}>{exportProgress}% · WAV 24-bit · -16 LUFS</p>
+        <div style={{marginTop:'16px',display:'flex',justifyContent:'center',gap:'8px'}}>
+          {['IA EQ','Compresión','Limiter','-16 LUFS'].map((step,i)=>(
+            <span key={step} style={{padding:'4px 10px',borderRadius:'20px',fontSize:'11px',background:exportProgress>i*25?'rgba(217,70,239,0.2)':'var(--panel-1)',color:exportProgress>i*25?'var(--accent)':'var(--text-muted)',border:`1px solid ${exportProgress>i*25?'rgba(217,70,239,0.4)':'var(--border)'}`}}>{step}</span>
+          ))}
         </div>
       </div>
     </div>
   );
 
-  if(isExporting){
-    const steps=[{l:'IA EQ '+iaEqPreset.name,t:30},{l:'Compresión',t:55},{l:'Limiter',t:75},{l:'-10 LUFS',t:92}];
-    return(
-      <div style={C.page}><Header user={user} onLogout={()=>{}} onCreditsUpdate={onCreditsUpdate}/>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'80vh',padding:'24px'}}>
-          <div style={{...C.card,maxWidth:'420px',width:'100%',textAlign:'center',padding:'40px 24px'}}>
-            <div style={{width:'72px',height:'72px',margin:'0 auto 20px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'20px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 32px rgba(192,38,211,0.6)'}}>
-              <i className="ri-equalizer-fill" style={{color:'#fff',fontSize:'28px'}}></i>
-            </div>
-            <h3 style={{fontSize:'22px',fontWeight:600,color:'#F8F0FF',marginBottom:'10px'}}>Procesando con IA</h3>
-            <p style={{color:'#9B7EC8',marginBottom:'20px',fontSize:'13px',lineHeight:1.6}}>{exportStep}</p>
-            <div style={{background:'rgba(36,22,54,0.75)',borderRadius:'8px',height:'6px',overflow:'hidden',marginBottom:'8px'}}>
-              <div style={C.progressBar(exportProgress)}></div>
-            </div>
-            <div style={{...C.mono,color:'#C026D3',fontWeight:600,fontSize:'18px',marginBottom:'24px'}}>{exportProgress}%</div>
-            <div style={{display:'flex',justifyContent:'center',gap:'16px',flexWrap:'wrap'}}>
-              {steps.map(s=>(
-                <div key={s.l} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'5px'}}>
-                  <div style={{width:'8px',height:'8px',borderRadius:'50%',background:exportProgress>=s.t?'#C026D3':'#241636',border:exportProgress>=s.t?'2px solid #EC4899':'2px solid #3D2560',boxShadow:exportProgress>=s.t?'0 0 8px rgba(192,38,211,0.7)':'none',transition:'all 0.4s'}}></div>
-                  <span style={{fontSize:'10px',color:'#9B7EC8'}}>{s.l}</span>
-                </div>
-              ))}
+  const presetColor = activePreset?.color ?? '#D946EF';
+
+  /* ════ MAIN RENDER ════ */
+  return (
+    <div style={{minHeight:'100vh',fontFamily:'Inter,-apple-system,system-ui,sans-serif',background:'radial-gradient(1200px 600px at 70% -5%, rgba(217,70,239,0.07), transparent 55%), radial-gradient(900px 500px at -5% 30%, rgba(168,85,247,0.05), transparent 55%), var(--bg-0)',color:'var(--text-primary)'}}>
+      {showPaywall && <PaywallModal onClose={()=>setShowPaywall(false)} onSuccess={()=>setShowPaywall(false)}/>}
+      {showUploadModal && <UploadModal onClose={()=>setShowUploadModal(false)} onUpload={handleUploadMoreStems}/>}
+
+      <div className="studio">
+
+        {/* ── HEADER ── */}
+        <header className="studio-header">
+          <div className="brand">
+            <div className="brand-mark">{Ico.spark}</div>
+            <div className="brand-text">
+              <div className="brand-name">MixingStudio AI</div>
+              <div className="brand-sub">
+                <span>{stems.length} stems</span>
+                <span className="dot"/>
+                <span>{fmt(duration)}</span>
+                {activePreset && <span className="pill">{Ico.spark}{activePreset.name}</span>}
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  return(
-    <div style={C.page}>
-      <Header user={user} onLogout={()=>{}} onCreditsUpdate={onCreditsUpdate}/>
-      <div style={{maxWidth:'1400px',margin:'0 auto',padding:'16px 12px 40px'}}>
-
-        {/* Header */}
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'16px',gap:'10px',flexWrap:'wrap'}}>
-          <div>
-            <h1 style={{fontSize:'clamp(18px,4vw,26px)',fontWeight:700,letterSpacing:'-0.5px',...C.grad,margin:0}}>🎛️ Mezclador AI Pro</h1>
-            <p style={{color:'#9B7EC8',fontSize:'12px',marginTop:'4px'}}>
-              {stems.length} stems · {fmt(duration)}
-              {activePreset&&(
-                <button onClick={()=>{}}
-                  style={{marginLeft:'8px',background:`linear-gradient(135deg,${activePreset.color}22,${activePreset.color}11)`,border:`1.5px solid ${activePreset.color}`,borderRadius:'980px',padding:'5px 14px',fontSize:'12px',color:'#F8F0FF',fontWeight:700,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'6px',boxShadow:`0 0 10px ${activePreset.color}44`}}>
-                  ✦ {activePreset.name}
-                </button>
-              )}
-            </p>
+          <div className="row gap-2 center">
+            <button className="btn-primary btn" onClick={handleExportClick}>{Ico.spark} Exportar Mezcla con IA</button>
+            <button className="btn btn-ghost" onClick={onBack}>{Ico.back} Volver</button>
           </div>
-          <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-            {stems.length<12&&<button onClick={()=>setShowUploadModal(true)} style={{...C.ghostBtn,fontSize:'12px',padding:'8px 14px'}}>+ Stems ({stems.length}/12)</button>}
-            <button onClick={handleExportClick} disabled={stems.length===0}
-              style={{background:stems.length===0?'#241636':'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',border:'none',color:'#fff',padding:'12px 28px',borderRadius:'980px',fontSize:'15px',fontWeight:700,cursor:stems.length===0?'not-allowed':'pointer',boxShadow:stems.length>0?'0 0 28px rgba(192,38,211,0.6)':'none',fontFamily:'inherit',opacity:stems.length===0?0.4:1,display:'inline-flex',alignItems:'center',gap:'8px',letterSpacing:'-0.2px'}}>
-              <i className="ri-equalizer-fill" style={{fontSize:'14px'}}></i>
-              ✦ Exportar Mezcla con IA
+        </header>
+
+        {/* ── TIMELINE ── */}
+        <div className="card">
+          <div className="card-head">
+            <span className="section-label">Timeline</span>
+            <div className="row gap-2 center mono" style={{fontSize:'12px',color:'var(--text-muted)'}}>
+              <span>{fmt(currentTime)}</span>
+              <span>/</span>
+              <span>{fmt(duration)}</span>
+            </div>
+          </div>
+          <div style={{padding:'12px 20px 16px',position:'relative'}}>
+            <div style={{cursor:'pointer',borderRadius:'6px',overflow:'hidden'}} onClick={handleTimelineSeek}>
+              <canvas ref={timelineCanvasRef} style={{width:'100%',height:'64px',display:'block'}}/>
+            </div>
+          </div>
+          <div style={{padding:'0 20px 16px',display:'flex',gap:'8px',alignItems:'center'}}>
+            <button onClick={handlePlayPause} style={{width:'36px',height:'36px',borderRadius:'50%',background:'var(--accent-grad)',border:'none',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'var(--shadow-glow)',flexShrink:0}}>
+              {isPlaying ? Ico.stop : Ico.play}
             </button>
-            <button onClick={onBack} style={{...C.ghostBtn,fontSize:'12px',padding:'8px 14px'}}>← Volver</button>
+            {isPlaying && <button onClick={handleStop} style={{width:'30px',height:'30px',borderRadius:'50%',background:'var(--panel-2)',border:'1px solid var(--border)',color:'var(--text-muted)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{Ico.stop}</button>}
           </div>
         </div>
 
-        {/* Timeline */}
-        <div style={{...C.card,marginBottom:'12px'}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
-            <span style={C.label}>Timeline</span>
-            <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-              <span style={{...C.mono,fontSize:'12px',color:'#9B7EC8'}}>{fmt(currentTime)}{' / '}{fmt(duration)}</span>
-              <button onClick={handlePlayPause} disabled={stems.length===0}
-                style={{width:'42px',height:'42px',borderRadius:'50%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 16px rgba(236,72,153,0.5)',flexShrink:0}}>
-                <i className={isPlaying?'ri-pause-fill':'ri-play-fill'} style={{color:'#fff',fontSize:'18px',marginLeft:isPlaying?0:'2px'}}></i>
-              </button>
-              <button onClick={handleStop} disabled={stems.length===0}
-                style={{width:'34px',height:'34px',borderRadius:'50%',background:'rgba(36,22,54,0.75)',border:'1px solid rgba(192,38,211,0.2)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <i className="ri-stop-fill" style={{color:'#9B7EC8',fontSize:'13px'}}></i>
-              </button>
-            </div>
+        {/* ── PRESETS ── */}
+        <div className="card">
+          <div className="card-head">
+            <span className="card-title">PRESET <span className="pill" style={{marginLeft:'4px'}}>Toca para aplicar</span></span>
           </div>
-          <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'8px',border:'1px solid rgba(192,38,211,0.1)'}}>
-            <canvas ref={timelineCanvasRef} width={1200} height={80}
-              style={{width:'100%',height:'50px',borderRadius:'6px',cursor:'pointer',display:'block'}}
-              onClick={e=>{if(timelineCanvasRef.current) handleWaveformClick(e,timelineCanvasRef.current,duration,handleTimelineSeek);}}/>
-          </div>
-        </div>
-
-        {/* Presets */}
-        <div style={{...C.card,marginBottom:'12px'}}>
-          <span style={C.label}>Preset — toca para aplicar y escuchar en tiempo real</span>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(100px,1fr))',gap:'7px'}}>
-            {PRESETS.map(p=>{
-              const isSel=activePreset?.id===p.id;
-              return(
-                <button key={p.id} onClick={()=>applyPresetToAudio(p)}
-                  style={{background:isSel?`linear-gradient(135deg,${p.color}22,${p.color}11)`:'rgba(8,4,16,0.5)',border:`1.5px solid ${isSel?p.color:'rgba(192,38,211,0.1)'}`,borderRadius:'11px',padding:'9px 8px',cursor:'pointer',textAlign:'left',transition:'all 0.15s',boxShadow:isSel?`0 0 12px ${p.color}44`:'none',position:'relative'}}>
-                  {isSel&&<div style={{position:'absolute',top:'5px',right:'5px',width:'14px',height:'14px',borderRadius:'50%',background:p.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'8px',color:'#fff',fontWeight:700}}>✓</div>}
-                  <div style={{height:'22px',display:'flex',alignItems:'flex-end',gap:'1px',marginBottom:'7px',background:'rgba(8,4,16,0.6)',borderRadius:'5px',padding:'3px 4px'}}>
-                    {p.wavePattern.map((h,i)=><div key={i} style={{flex:1,borderRadius:'2px 2px 0 0',height:`${h*100}%`,background:isSel?p.color:'rgba(155,126,200,0.2)',transition:'background 0.2s'}}></div>)}
-                  </div>
-                  <div style={{fontSize:'11px',fontWeight:700,color:'#F8F0FF',marginBottom:'2px'}}>{p.name}</div>
-                  <div style={{fontSize:'9px',color:'rgba(155,126,200,0.6)',marginBottom:'5px'}}>{p.tags[0]}</div>
-                  <div style={{display:'flex',gap:'3px',flexWrap:'wrap'}}>
-                    <span style={{fontSize:'9px',padding:'1px 5px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>B:{p.bass>0?'+':''}{p.bass}</span>
-                    <span style={{fontSize:'9px',padding:'1px 5px',borderRadius:'980px',background:`${p.color}22`,color:p.color,border:`1px solid ${p.color}33`}}>R:{Math.round(p.reverbWet*100)}%</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* MIX BUS MASTER */}
-        <div style={{background:'linear-gradient(135deg,rgba(36,22,54,0.88),rgba(26,16,40,0.88))',border:'1px solid rgba(192,38,211,0.3)',borderRadius:'16px',padding:'16px',marginBottom:'12px',position:'relative',overflow:'hidden'}}>
-          <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)'}}></div>
-          <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'14px'}}>
-            <i className="ri-equalizer-fill" style={{color:'#C026D3',fontSize:'14px'}}></i>
-            <span style={{fontSize:'11px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#F8F0FF'}}>Mix Bus Master</span>
-            {activePreset&&<span style={{background:`linear-gradient(135deg,${activePreset.color},${activePreset.color}88)`,borderRadius:'980px',padding:'3px 10px',fontSize:'10px',color:'#fff',fontWeight:700}}>✦ {activePreset.name}</span>}
-            <span style={{marginLeft:'auto',fontSize:'10px',color:isPlaying?'#4ade80':'#9B7EC8',fontFamily:"'DM Mono',monospace",fontWeight:600}}>{isPlaying?'▶ PLAYING':'■ STOPPED'}</span>
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'10px'}}>
-
-            {/* EQ sliders */}
-            <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'12px'}}>
-              <div style={{fontSize:'9px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px'}}>EQ — arrastra para ajustar</div>
-              {([{label:'Bass',val:bassGain,color:'#EC4899',band:'bass'},{label:'Mid',val:midGain,color:'#C026D3',band:'mid'},{label:'High',val:highGain,color:'#7C3AED',band:'high'}] as const).map(eq=>(
-                <div key={eq.label} style={{marginBottom:'10px'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
-                    <span style={{fontSize:'10px',color:'#9B7EC8'}}>{eq.label}</span>
-                    <span style={{fontSize:'10px',color:eq.color,fontFamily:"'DM Mono',monospace",fontWeight:600}}>{eq.val>0?'+':''}{eq.val} dB</span>
-                  </div>
-                  <div style={{position:'relative',height:'18px',display:'flex',alignItems:'center'}}>
-                    <div style={{position:'absolute',left:0,right:0,height:'4px',background:'rgba(192,38,211,0.15)',borderRadius:'2px'}}>
-                      <div style={{height:'100%',borderRadius:'2px',background:eq.color,width:`${((eq.val+12)/24)*100}%`}}></div>
+          <div className="card-body" style={{paddingTop:'16px'}}>
+            <div className="preset-grid">
+              {PRESETS.map(p => {
+                const active = activePreset?.id === p.id;
+                return (
+                  <div key={p.id} className={`preset-card${active?' active':''}`} onClick={()=>applyPresetToAudio(p)}>
+                    <div className="preset-mini">
+                      {[0.3,0.5,0.8,0.9,0.7,0.6,0.4,0.7,0.8,0.6,0.5,0.3].map((h,i)=>(
+                        <i key={i} style={{height:`${h*100}%`,background:active?p.color:'currentColor'}}/>
+                      ))}
                     </div>
-                    <input type="range" min="-12" max="12" step="1" value={eq.val}
-                      onChange={e=>{
-                        const v=parseInt(e.target.value); const ctx=audioContextRef.current;
-                        if(eq.band==='bass'){setBassGain(v);if(bassFilterRef.current&&ctx)bassFilterRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
-                        else if(eq.band==='mid'){setMidGain(v);if(midFilterRef.current&&ctx)midFilterRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
-                        else{setHighGain(v);if(highFilterRef.current&&ctx)highFilterRef.current.gain.setTargetAtTime(v,ctx.currentTime,0.05);}
-                      }}
-                      style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%'}}/>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* FX */}
-            <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'12px'}}>
-              <div style={{fontSize:'9px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px'}}>Efectos</div>
-              {[
-                {label:'Reverb',active:reverbActive,toggle:toggleReverb,val:activePreset?`${Math.round(activePreset.reverbWet*100)}%`:'0%',sub:'Espacio'},
-                {label:'Delay',active:delayActive,toggle:toggleDelay,val:activePreset?`${Math.round(activePreset.delayWet*100)}%`:'0%',sub:'1/4 beat'},
-                {label:'Widener',active:widenerActive,toggle:()=>setWidenerActive(!widenerActive),val:activePreset?`${Math.round(activePreset.stereoWidth*100)}%`:'50%',sub:'Estéreo'},
-              ].map(fx=>(
-                <div key={fx.label} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
-                  <div><div style={{fontSize:'11px',color:'#F8F0FF',fontWeight:600}}>{fx.label}</div><div style={{fontSize:'10px',color:'#9B7EC8'}}>{fx.val} · {fx.sub}</div></div>
-                  <div onClick={fx.toggle} style={{width:'32px',height:'18px',borderRadius:'9px',background:fx.active?'#C026D3':'rgba(155,126,200,0.2)',position:'relative',cursor:'pointer',transition:'background 0.2s'}}>
-                    <div style={{width:'13px',height:'13px',borderRadius:'50%',background:'#fff',position:'absolute',top:'2.5px',left:fx.active?'16px':'3px',transition:'left 0.2s'}}></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Compresión */}
-            <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'12px'}}>
-              <div style={{fontSize:'9px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8',marginBottom:'10px'}}>Compresión</div>
-              <div style={{fontSize:'14px',fontWeight:700,color:'#F8F0FF',marginBottom:'4px',textTransform:'capitalize' as const}}>{activePreset?.compression||'media'}</div>
-              <div style={{fontSize:'10px',color:'#9B7EC8',marginBottom:'8px'}}>
-                {activePreset?.compression==='none'?'Sin compresión':activePreset?.compression==='low'?'Thr: -24dB · 2:1':activePreset?.compression==='medium'?'Thr: -18dB · 4:1':activePreset?.compression==='high'?'Thr: -14dB · 6:1':'Thr: -10dB · 10:1'}
-              </div>
-              <div style={{fontSize:'10px',color:'#9B7EC8',marginBottom:'3px'}}>GR Meter</div>
-              <div style={{height:'6px',background:'rgba(192,38,211,0.15)',borderRadius:'4px',overflow:'hidden'}}>
-                <div style={{height:'100%',background:'linear-gradient(90deg,#4ade80,#FBBF24,#EC4899)',borderRadius:'4px',width:activePreset?.compression==='none'?'5%':activePreset?.compression==='low'?'20%':activePreset?.compression==='medium'?'40%':activePreset?.compression==='high'?'60%':'80%'}}></div>
-              </div>
-            </div>
-
-            {/* LUFS */}
-            <div style={{background:'rgba(15,10,26,0.6)',borderRadius:'10px',padding:'12px'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
-                <span style={{fontSize:'9px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#9B7EC8'}}>LUFS</span>
-                <span style={{fontSize:'9px',fontWeight:700,padding:'2px 8px',borderRadius:'980px',background:'rgba(74,222,128,0.1)',color:'#4ade80',border:'1px solid rgba(74,222,128,0.2)'}}>
-                  {momentaryLufs>-14?'⚠ Loud':momentaryLufs<-30?'↓ Soft':'✓ Safe'}
-                </span>
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px',marginBottom:'8px'}}>
-                {[{l:'Mom',v:momentaryLufs},{l:'Int',v:integratedLufs}].map(m=>(
-                  <div key={m.l} style={{background:'rgba(8,4,16,0.6)',borderRadius:'8px',padding:'8px',textAlign:'center',border:'1px solid rgba(192,38,211,0.1)'}}>
-                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:'16px',fontWeight:500,...C.grad}}>{m.v.toFixed(1)}</div>
-                    <div style={{fontSize:'9px',color:'#9B7EC8',textTransform:'uppercase' as const,letterSpacing:'0.5px'}}>{m.l}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px',marginBottom:'2px'}}>
-                <span style={{color:'#9B7EC8'}}>Spotify</span><span style={{color:'#4ade80'}}>-10</span>
-              </div>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px'}}>
-                <span style={{color:'#9B7EC8'}}>YouTube -10</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* IA EQ — inline below MixBusMaster, same dark style */}
-        <div style={{background:'linear-gradient(135deg,rgba(20,10,36,0.92),rgba(26,14,44,0.92))',border:'1px solid rgba(192,38,211,0.3)',borderRadius:'16px',padding:'16px',marginBottom:'12px',position:'relative',overflow:'hidden'}}>
-          <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,#7C3AED,#C026D3,#EC4899)'}}></div>
-          <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'12px',flexWrap:'wrap'}}>
-            <div style={{width:'28px',height:'28px',borderRadius:'8px',background:'linear-gradient(135deg,#7C3AED,#C026D3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'14px',flexShrink:0}}>🎚️</div>
-            <div>
-              <span style={{fontSize:'11px',fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' as const,color:'#F8F0FF'}}>IA EQ — {iaEqPreset.name}</span>
-              <div style={{fontSize:'9px',color:'rgba(155,126,200,0.7)'}}>Activo en tiempo real · se exporta junto a la mezcla · -10 LUFS</div>
-            </div>
-            <span style={{marginLeft:'auto',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'980px',padding:'2px 10px',fontSize:'10px',fontWeight:700,color:'#4ade80'}}>Live</span>
-          </div>
-
-          {/* Preset chips */}
-          <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'12px'}}>
-            {IAEQ_PRESETS.map(p=>(
-              <button key={p.id} onClick={()=>{setIaEqPreset(p);setIaEqBands([...p.bands]);updateLiveIAEQ([...p.bands]);}}
-                style={{padding:'5px 12px',borderRadius:'980px',fontSize:'11px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.12s',
-                  background:iaEqPreset.id===p.id?'rgba(192,38,211,0.2)':'rgba(255,255,255,0.04)',
-                  border:`1px solid ${iaEqPreset.id===p.id?'#C026D3':'rgba(255,255,255,0.08)'}`,
-                  color:iaEqPreset.id===p.id?'#EC4899':'rgba(155,126,200,0.7)',
-                  boxShadow:iaEqPreset.id===p.id?'0 0 10px rgba(192,38,211,0.25)':'none'}}>
-                {p.name}
-              </button>
-            ))}
-          </div>
-
-          {/* 12-band faders */}
-          <div style={{overflowX:'auto'}}>
-            <div style={{display:'flex',gap:'4px',alignItems:'flex-end',minWidth:'560px',padding:'4px 2px 8px'}}>
-              {IAEQ_BANDS.map((bd,i)=>{
-                const val=iaEqBands[i]??0;
-                const pct=Math.round(((val+12)/24)*100);
-                return(
-                  <div key={bd.label} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',flex:1}}>
-                    <span style={{fontSize:'9px',fontWeight:700,fontFamily:'monospace',color:val===0?'rgba(155,126,200,0.5)':val>0?'#4ade80':'#EC4899',minHeight:'12px',textAlign:'center'}}>
-                      {val>0?`+${val.toFixed(0)}`:val.toFixed(0)}
-                    </span>
-                    <div style={{position:'relative',height:'72px',width:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      {/* Track visual */}
-                      <div style={{position:'absolute',top:0,bottom:0,left:'50%',width:'2px',transform:'translateX(-50%)',background:'rgba(192,38,211,0.12)',borderRadius:'1px'}}></div>
-                      <div style={{position:'absolute',bottom:'50%',left:'50%',width:'2px',transform:'translateX(-50%)',background:val>0?'#C026D3':'#EC4899',borderRadius:'1px',height:`${Math.abs(val)/12*50}%`}}></div>
-                      {/* Thumb dot */}
-                      <div style={{position:'absolute',top:`${100-pct}%`,left:'50%',transform:'translate(-50%,-50%)',width:'12px',height:'12px',borderRadius:'50%',background:val===0?'rgba(155,126,200,0.6)':val>0?'#C026D3':'#EC4899',border:'2px solid rgba(255,255,255,0.15)',pointerEvents:'none',transition:'top 0.05s',zIndex:1}}></div>
-                      <input type="range" min="-12" max="12" step="0.5" value={val}
-                        onChange={e=>{
-                          const v=parseFloat(e.target.value);
-                          const nb=[...iaEqBands]; nb[i]=v; setIaEqBands(nb); updateLiveIAEQ(nb);
-                        }}
-                        style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%',writingMode:'vertical-lr' as any,direction:'rtl' as any,WebkitAppearance:'slider-vertical' as any}}/>
+                    <div className="preset-name">{p.name}</div>
+                    <div className="preset-sub">{p.tags?.[0]}</div>
+                    <div className="preset-chips">
+                      <span className="chip" style={{background:`${p.color}20`,color:p.color,border:`1px solid ${p.color}40`,padding:'2px 6px',borderRadius:'4px',fontSize:'10px',fontWeight:600}}>B{p.bass>0?'+':''}{p.bass}</span>
+                      <span className="chip" style={{background:'rgba(255,255,255,0.05)',color:'var(--text-muted)',border:'1px solid var(--border)',padding:'2px 6px',borderRadius:'4px',fontSize:'10px'}}>R{Math.round(p.reverbWet*100)}%</span>
                     </div>
-                    <span style={{fontSize:'9px',color:'rgba(155,126,200,0.55)',textAlign:'center',lineHeight:1.1}}>{bd.label}</span>
                   </div>
                 );
               })}
             </div>
           </div>
+        </div>
 
-          {/* Band labels */}
-          <div style={{display:'flex',gap:'5px',marginTop:'6px',flexWrap:'wrap'}}>
-            {[{l:'Preamp: Pre',flex:'0 0 auto'},{l:'Bass: 30Hz–170Hz',flex:'1'},{l:'Mid: 310Hz–3kHz',flex:'1'},{l:'High: 6kHz–16kHz',flex:'1'}].map(({l,flex})=>(
-              <div key={l} style={{background:'rgba(192,38,211,0.06)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'6px',padding:'3px 10px',fontSize:'9px',fontWeight:700,color:'rgba(155,126,200,0.7)',flex,textAlign:'center',whiteSpace:'nowrap'}}>
-                {l}
+        {/* ── MIX BUS MASTER ── */}
+        <div className="card">
+          <div className="card-head">
+            <span className="card-title">
+              <span style={{fontSize:'16px'}}>🎛️</span> MIX BUS MASTER
+              {activePreset && <span className="pill">{Ico.spark}{activePreset.name}</span>}
+            </span>
+            <span style={{fontSize:'11px',fontWeight:600,color:'var(--text-muted)',letterSpacing:'0.1em'}}>{isPlaying?'PLAYING':'STOPPED'}</span>
+          </div>
+          <div className="card-body mbm-grid" style={{gap:'0'}}>
+
+            {/* EQ */}
+            <div className="mbm-col">
+              <div className="section-label" style={{marginBottom:'16px'}}>EQ — Arrastra para ajustar</div>
+              {[{label:'Bass',val:bassGain,cb:(v:number)=>{setBassGain(v);bassFilterRef.current?.gain.setTargetAtTime(v,audioContextRef.current?.currentTime??0,0.01);}},
+                {label:'Mid', val:midGain, cb:(v:number)=>{setMidGain(v);midFilterRef.current?.gain.setTargetAtTime(v,audioContextRef.current?.currentTime??0,0.01);}},
+                {label:'High',val:highGain,cb:(v:number)=>{setHighGain(v);highFilterRef.current?.gain.setTargetAtTime(v,audioContextRef.current?.currentTime??0,0.01);}}
+              ].map(eq=>(
+                <div key={eq.label} style={{marginBottom:'16px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:'8px'}}>
+                    <span style={{fontSize:'12px',color:'var(--text-secondary)'}}>{eq.label}</span>
+                    <span className="mono" style={{fontSize:'12px',color:'var(--accent)',fontWeight:500}}>{eq.val>0?'+':''}{eq.val.toFixed(1)} dB</span>
+                  </div>
+                  <HSlider value={eq.val} min={-12} max={12} onChange={eq.cb} color={presetColor}/>
+                </div>
+              ))}
+            </div>
+
+            {/* Effects */}
+            <div className="mbm-col">
+              <div className="section-label" style={{marginBottom:'16px'}}>Efectos</div>
+              {[
+                {label:'Reverb', sub:`${Math.round((activePreset?.reverbWet??0)*100)}% · Espacio`, active:reverbActive, toggle:toggleReverb},
+                {label:'Delay',  sub:`0% · 1/4 beat`,                                              active:delayActive,  toggle:toggleDelay},
+                {label:'Widener',sub:'50% · Estéreo',                                              active:widenerActive,toggle:()=>setWidenerActive(v=>!v)},
+              ].map(fx=>(
+                <div key={fx.label} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}}>
+                  <div>
+                    <div style={{fontSize:'13px',fontWeight:500,color:'var(--text-primary)',marginBottom:'2px'}}>{fx.label}</div>
+                    <div style={{fontSize:'11px',color:'var(--text-muted)'}}>{fx.sub}</div>
+                  </div>
+                  <Toggle on={fx.active} onChange={fx.toggle}/>
+                </div>
+              ))}
+            </div>
+
+            {/* Compression */}
+            <div className="mbm-col">
+              <div className="section-label" style={{marginBottom:'16px'}}>Compresión</div>
+              <div style={{fontSize:'20px',fontWeight:600,color:'var(--text-primary)',marginBottom:'4px'}}>Medium</div>
+              <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'12px'}}>Thr: -18dB · 4:1</div>
+              <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'6px'}}>GR Meter</div>
+              <div style={{height:'6px',background:'var(--panel-2)',borderRadius:'3px',overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${Math.min(100,Math.max(0,(momentaryLufs+60)/60*100))}%`,background:'linear-gradient(90deg,var(--green),var(--yellow),var(--red))',borderRadius:'3px',transition:'width 100ms'}}/>
               </div>
-            ))}
+            </div>
+
+            {/* LUFS */}
+            <div className="mbm-col" style={{borderRight:'none'}}>
+              <div className="section-label" style={{marginBottom:'16px'}}>LUFS</div>
+              <div style={{display:'flex',gap:'8px',marginBottom:'12px'}}>
+                {[{val:momentaryLufs,lbl:'MOM'},{val:integratedLufs,lbl:'INT'}].map(m=>(
+                  <div key={m.lbl} className="lufs-box" style={{flex:1}}>
+                    <div className="lufs-val mono">{m.val.toFixed(1)}</div>
+                    <div className="lufs-lbl">{m.lbl}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="lufs-targets">
+                {[{lbl:'Spotify',val:'-16 LUFS'},{lbl:'YouTube',val:'-16 LUFS'}].map(t=>(
+                  <div key={t.lbl} className="row" style={{justifyContent:'space-between',fontSize:'11px'}}>
+                    <span style={{color:'var(--text-muted)'}}>{t.lbl}</span>
+                    <span className="val mono">{t.val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Controls grid */}
-        <div className="controls-grid" style={{marginBottom:'12px'}}>
-          {/* Transport */}
-          <div style={C.card}>
-            <span style={C.label}>Control Mix</span>
-            <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px'}}>
-              <button onClick={handlePlayPause} disabled={stems.length===0}
-                style={{width:'52px',height:'52px',borderRadius:'50%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 20px rgba(236,72,153,0.5)',flexShrink:0}}>
-                <i className={isPlaying?'ri-pause-fill':'ri-play-fill'} style={{color:'#fff',fontSize:'20px',marginLeft:isPlaying?0:'2px'}}></i>
-              </button>
-              <button onClick={handleStop} disabled={stems.length===0}
-                style={{width:'36px',height:'36px',borderRadius:'50%',background:'rgba(36,22,54,0.75)',border:'1px solid rgba(192,38,211,0.2)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <i className="ri-stop-fill" style={{color:'#9B7EC8',fontSize:'14px'}}></i>
-              </button>
+        {/* ── IA EQ ── */}
+        <div className="card">
+          <div className="card-head">
+            <span className="card-title">
+              <span style={{fontSize:'16px'}}>🎚️</span> IA EQ — {iaEqPreset.name.toUpperCase()}
+              <span style={{padding:'2px 8px',borderRadius:'4px',background:'rgba(59,214,113,0.15)',color:'var(--green)',fontSize:'10px',fontWeight:700,letterSpacing:'0.1em'}}>● LIVE</span>
+            </span>
+          </div>
+          <div className="card-body">
+            <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'12px'}}>Activo en tiempo real · se exporta junto a la mezcla · -16 LUFS</div>
+            {/* Device tabs */}
+            <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'20px'}}>
+              {IAEQ_PRESETS.map(p=>(
+                <button key={p.id} onClick={()=>{setIaEqPreset(p);setIaEqBands([...p.bands]);setActiveIaTab(p.id);updateLiveIAEQ(p.bands);}}
+                  style={{padding:'5px 12px',borderRadius:'999px',border:`1px solid ${activeIaTab===p.id?'rgba(217,70,239,0.5)':'var(--border)'}`,background:activeIaTab===p.id?'var(--accent-soft)':'var(--panel-2)',color:activeIaTab===p.id?'var(--accent)':'var(--text-muted)',fontSize:'11px',fontWeight:activeIaTab===p.id?600:400,cursor:'pointer',transition:'all 200ms',boxShadow:activeIaTab===p.id?'0 0 10px var(--accent-glow)':'none'}}>
+                  {p.name}
+                </button>
+              ))}
             </div>
-            <div style={{marginBottom:'14px'}}>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:'12px',marginBottom:'4px'}}>
-                <span style={{color:'#9B7EC8'}}>Mix Volume</span>
-                <span style={{...C.mono,color:'#EC4899',fontWeight:500}}>{masterVolume>0?'+':''}{masterVolume.toFixed(1)} dB</span>
-              </div>
-              <div style={C.track}>
-                <div style={C.trackFill(((masterVolume+60)/72)*100)}></div>
-                <input type="range" min="-60" max="12" step="0.1" value={masterVolume}
-                  onChange={e=>updateMasterVolume(parseFloat(e.target.value))}
-                  style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%'}}/>
-              </div>
+            {/* Band sliders */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(12,1fr)',gap:'8px',marginBottom:'16px'}}>
+              {IAEQ_BANDS.map((band,i)=>{
+                const val=iaEqBands[i]??0;
+                const pct=Math.round(((val+12)/24)*100);
+                return (
+                  <div key={band.label} className={`eq-band${val!==0?' active':''}`} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'6px'}}>
+                    <span style={{fontSize:'9px',color:'var(--text-muted)',fontVariantNumeric:'tabular-nums'}}>{val>0?'+':''}{val}</span>
+                    <div className="eq-band-slider" style={{position:'relative',height:'80px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      <div style={{width:'2px',height:'100%',background:'rgba(255,255,255,0.06)',borderRadius:'1px',position:'relative'}}>
+                        <div style={{position:'absolute',bottom:'50%',left:0,width:'100%',height:`${Math.abs(pct-50)}%`,background:val>=0?'var(--accent)':'var(--accent-2)',borderRadius:'1px',transform:val>=0?'translateY(0)':'translateY(100%)'}}/>
+                      </div>
+                      <div className="knob" style={{position:'absolute',top:`${100-pct}%`,transform:'translate(-50%,-50%)',left:'50%',width:'14px',height:'14px',borderRadius:'50%',background:val!==0?'var(--accent)':'var(--panel-2)',border:`2px solid ${val!==0?'var(--accent)':'var(--border-strong)'}`,boxShadow:val!==0?'0 0 8px var(--accent-glow)':'none',cursor:'ns-resize'}}/>
+                      <input type="range" min={-12} max={12} step={0.5} value={val}
+                        onChange={e=>{const nb=[...iaEqBands];nb[i]=parseFloat(e.target.value);setIaEqBands(nb);updateLiveIAEQ(nb);}}
+                        style={{position:'absolute',inset:0,opacity:0,cursor:'ns-resize',writingMode:'vertical-lr',width:'100%',height:'100%'}}/>
+                    </div>
+                    <span style={{fontSize:'9px',color:'var(--text-dim)',textAlign:'center',lineHeight:1.2}}>{band.label}</span>
+                  </div>
+                );
+              })}
             </div>
-            <div>
-              <div style={{fontSize:'11px',color:'#9B7EC8',marginBottom:'8px'}}>Stems Gain</div>
-              <div style={{display:'flex',gap:'6px'}}>
-                {[-12,-6,0].map(v=>(
-                  <button key={v} onClick={()=>setAllStemsGain(v)}
-                    style={{flex:1,padding:'7px 0',background:'rgba(36,22,54,0.75)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',fontSize:'11px',color:'#9B7EC8',cursor:'pointer',fontFamily:'inherit'}}>
-                    {v===0?'0 dB':`${v}`}
+            {/* Frequency zones */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 4fr 4fr 4fr',gap:'4px'}}>
+              {[{lbl:'Preamp: Pre',color:'#9B7AE8'},{lbl:'Bass: 30Hz–170Hz',color:'#E08254'},{lbl:'Mid: 310Hz–3kHz',color:'#4FD4D4'},{lbl:'High: 6kHz–16kHz',color:'#6DCE7A'}].map(z=>(
+                <div key={z.lbl} style={{height:'3px',borderRadius:'2px',background:z.color,opacity:0.6}}/>
+              ))}
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 4fr 4fr 4fr',gap:'4px',marginTop:'4px'}}>
+              {['Preamp: Pre','Bass: 30Hz–170Hz','Mid: 310Hz–3kHz','High: 6kHz–16kHz'].map(lbl=>(
+                <span key={lbl} style={{fontSize:'9px',color:'var(--text-dim)'}}>{lbl}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── TOOLS ROW ── */}
+        <div className="tools-grid">
+
+          {/* Control Mix */}
+          <div className="card">
+            <div className="card-head"><span className="card-title">Control Mix</span></div>
+            <div className="card-body">
+              <div style={{display:'flex',gap:'8px',marginBottom:'16px'}}>
+                <button onClick={handlePlayPause} style={{width:'32px',height:'32px',borderRadius:'50%',background:'var(--accent-grad)',border:'none',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'var(--shadow-glow)',flexShrink:0}}>
+                  {isPlaying?Ico.stop:Ico.play}
+                </button>
+                {isPlaying && <button onClick={handleStop} style={{width:'32px',height:'32px',borderRadius:'50%',background:'var(--panel-2)',border:'1px solid var(--border)',color:'var(--text-muted)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{Ico.stop}</button>}
+              </div>
+              <div style={{marginBottom:'12px'}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'6px'}}>
+                  <span style={{fontSize:'11px',color:'var(--text-muted)'}}>Mix Volume</span>
+                  <span className="mono" style={{fontSize:'11px',color:'var(--text-primary)',fontWeight:500}}>{masterVolume.toFixed(1)} dB</span>
+                </div>
+                <HSlider value={masterVolume} min={-40} max={12} onChange={updateMasterVolume}/>
+              </div>
+              <div style={{display:'flex',gap:'6px',marginTop:'8px'}}>
+                {[-12,-6,0].map(db=>(
+                  <button key={db} onClick={()=>{stems.forEach(s=>updateStemVolume(s.id,db));}} style={{flex:1,padding:'7px 4px',borderRadius:'6px',background:masterVolume===db?'var(--accent-soft)':'var(--panel-2)',border:`1px solid ${masterVolume===db?'rgba(217,70,239,0.4)':'var(--border)'}`,color:masterVolume===db?'var(--accent)':'var(--text-muted)',fontSize:'11px',cursor:'pointer',fontWeight:500}}>
+                    {db} dB
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* FFT */}
-          <div style={C.card}>
-            <span style={C.label}>FFT Analyzer</span>
-            <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'8px',border:'1px solid rgba(192,38,211,0.1)',marginBottom:'14px',height:'90px',overflow:'hidden'}}>
-              <canvas ref={mixFFTCanvasRef} width={800} height={100} style={{width:'100%',height:'100%',display:'block'}}/>
-            </div>
-            <div style={{display:'flex',justifyContent:'space-around'}}>
-              {(['bass','mid','high'] as const).map(band=>{
-                const val=band==='bass'?bassGain:band==='mid'?midGain:highGain;
-                return(
-                  <div key={band} style={{textAlign:'center'}}>
-                    <div style={{fontSize:'10px',fontWeight:600,letterSpacing:'0.8px',textTransform:'uppercase',color:'#9B7EC8',marginBottom:'8px'}}>{band}</div>
-                    <div style={{display:'flex',gap:'6px',justifyContent:'center'}}>
-                      <button onClick={()=>adjustGlobalEQ(band,'down')} style={{width:'32px',height:'32px',background:'rgba(36,22,54,0.75)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
-                      <button onClick={()=>adjustGlobalEQ(band,'up')} style={{width:'32px',height:'32px',background:'rgba(36,22,54,0.75)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'8px',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+          {/* FFT Analyzer */}
+          <div className="card">
+            <div className="card-head"><span className="card-title">FFT Analyzer</span></div>
+            <div className="card-body" style={{padding:'12px'}}>
+              <div style={{position:'relative',borderRadius:'6px',overflow:'hidden',background:'rgba(5,1,10,0.4)',border:'1px solid var(--border)'}}>
+                <canvas ref={mixFFTCanvasRef} width={560} height={120} style={{width:'100%',height:'120px',display:'block'}}/>
+                <div style={{position:'absolute',bottom:'6px',left:0,right:0,display:'flex',justifyContent:'space-between',padding:'0 8px'}}>
+                  {['Hz','260Hz','1kHz','4kHz','10k'].map(lbl=>(
+                    <span key={lbl} style={{fontSize:'9px',color:'rgba(255,255,255,0.25)'}}>{lbl}</span>
+                  ))}
+                </div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px',marginTop:'12px'}}>
+                {[{lbl:'BASS',val:bassGain,adj:(d:'up'|'down')=>adjustGlobalEQ('bass',d)},{lbl:'MID',val:midGain,adj:(d:'up'|'down')=>adjustGlobalEQ('mid',d)},{lbl:'HIGH',val:highGain,adj:(d:'up'|'down')=>adjustGlobalEQ('high',d)}].map(b=>(
+                  <div key={b.lbl} style={{textAlign:'center'}}>
+                    <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'6px'}}>{b.lbl}</div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
+                      <button onClick={()=>b.adj('down')} style={{width:'18px',height:'18px',borderRadius:'4px',border:'1px solid var(--border)',background:'var(--panel-2)',color:'var(--text-muted)',fontSize:'12px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>−</button>
+                      <span className="mono" style={{fontSize:'12px',color:'var(--accent)',fontWeight:600,minWidth:'40px',textAlign:'center'}}>{b.val>0?'+':''}{b.val.toFixed(1)} dB</span>
+                      <button onClick={()=>b.adj('up')} style={{width:'18px',height:'18px',borderRadius:'4px',border:'1px solid var(--border)',background:'var(--panel-2)',color:'var(--text-muted)',fontSize:'12px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>+</button>
                     </div>
-                    <div style={{...C.mono,fontSize:'11px',color:'#C026D3',marginTop:'5px',fontWeight:500}}>{val>0?'+':''}{val.toFixed(1)} dB</div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* LUFS */}
-          <div style={C.card}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}}>
-              <span style={{...C.label,marginBottom:0}}>LUFS</span>
-              <span style={{fontSize:'10px',fontWeight:600,padding:'3px 10px',borderRadius:'980px',background:'rgba(74,222,128,0.1)',color:'#4ade80',border:'1px solid rgba(74,222,128,0.2)'}}>Safe</span>
+          {/* LUFS Pane */}
+          <div className="card">
+            <div className="card-head">
+              <span className="card-title">LUFS</span>
+              <span style={{padding:'2px 8px',borderRadius:'4px',background:momentaryLufs>-20?'rgba(59,214,113,0.15)':'rgba(244,183,64,0.15)',color:momentaryLufs>-20?'var(--green)':'var(--yellow)',fontSize:'10px',fontWeight:700}}>
+                {momentaryLufs>-20?'● SAFE':'● SOFT'}
+              </span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'12px'}}>
-              {[{l:'Momentary',v:lufsMomentary},{l:'Integrated',v:lufsIntegrated}].map(m=>(
-                <div key={m.l} style={{background:'rgba(8,4,16,0.88)',borderRadius:'10px',padding:'12px',textAlign:'center',border:'1px solid rgba(192,38,211,0.08)'}}>
-                  <div style={{...C.mono,fontSize:'20px',fontWeight:500,...C.grad}}>{m.v.toFixed(1)}</div>
-                  <div style={{fontSize:'10px',color:'#9B7EC8',marginTop:'2px',textTransform:'uppercase',letterSpacing:'0.6px'}}>{m.l}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{borderTop:'1px solid rgba(192,38,211,0.1)',paddingTop:'10px'}}>
-              {[{n:'Spotify -10',c:'#4ade80'},{n:'YouTube -10',c:'#f87171'}].map(r=>(
-                <div key={r.n} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:'11px',marginBottom:'5px'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-                    <div style={{width:'6px',height:'6px',borderRadius:'50%',background:r.c}}></div>
-                    <span style={{color:'#9B7EC8'}}>{r.n}</span>
+            <div className="card-body">
+              <div className="lufs-big">
+                {[{val:momentaryLufs,lbl:'MOMENTARY'},{val:integratedLufs,lbl:'INTEGRATED'}].map(m=>(
+                  <div key={m.lbl} className="lufs-box">
+                    <div className="lufs-val mono">{m.val.toFixed(1)}</div>
+                    <div className="lufs-lbl">{m.lbl}</div>
                   </div>
-                  <span style={{...C.mono,color:'#F8F0FF',fontWeight:500}}>{r.v}</span>
-                </div>
-              ))}
+                ))}
+              </div>
+              <div className="lufs-targets-pane">
+                {[{lbl:'Spotify',val:'-16 LUFS',cls:'green'},{lbl:'YouTube',val:'-16 LUFS',cls:'yellow'}].map(t=>(
+                  <div key={t.lbl} className={`lufs-target-row ${t.cls}`}>
+                    <strong>{t.lbl}</strong>
+                    <span className="val mono">{t.val}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Stems */}
-        {stems.length>0&&(
-          <div>
-            <div style={{background:'rgba(192,38,211,0.06)',border:'1px solid rgba(192,38,211,0.15)',borderRadius:'12px',padding:'10px 14px',marginBottom:'12px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-              <button onClick={selectedStems.size===stems.length?clearSelection:selectAll}
-                style={{fontSize:'12px',fontWeight:700,padding:'6px 14px',borderRadius:'8px',background:selectedStems.size===stems.length?'rgba(192,38,211,0.25)':'rgba(192,38,211,0.12)',border:'1px solid rgba(192,38,211,0.35)',color:'#C026D3',cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
-                {selectedStems.size===stems.length?`✓ Todos (${stems.length})`:`Seleccionar todo (${stems.length})`}
-              </button>
-              {selectedStems.size>0&&<>
-                <div style={{width:'1px',height:'24px',background:'rgba(192,38,211,0.2)',flexShrink:0}}></div>
-                <span style={{fontSize:'11px',color:'#9B7EC8',flexShrink:0}}>{selectedStems.size} stem{selectedStems.size>1?'s':''} sel.</span>
-                <div style={{display:'flex',alignItems:'center',gap:'6px',background:'rgba(8,4,16,0.5)',borderRadius:'8px',padding:'4px 10px',border:'1px solid rgba(192,38,211,0.25)'}}>
-                  <span style={{fontSize:'11px',color:'#9B7EC8',flexShrink:0}}>Poner a:</span>
-                  <input type="number" min="-60" max="12" step="0.5" value={bulkDbInput}
-                    onChange={e=>setBulkDbInput(e.target.value)}
-                    onKeyDown={e=>{if(e.key==='Enter'){applyBulkDb(bulkDbInput);setBulkDbInput('');}}}
-                    placeholder="-6.0"
-                    style={{width:'56px',background:'transparent',border:'none',outline:'none',color:'#EC4899',fontSize:'13px',fontFamily:'monospace',fontWeight:700,textAlign:'center'}}/>
-                  <span style={{fontSize:'11px',color:'#9B7EC8',flexShrink:0}}>dB</span>
-                  <button onClick={()=>{applyBulkDb(bulkDbInput);setBulkDbInput('');}}
-                    style={{background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'3px 10px',borderRadius:'6px',fontSize:'11px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>↵</button>
-                </div>
-                <div style={{display:'flex',alignItems:'center',gap:'3px'}}>
-                  <button onClick={()=>updateSelectedVolume(-1)} style={{width:'26px',height:'26px',borderRadius:'6px',background:'rgba(192,38,211,0.12)',border:'1px solid rgba(192,38,211,0.2)',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>−</button>
-                  <span style={{fontSize:'10px',color:'#9B7EC8',padding:'0 2px'}}>1dB</span>
-                  <button onClick={()=>updateSelectedVolume(1)} style={{width:'26px',height:'26px',borderRadius:'6px',background:'rgba(192,38,211,0.12)',border:'1px solid rgba(192,38,211,0.2)',color:'#F8F0FF',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>+</button>
-                </div>
-                <button onClick={clearSelection} style={{marginLeft:'auto',fontSize:'11px',padding:'4px 10px',borderRadius:'6px',background:'transparent',border:'1px solid rgba(255,255,255,0.1)',color:'#9B7EC8',cursor:'pointer',fontFamily:'inherit'}}>✕ Limpiar</button>
-              </>}
+        {/* ── STEMS ── */}
+        <div className="card">
+          <div className="card-head stems-toolbar">
+            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+              <span className="card-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                Todos ({stems.length})
+              </span>
             </div>
-            <div className="stems-grid">
-              {stems.map(stem=>{
-                const isSel=selectedStems.has(stem.id);
-                return(
-                  <div key={stem.id} onClick={e=>toggleStemSelect(stem.id,e)}
-                    style={{...C.card,position:'relative' as const,borderColor:stem.muted?'rgba(248,113,113,0.4)':isSel?'rgba(192,38,211,0.6)':'rgba(192,38,211,0.15)',boxShadow:isSel?'0 0 10px rgba(192,38,211,0.25)':'none',cursor:'pointer',transition:'all 0.15s'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:'5px',marginBottom:'8px'}}>
-                      <span style={{fontSize:'16px',flexShrink:0}}>{stem.icon}</span>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:'10px',fontWeight:700,color:'#F8F0FF',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{stem.name.replace(/\.[^.]+$/,'').toUpperCase()}</div>
-                        <div style={{fontSize:'9px',color:'#9B7EC8'}}>{stem.instrument}</div>
+            <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+              <button onClick={()=>setShowUploadModal(true)} style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',borderRadius:'8px',background:'var(--panel-2)',border:'1px solid var(--border)',color:'var(--text-secondary)',fontSize:'12px',cursor:'pointer',transition:'all 200ms'}}>
+                {Ico.upload} Agregar stems
+              </button>
+            </div>
+          </div>
+
+          <div className="card-body" style={{paddingTop:'8px'}}>
+            <div className="stem-list">
+              {stems.map((stem, idx) => {
+                const color = TC[idx % TC.length];
+                const preset = stem.stemPresetId ? PRESETS.find(p=>p.id===stem.stemPresetId) : null;
+                // showPlugins removed
+                const showPresetMenu = openStemPresetId === stem.id;
+
+                return (
+                  <div key={stem.id} className={`stem${stem.muted?' muted':''}`}>
+                    {/* Color bar */}
+                    <div className="stem-color" style={{background:color}}/>
+                    {/* Meta */}
+                    <div className="stem-meta">
+                      <div className="stem-icon" style={{background:`${color}18`}}>
+                        <span style={{fontSize:'18px'}}>{stem.icon}</span>
                       </div>
-                      <button onClick={e=>{e.stopPropagation();toggleStemMute(stem.id);}}
-                        style={{width:'24px',height:'24px',borderRadius:'6px',flexShrink:0,background:stem.muted?'rgba(248,113,113,0.2)':'rgba(192,38,211,0.15)',border:stem.muted?'1px solid rgba(248,113,113,0.5)':'1px solid rgba(192,38,211,0.2)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        <i className={stem.muted?'ri-volume-mute-line':'ri-volume-up-line'} style={{color:stem.muted?'#f87171':'#C026D3',fontSize:'11px'}}></i>
+                      <div className="stem-info">
+                        <div className="stem-name" title={stem.name}>{stem.name.replace(/\.[^/.]+$/,'')}</div>
+                        <div className="stem-kind">{stem.instrument}</div>
+                      </div>
+                      <button onClick={()=>toggleStemMute(stem.id)} className={`stem-m${stem.muted?' on':''}`}>
+                        M
                       </button>
                     </div>
-                    <div style={{background:'rgba(8,4,16,0.88)',borderRadius:'6px',height:'24px',overflow:'hidden',border:'1px solid rgba(192,38,211,0.08)',marginBottom:'8px',opacity:stem.muted?0.3:1}}>
-                      <canvas width={200} height={28} style={{width:'100%',height:'100%',display:'block'}}
-                        ref={c=>{if(c&&stem.fftData) drawMiniFFT(c,stem.fftData,stem.muted?'#666':'#C026D3');}}/>
+
+                    {/* Waveform */}
+                    <div className="stem-wave">
+                      <StemWave peaks={stem.waveformPeaks} color={color} currentTime={currentTime} duration={duration}/>
                     </div>
-                    <div style={{marginBottom:'6px'}}>
-                      <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px',marginBottom:'3px',alignItems:'center'}}>
-                        <span style={{color:'#9B7EC8'}}>Vol</span>
-                        {editingVolumeId===stem.id?(
-                          <input type="number" min="-60" max="12" step="0.1" value={editingVolumeVal}
-                            onChange={e=>setEditingVolumeVal(e.target.value)}
-                            onBlur={()=>commitEditVolume(stem.id)}
-                            onKeyDown={e=>{if(e.key==='Enter')commitEditVolume(stem.id);if(e.key==='Escape')setEditingVolumeId(null);}}
-                            onClick={e=>e.stopPropagation()} autoFocus
-                            style={{width:'50px',background:'rgba(192,38,211,0.15)',border:'1px solid #C026D3',borderRadius:'4px',color:'#F8F0FF',fontSize:'10px',padding:'1px 4px',fontFamily:'monospace',textAlign:'right'}}/>
-                        ):(
-                          <span onClick={e=>{e.stopPropagation();startEditVolume(stem);}}
-                            style={{...C.mono,color:'#C026D3',fontWeight:500,cursor:'text',borderBottom:'1px dashed rgba(192,38,211,0.3)',paddingBottom:'1px'}}>
-                            {stem.volume>0?'+':''}{stem.volume.toFixed(1)} dB
-                          </span>
-                        )}
+
+                    {/* Controls */}
+                    <div className="stem-ctrl">
+                      <div className="stem-ctrl-row">
+                        <span className="stem-ctrl-lbl">Vol</span>
+                        <span className="stem-ctrl-val mono">{stem.volume.toFixed(1)} dB</span>
                       </div>
-                      <div style={C.track}>
-                        <div style={C.trackFill(((stem.volume+60)/72)*100)}></div>
-                        <input type="range" min="-60" max="12" step="0.1" value={stem.volume}
-                          onChange={e=>{e.stopPropagation();updateStemVolume(stem.id,parseFloat(e.target.value));}}
-                          onClick={e=>e.stopPropagation()}
-                          style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%'}}/>
+                      <div style={{position:'relative',height:'4px',background:'rgba(255,255,255,0.06)',borderRadius:'2px',cursor:'pointer',margin:'4px 0 8px'}}
+                        onClick={e=>{const r=e.currentTarget.getBoundingClientRect();updateStemVolume(stem.id,-40+(((e.clientX-r.left)/r.width)*52));}}>
+                        <div style={{height:'100%',width:`${((stem.volume+40)/52)*100}%`,background:`linear-gradient(90deg,${color},var(--accent-2))`,borderRadius:'2px'}}/>
+                        <div style={{position:'absolute',top:'50%',left:`${((stem.volume+40)/52)*100}%`,transform:'translate(-50%,-50%)',width:'10px',height:'10px',borderRadius:'50%',background:color,boxShadow:`0 0 6px ${color}`}}/>
                       </div>
-                    </div>
-                    <div style={{marginBottom:'8px'}}>
-                      <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px',marginBottom:'3px'}}>
-                        <span style={{color:'#9B7EC8'}}>Pan</span>
-                        <span style={{...C.mono,color:'#C026D3',fontWeight:500}}>{stem.pan===0?'C':stem.pan>0?`R${(stem.pan*100).toFixed(0)}`:`L${(Math.abs(stem.pan)*100).toFixed(0)}`}</span>
+                      <div className="stem-ctrl-row">
+                        <span className="stem-ctrl-lbl">Pan</span>
+                        <span className="stem-ctrl-val mono">{stem.pan===0?'C':stem.pan>0?`R${stem.pan}`:`L${Math.abs(stem.pan)}`}</span>
                       </div>
-                      <div style={C.track}>
-                        <div style={C.trackFill(((stem.pan+1)/2)*100)}></div>
-                        <input type="range" min="-1" max="1" step="0.01" value={stem.pan}
-                          onChange={e=>{e.stopPropagation();updateStemPan(stem.id,parseFloat(e.target.value));}}
-                          onClick={e=>e.stopPropagation()}
-                          style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%'}}/>
+                      <div style={{position:'relative',height:'4px',background:'rgba(255,255,255,0.06)',borderRadius:'2px',cursor:'pointer',margin:'4px 0'}}
+                        onClick={e=>{const r=e.currentTarget.getBoundingClientRect();updateStemPan(stem.id,Math.round(-50+(((e.clientX-r.left)/r.width)*100)));}}>
+                        <div style={{position:'absolute',left:'50%',width:'2px',top:0,bottom:0,background:'rgba(255,255,255,0.1)',transform:'translateX(-50%)'}}/>
+                        <div style={{height:'100%',position:'absolute',left:stem.pan>=0?'50%':`${((stem.pan+50)/100)*100}%`,width:`${Math.abs(stem.pan)}%`,background:`linear-gradient(90deg,${color},var(--accent-2))`,borderRadius:'2px'}}/>
+                        <div style={{position:'absolute',top:'50%',left:`${((stem.pan+50)/100)*100}%`,transform:'translate(-50%,-50%)',width:'10px',height:'10px',borderRadius:'50%',background:color,boxShadow:`0 0 6px ${color}`}}/>
                       </div>
-                    </div>
-                    <div onClick={e=>e.stopPropagation()}>
-                      <button onClick={e=>{e.stopPropagation();setOpenStemPresetId(openStemPresetId===stem.id?null:stem.id);}}
-                        style={{width:'100%',background:stem.stemPresetId?`${PRESETS.find(p=>p.id===stem.stemPresetId)?.color}18`:'rgba(255,255,255,0.04)',border:`1px solid ${stem.stemPresetId?PRESETS.find(p=>p.id===stem.stemPresetId)?.color+'44':'rgba(255,255,255,0.08)'}`,borderRadius:'7px',padding:'5px 8px',color:stem.stemPresetId?PRESETS.find(p=>p.id===stem.stemPresetId)?.color:'#9B7EC8',fontSize:'10px',fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                        <span>{stem.stemPresetId?`✦ ${PRESETS.find(p=>p.id===stem.stemPresetId)?.name}`:'+ Preset EQ'}</span>
-                        <span style={{fontSize:'9px',opacity:0.6}}>{openStemPresetId===stem.id?'▲':'▼'}</span>
-                      </button>
-                      {openStemPresetId===stem.id&&(
-                        <div style={{position:'absolute',zIndex:50,background:'rgba(15,10,26,0.98)',border:'1px solid rgba(192,38,211,0.3)',borderRadius:'12px',padding:'10px',width:'220px',boxShadow:'0 8px 32px rgba(0,0,0,0.6)',marginTop:'4px'}}>
-                          <div style={{fontSize:'10px',fontWeight:700,color:'#9B7EC8',marginBottom:'8px',letterSpacing:'0.5px',textTransform:'uppercase'}}>Preset EQ para este stem</div>
-                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'5px',marginBottom:'8px'}}>
-                            {PRESETS.map(p=>(
-                              <button key={p.id} onClick={()=>applyStemPreset(stem,p)}
-                                style={{padding:'6px 8px',borderRadius:'7px',border:`1px solid ${p.color}44`,background:stem.stemPresetId===p.id?`${p.color}22`:'rgba(8,4,16,0.6)',color:stem.stemPresetId===p.id?p.color:'#C9B8F0',fontSize:'10px',fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:'5px',textAlign:'left'}}>
-                                <div style={{width:'8px',height:'8px',borderRadius:'50%',background:p.color,flexShrink:0}}></div>{p.name}
-                              </button>
-                            ))}
-                          </div>
-                          {stem.stemPresetId&&(
-                            <button onClick={()=>clearStemPreset(stem)}
-                              style={{width:'100%',padding:'5px',borderRadius:'6px',background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.25)',color:'#f87171',fontSize:'10px',fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                              ✕ Quitar preset
-                            </button>
+
+                      {/* Preset + Plugins buttons */}
+                      <div className="stem-actions" style={{marginTop:'8px',gridTemplateColumns:'1fr 1fr 1fr'}}>
+                        {/* Preset EQ */}
+                        <div style={{gridColumn:'1/-1',position:'relative'}}>
+                          <button onClick={()=>setOpenStemPresetId(openStemPresetId===stem.id?null:stem.id)} className="stem-act-btn" style={{width:'100%',background:preset?`${preset.color}18`:'var(--panel-2)',borderColor:preset?`${preset.color}40`:'var(--border)',color:preset?preset.color:'var(--text-secondary)'}}>
+                            {Ico.eq} {preset?`✦ ${preset.name}`:'+ Preset EQ'}
+                          </button>
+                          {showPresetMenu && (
+                            <div data-preset-menu style={{position:'absolute',bottom:'calc(100% + 6px)',left:0,right:0,background:'var(--panel-1)',border:'1px solid var(--border-strong)',borderRadius:'var(--r-lg)',padding:'12px',zIndex:100,boxShadow:'var(--shadow-lg)',minWidth:'220px'}}>
+                              <div style={{fontSize:'10px',fontWeight:700,color:'var(--text-muted)',letterSpacing:'0.1em',marginBottom:'8px'}}>PRESET EQ PARA ESTE STEM</div>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                                {PRESETS.map(p=>(
+                                  <button key={p.id} onClick={()=>applyStemPreset(stem,p)} style={{padding:'7px 10px',borderRadius:'8px',border:`1px solid ${stem.stemPresetId===p.id?p.color+'60':p.color+'22'}`,background:stem.stemPresetId===p.id?`${p.color}18`:'rgba(0,0,0,0.3)',color:stem.stemPresetId===p.id?p.color:'var(--text-secondary)',fontSize:'12px',fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',textAlign:'left'}}>
+                                    <span style={{width:'8px',height:'8px',borderRadius:'50%',background:p.color,flexShrink:0}}/>
+                                    {p.name}
+                                  </button>
+                                ))}
+                              </div>
+                              {stem.stemPresetId && <button onClick={()=>clearStemPreset(stem)} style={{marginTop:'8px',width:'100%',padding:'6px',borderRadius:'6px',background:'transparent',border:'1px solid var(--border)',color:'var(--text-muted)',fontSize:'11px',cursor:'pointer'}}>Limpiar preset</button>}
+                            </div>
                           )}
                         </div>
-                      )}
+
+                        {/* Plugin buttons */}
+                        <PlugBtn label="Comp" active={stem.plugins.compressor} onClick={()=>toggleStemPlugin(stem.id,'compressor')}/>
+                        <PlugBtn label="Reverb" active={stem.plugins.reverb} onClick={()=>toggleStemPlugin(stem.id,'reverb')}/>
+                        <PlugBtn label="Delay" active={stem.plugins.delay} onClick={()=>toggleStemPlugin(stem.id,'delay')}/>
+                        <PlugBtn label="Tape" active={stem.plugins.tape} onClick={()=>toggleStemPlugin(stem.id,'tape')}/>
+                        <PlugBtn label="NR" active={stem.plugins.noiseReduction} onClick={()=>toggleStemPlugin(stem.id,'noiseReduction')}/>
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      {showUpgradeModal&&(
-        <UpgradeModal trigger="export" onClose={()=>setShowUpgradeModal(false)}
-          user={(()=>{try{const u=localStorage.getItem('audioMixerUser');return u?JSON.parse(u):null;}catch{return null;}})()}
-          onSuccess={()=>setShowUpgradeModal(false)}/>
-      )}
-      {showPaywall&&(
-        <PaywallModal onClose={()=>setShowPaywall(false)} onSuccess={()=>{setShowPaywall(false);handleExportMix();}}/>
-      )}
-      <UploadModal isOpen={showUploadModal} onClose={()=>setShowUploadModal(false)}
-        onUploadComplete={handleUploadMoreStems} userCredits={user.credits} onCreditsUpdate={onCreditsUpdate}/>
+      </div>{/* .studio */}
+
+      <style>{`
+        .mbm-grid { display:grid; grid-template-columns:repeat(4,1fr); }
+        .mbm-col { padding:20px; border-right:1px solid var(--border); }
+        .mbm-col:last-child { border-right:none; }
+        .tools-grid { display:grid; grid-template-columns:1fr 2fr 1fr; gap:20px; }
+        .preset-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; }
+        .stems-toolbar { align-items:center; }
+        .stem { position:relative; }
+        .knob { cursor:ns-resize; transition:box-shadow 150ms; }
+        .knob:hover { box-shadow:0 0 12px var(--accent-glow) !important; }
+        .eq-band-slider { touch-action:none; }
+        .btn-ghost { background:transparent !important; border-color:var(--border-strong) !important; color:var(--text-secondary) !important; }
+        .btn-ghost:hover { background:var(--panel-2) !important; color:var(--text-primary) !important; }
+        .stem-actions { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; }
+        @media(max-width:1200px){
+          .mbm-grid{grid-template-columns:1fr 1fr;}
+          .mbm-col{border-right:none;border-bottom:1px solid var(--border);}
+          .tools-grid{grid-template-columns:1fr;}
+          .stem{grid-template-columns:140px 1fr !important;}
+        }
+        @media(max-width:900px){
+          .stem{grid-template-columns:1fr !important; display:flex; flex-direction:column;}
+        }
+        @keyframes spin{to{transform:rotate(360deg)}}
+      `}</style>
     </div>
   );
 }

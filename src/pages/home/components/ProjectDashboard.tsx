@@ -6,7 +6,8 @@ import Header from '@/components/feature/Header';
 import MixEditor from './MixEditor';
 import ExportScreen from './ExportScreen';
 import NewProjectScreen from './NewProjectScreen';
-import PresetScreen, { MixPreset, PRESETS } from './PresetScreen';
+import PresetScreen from './PresetScreen';
+import { MixPreset, PRESETS } from './mixTypes';
 import AIChat from './AIChat';
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -247,7 +248,7 @@ function UploadArea({ onUploadComplete }: { onUploadComplete: (f: File[]) => voi
     <>
       <input type="file" multiple accept="audio/*,.wav,.mp3,.flac,.aac,.m4a" onChange={e => { if(e.target.files) processFiles(Array.from(e.target.files)); e.target.value=''; }} id="file-upload" style={{display:'none'}} />
       <div
-        style={{background:'rgba(26,16,40,0.82)',border:`2px dashed ${isDragging?'#C026D3':'rgba(192,38,211,0.25)'}`,borderRadius:'20px',padding:'48px 24px',textAlign:'center',cursor:'pointer',transition:'all 0.2s',background:isDragging?'rgba(192,38,211,0.05)':'#1A1028'} as any}
+        style={{background:isDragging?'rgba(192,38,211,0.05)':'#1A1028',border:`2px dashed ${isDragging?'#C026D3':'rgba(192,38,211,0.25)'}`,borderRadius:'20px',padding:'48px 24px',textAlign:'center',cursor:'pointer',transition:'all 0.2s'} as any}
         onDragOver={e=>{e.preventDefault();setIsDragging(true)}} onDragLeave={e=>{e.preventDefault();setIsDragging(false)}}
         onDrop={handleDrop} onClick={() => document.getElementById('file-upload')?.click()}>
         <div style={{width:'60px',height:'60px',margin:'0 auto 16px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'16px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 24px rgba(192,38,211,0.4)'}}>

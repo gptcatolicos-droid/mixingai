@@ -226,7 +226,7 @@ export default function ExportScreen({ user, exportData, exportProgress, exportS
                     ))}
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px'}}>
-                    {[{l:'Sample Rate',v:'44.1 kHz',c:'#C026D3'},{l:'Bit Depth',v:'24 bits',c:'#7C3AED'},{l:'Spotify',v:exportData.finalLufs?.toFixed(1),c:Math.abs((exportData.finalLufs??-10)+10)<1.5?'#4ade80':'#FBBF24'}].map(s=>(
+                    {[{l:'Sample Rate',v:'44.1 kHz',c:'#C026D3'},{l:'Bit Depth',v:'24 bits',c:'#7C3AED'},{l:'Spotify',v:exportData.finalLufs?.toFixed(1),c:Math.abs((exportData.finalLufs??-16)+16)<1.5?'#4ade80':'#FBBF24'}].map(s=>(
                       <div key={s.l} style={{background:'rgba(15,10,26,0.6)',borderRadius:'8px',padding:'8px',textAlign:'center' as const,border:'1px solid rgba(192,38,211,0.06)'}}>
                         <div style={{...S.mono,fontSize:'13px',fontWeight:600,color:s.c}}>{s.v}</div>
                         <div style={{fontSize:'9px',color:'#9B7EC8'}}>{s.l}</div>

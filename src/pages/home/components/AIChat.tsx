@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MixPreset, PRESETS } from './PresetScreen';
+import { MixPreset, PRESETS } from './mixTypes';
 
 interface User { id: string; firstName: string; lastName: string; email: string; country: string; credits: number; provider?: string; createdAt: string; username?: string; avatar?: string; }
 interface Message { id: string; role: 'ai'|'user'; text: string; presets?: MixPreset[]; stems?: File[]; showUploadCard?: boolean; showProgress?: boolean; showMixerBtn?: boolean; }

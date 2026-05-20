@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MixPreset, PRESETS } from './PresetScreen';
+import { MixPreset, PRESETS } from './mixTypes';
 import { blogArticles } from '../../../mocks/blogArticles';
 
 interface HomeHeroProps { onStartMixer: (preset: MixPreset, files: File[]) => void; }
@@ -22,7 +22,7 @@ const EQ_LABELS=['Pre','30Hz','60Hz','170Hz','310Hz','600Hz','1kHz','3kHz','6kHz
 const TESTIMONIALS = [
   { name:'Carlos M.', role:'Productor Gospel', country:'🇨🇴', text:'Subí 10 stems de mi coro y en 3 minutos tenía una mezcla lista para radio. Increíble.', stars:5 },
   { name:'Valeria R.', role:'Cantautora', country:'🇲🇽', text:'Nunca pensé que podría tener calidad de estudio sin pagar miles de dólares. MixingMusic.AI cambió todo.', stars:5 },
-  { name:'DJ Fontana', role:'DJ / Productor EDM', country:'🇦🇷', text:'El preset Dance/EDM está brutal. Los -10 LUFS suenan perfecto en Spotify desde el primer intento.', stars:5 },
+  { name:'DJ Fontana', role:'DJ / Productor EDM', country:'🇦🇷', text:'El preset Dance/EDM está brutal. Los -16 LUFS suenan perfecto en Spotify desde el primer intento.', stars:5 },
   { name:'Pastor Reyes', role:'Director Musical', country:'🇵🇪', text:'Lo uso cada domingo para mezclar el ensayo del coro. La reverb de gospel es exactamente lo que necesitaba.', stars:5 },
   { name:'Ana Sofía T.', role:'Artista Indie', country:'🇨🇱', text:'El IA EQ me dejó escuchar cómo suena mi mezcla en cada dispositivo antes de descargar. Genial.', stars:5 },
   { name:'Marcos L.', role:'Ingeniero de Audio', country:'🇧🇷', text:'Los LUFS integrados son reales. El limiter hace su trabajo. Para una herramienta gratuita es sorprendente.', stars:5 },
@@ -31,15 +31,15 @@ const TESTIMONIALS = [
 const FAQ_ITEMS = [
   { q:'¿Por qué mezclar con IA en lugar de un ingeniero humano?', a:'Un ingeniero profesional cobra entre $500 y $3,000 por mezcla. Nuestra IA aplica las mismas técnicas en 3 minutos, completamente gratis. Para demos, proyectos independientes y música para streaming, la diferencia es indetectable.' },
   { q:'¿Qué formatos de audio acepta MixingMusic.AI?', a:'Acepta WAV, MP3, FLAC, AAC y M4A. Puedes subir hasta 12 stems simultáneamente. Recomendamos WAV 24-bit para mejor calidad en la exportación final.' },
-  { q:'¿Qué significa -10 LUFS y por qué importa?', a:'LUFS es el estándar de volumen para plataformas de streaming. Spotify normaliza a -10 LUFS, YouTube a -13 LUFS. Si tu canción supera ese nivel, la plataforma la baja automáticamente y suena peor. Nuestra IA exporta siempre en el rango correcto.' },
-  { q:'¿Cómo funciona el IA EQ?', a:'El IA EQ tiene 12 bandas (30Hz a 16kHz) con presets optimizados para cada dispositivo: Car, iPhone, MacBook, Headphones, TV, Home Theater, Bluetooth Speaker, Studio Monitors, Gaming Headset y Tablet. Escuchas el cambio en tiempo real y la exportación incluye el EQ aplicado a -10 LUFS.' },
+  { q:'¿Qué significa -16 LUFS y por qué importa?', a:'LUFS es el estándar de volumen para plataformas de streaming. Spotify normaliza a -16 LUFS, YouTube a -13 LUFS. Si tu canción supera ese nivel, la plataforma la baja automáticamente y suena peor. Nuestra IA exporta siempre en el rango correcto.' },
+  { q:'¿Cómo funciona el IA EQ?', a:'El IA EQ tiene 12 bandas (30Hz a 16kHz) con presets optimizados para cada dispositivo: Car, iPhone, MacBook, Headphones, TV, Home Theater, Bluetooth Speaker, Studio Monitors, Gaming Headset y Tablet. Escuchas el cambio en tiempo real y la exportación incluye el EQ aplicado a -16 LUFS.' },
   { q:'¿Cuánto cuesta?', a:'La primera mezcla es 100% gratis al registrarte. Después puedes obtener mezclas ilimitadas por $3.99. Puedes pagar con PayPal o Mercado Pago.' },
   { q:'¿Qué es el Mix Bus Master?', a:'Es el canal master donde se aplican todos los efectos finales: EQ, compresión, reverb, delay, IA EQ y el limiter anti-clipping. Es la misma arquitectura que usan los DAW profesionales como Pro Tools y Logic Pro.' },
 ];
 
 const STATS = [
   { num:'47,832', label:'Mezclas generadas', icon:'🎛️' },
-  { num:'-10 LUFS', label:'Estándar Spotify garantizado', icon:'🎵' },
+  { num:'-16 LUFS', label:'Estándar Spotify garantizado', icon:'🎵' },
   { num:'10', label:'Presets IA EQ por dispositivo', icon:'🎚️' },
   { num:'$3.99', label:'Mezclas ilimitadas', icon:'∞' },
 ];
@@ -50,7 +50,7 @@ const PRICING_FEATURES = [
   '🎚️ IA EQ 12 bandas · Car, iPhone, TV, Studio y más',
   '🎛️ 9 presets de género (Pop, Rock, Gospel, EDM…)',
   '📁 Descarga WAV 24-bit + MP3',
-  '⚡ Exportación a -10 LUFS (listo para Spotify)',
+  '⚡ Exportación a -16 LUFS (listo para Spotify)',
   '🔇 Reducción de ruido + Compresor IA',
   '🎵 Hasta 12 stems simultáneos',
 ];
@@ -135,7 +135,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
             ))}
           </div>
           <div style={{padding:'12px 20px',background:'rgba(8,4,16,0.5)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-            <span style={{fontSize:'11px',color:'#9B7EC8'}}>✦ Gospel activo · -10 LUFS · Safe ✓</span>
+            <span style={{fontSize:'11px',color:'#9B7EC8'}}>✦ Gospel activo · -16 LUFS · Safe ✓</span>
             <button onClick={goRegister} style={{background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'7px 16px',borderRadius:'980px',fontSize:'11px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Usar gratis →</button>
           </div>
         </div>
@@ -151,6 +151,24 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
               <div style={{fontSize:'13px',color:'rgba(248,240,255,0.5)',marginTop:'4px'}}>{s.label}</div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* ───── AWARD — debajo del hero ───── */}
+      <div style={{padding:'60px 20px 40px',background:'linear-gradient(180deg,rgba(10,7,16,0.0),rgba(10,7,16,0.95))'}}>
+        <div style={{maxWidth:'960px',margin:'0 auto',textAlign:'center'}}>
+          <img
+            src="/winner3.png"
+            alt="2026 Global Recognition Award — MixingMusic.AI"
+            style={{
+              width:'100%',
+              maxWidth:'560px',
+              borderRadius:'20px',
+              boxShadow:'0 0 80px rgba(217,70,239,0.25), 0 20px 60px rgba(0,0,0,0.6)',
+              display:'block',
+              margin:'0 auto',
+            }}
+          />
         </div>
       </div>
 
@@ -228,8 +246,8 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'20px'}}>
             {[
               {num:'1',icon:'🎵',color:'#EC4899',title:'Regístrate y sube tus stems',sub:'WAV · MP3 · FLAC · hasta 12 pistas',desc:'Crea tu cuenta gratis. La IA detecta cada instrumento — voz, batería, bajo, guitarra, piano — y los organiza automáticamente.',badge:'Auto-detección IA'},
-              {num:'2',icon:'🎛️',color:'#C026D3',title:'Mezcla con IA',sub:'EQ · Compresor · Reverb · -10 LUFS',desc:'9 presets de género calibrados profesionalmente. Ajusta faders, mute por pista y edición manual de dB en tiempo real.',badge:'9 presets de género'},
-              {num:'3',icon:'🎚️',color:'#7C3AED',title:'IA EQ por dispositivo',sub:'Car · iPhone · Headphones · Studio · +7 más',desc:'Escucha tu mezcla tal como sonaría en cada dispositivo. Descarga con el EQ aplicado a -10 LUFS WAV 24-bit.',badge:'IA EQ 12 bandas'},
+              {num:'2',icon:'🎛️',color:'#C026D3',title:'Mezcla con IA',sub:'EQ · Compresor · Reverb · -16 LUFS',desc:'9 presets de género calibrados profesionalmente. Ajusta faders, mute por pista y edición manual de dB en tiempo real.',badge:'9 presets de género'},
+              {num:'3',icon:'🎚️',color:'#7C3AED',title:'IA EQ por dispositivo',sub:'Car · iPhone · Headphones · Studio · +7 más',desc:'Escucha tu mezcla tal como sonaría en cada dispositivo. Descarga con el EQ aplicado a -16 LUFS WAV 24-bit.',badge:'IA EQ 12 bandas'},
             ].map((step,i)=>(
               <div key={i} style={{background:'rgba(26,16,40,0.9)',border:`1px solid ${step.color}22`,borderRadius:'20px',padding:'28px',borderTop:`3px solid ${step.color}`,position:'relative',overflow:'hidden'}}>
                 <div style={{position:'absolute',top:'-20px',right:'-10px',fontSize:'100px',fontWeight:900,color:`${step.color}06`,lineHeight:1,userSelect:'none'}}>{step.num}</div>
@@ -260,7 +278,7 @@ export default function HomeHero({ onStartMixer }: HomeHeroProps) {
         <div style={{maxWidth:'900px',margin:'0 auto'}}>
           <div style={{textAlign:'center',marginBottom:'36px'}}>
             <h2 style={{...S.sectionTitle}}>IA EQ — escucha tu mezcla <span style={S.grad}>en cualquier dispositivo</span></h2>
-            <p style={{...S.sectionSub,marginBottom:'0'}}>12 bandas · presets por dispositivo · se exporta con tu mezcla a -10 LUFS</p>
+            <p style={{...S.sectionSub,marginBottom:'0'}}>12 bandas · presets por dispositivo · se exporta con tu mezcla a -16 LUFS</p>
           </div>
           <div style={{background:'rgba(13,8,22,0.95)',border:'1px solid rgba(192,38,211,0.2)',borderRadius:'20px',padding:'24px',overflow:'hidden'}}>
             <div style={{display:'flex',flexWrap:'wrap',gap:'7px',marginBottom:'20px'}}>

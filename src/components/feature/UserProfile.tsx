@@ -123,7 +123,7 @@ export default function UserProfile({ user, isOpen, onClose, onLogout }: UserPro
                     </h4>
                     <span className="text-sm font-bold text-purple-400 bg-purple-400/10 px-3 py-1 rounded-full">∞ Activo</span>
                   </div>
-                  <p className="text-xs text-slate-400">Mezclas ilimitadas · IA EQ · WAV 24-bit · -10 LUFS</p>
+                  <p className="text-xs text-slate-400">Mezclas ilimitadas · IA EQ · WAV 24-bit · -16 LUFS</p>
                 </>
               ) : (
                 <>

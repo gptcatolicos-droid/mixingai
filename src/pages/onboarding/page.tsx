@@ -81,7 +81,7 @@ const OnboardingPage: React.FC = () => {
                 <i className="ri-headphone-line text-white text-2xl"></i>
               </div>
               <h4 className="font-bold text-gray-900 mb-2">Calidad Studio</h4>
-              <p className="text-gray-600 text-sm">Exportación profesional -10 LUFS para streaming</p>
+              <p className="text-gray-600 text-sm">Exportación profesional -16 LUFS para streaming</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 mx-auto bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg mb-3">
@@ -302,7 +302,7 @@ const OnboardingPage: React.FC = () => {
               </div>
               <div className="flex items-center justify-between bg-white/50 rounded-xl p-3">
                 <span className="text-gray-700">Calidad de Exportación</span>
-                <span className="font-bold text-blue-600">-10 LUFS</span>
+                <span className="font-bold text-blue-600">-16 LUFS</span>
               </div>
               <div className="flex items-center justify-between bg-white/50 rounded-xl p-3">
                 <span className="text-gray-700">Plantillas Incluidas</span>
