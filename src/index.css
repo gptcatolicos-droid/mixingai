@@ -118,3 +118,8 @@ a, button { -webkit-tap-highlight-color: transparent; }
     grid-template-columns: 1fr;
   }
 }
+
+/* Mixer — misma imagen de fondo que el home */
+body.page-mixer {
+  background: rgba(15,10,26,0.88) !important;
+}

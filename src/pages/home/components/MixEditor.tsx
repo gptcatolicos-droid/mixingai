@@ -189,7 +189,7 @@ function StemWave({ peaks, color, currentTime, duration }: { peaks: Float32Array
       ctx.fillRect(playedW, 0, 1, h);
     }
   }, [peaks, currentTime, duration, color]);
-  return <canvas ref={ref} width={600} height={44} style={{ width:'100%', height:'44px', display:'block' }} />;
+  return <canvas ref={ref} width={800} height={64} style={{ width:'100%', height:'64px', display:'block' }} />;
 }
 
 /* ─── Track color palette — hex reales (canvas no entiende CSS vars) ─── */
@@ -219,31 +219,33 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   );
 }
 
-/* ─── HSlider — click + drag ─── */
+/* ─── HSlider — click + drag sin memory leaks ─── */
 function HSlider({ value, min, max, onChange, color='#D946EF' }: { value:number; min:number; max:number; onChange:(v:number)=>void; color?:string }) {
   const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
   const ref = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; });
 
-  const calcValue = (clientX: number) => {
+  const calcValue = useCallback((clientX: number) => {
     const r = ref.current?.getBoundingClientRect();
-    if (!r) return value;
-    return Math.max(min, Math.min(max, min + ((clientX - r.left) / r.width) * (max - min)));
-  };
+    if (!r) return;
+    const v = Math.max(min, Math.min(max, min + ((clientX - r.left) / r.width) * (max - min)));
+    onChangeRef.current(v);
+  }, [min, max]);
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => { if (dragging.current) onChange(calcValue(e.clientX)); };
+    const onMove = (e: MouseEvent) => { if (dragging.current) calcValue(e.clientX); };
     const onUp   = () => { dragging.current = false; };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-  }, [min, max, onChange]);
+  }, [calcValue]);
 
   return (
     <div ref={ref}
       style={{ position:'relative', height:'4px', background:'rgba(255,255,255,0.08)', borderRadius:'2px', cursor:'pointer', userSelect:'none' }}
-      onMouseDown={e => { dragging.current = true; onChange(calcValue(e.clientX)); }}
-      onClick={e => onChange(calcValue(e.clientX))}>
+      onMouseDown={e => { dragging.current = true; calcValue(e.clientX); }}>
       <div style={{ height:'100%', width:`${pct}%`, background:`linear-gradient(90deg, ${color}, #A855F7)`, borderRadius:'2px', pointerEvents:'none' }} />
       <div style={{ position:'absolute', top:'50%', left:`${pct}%`, transform:'translate(-50%,-50%)', width:'12px', height:'12px', borderRadius:'50%', background:color, boxShadow:`0 0 8px ${color}80`, pointerEvents:'none' }} />
     </div>
@@ -464,7 +466,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       setStems(stemsArr); setDuration(maxDur); startFFTAnimation();
       setLoadingProgress(100); setLoadingStep('¡Listo!');
       setTimeout(() => setIsLoading(false), 500);
-    } catch(e) { console.error(e); setIsLoading(false); }
+    } catch(e) { console.error(e); setLoadingStep('Error al cargar archivos de audio. Verifica que sean .wav o .mp3'); setIsLoading(false); }
   };
 
   /* ─── Plugin toggle (on/off via audio param changes) ─── */
@@ -802,6 +804,12 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     audioContextRef.current?.close();
   },[]);
 
+  /* ─── Activar background de estudio igual que el home ─── */
+  useEffect(() => {
+    document.body.classList.add('page-mixer');
+    return () => document.body.classList.remove('page-mixer');
+  }, []);
+
   /* ─── Click outside: cerrar menú de presets del stem ─── */
   useEffect(()=>{
     if(!openStemPresetId) return;
@@ -819,7 +827,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
   /* ════ LOADING SCREEN ════ */
   if(isLoading) return(
-    <div style={{minHeight:'100vh',background:'var(--bg-0)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'24px',fontFamily:'Inter,system-ui,sans-serif'}}>
+    <div style={{minHeight:'100vh',background:'transparent',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'24px',fontFamily:'Inter,system-ui,sans-serif'}}>
       <div style={{fontSize:'48px'}}>🎛️</div>
       <div style={{textAlign:'center'}}>
         <h2 style={{fontSize:'18px',fontWeight:600,color:'var(--text-primary)',marginBottom:'8px'}}>{loadingStep}</h2>
@@ -834,7 +842,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
   /* ════ EXPORT OVERLAY ════ */
   if(isExporting) return(
-    <div style={{minHeight:'100vh',background:'var(--bg-0)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'24px',fontFamily:'Inter,system-ui,sans-serif'}}>
+    <div style={{minHeight:'100vh',background:'transparent',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'24px',fontFamily:'Inter,system-ui,sans-serif'}}>
       <div style={{fontSize:'48px'}}>🎚️</div>
       <div style={{textAlign:'center',maxWidth:'360px'}}>
         <h2 style={{fontSize:'18px',fontWeight:600,color:'var(--text-primary)',marginBottom:'8px'}}>{exportStep}</h2>
@@ -855,7 +863,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
   /* ════ MAIN RENDER ════ */
   return (
-    <div style={{minHeight:'100vh',fontFamily:'Inter,-apple-system,system-ui,sans-serif',background:'radial-gradient(1200px 600px at 70% -5%, rgba(217,70,239,0.07), transparent 55%), radial-gradient(900px 500px at -5% 30%, rgba(168,85,247,0.05), transparent 55%), var(--bg-0)',color:'var(--text-primary)'}}>
+    <div style={{minHeight:'100vh',fontFamily:'Inter,-apple-system,system-ui,sans-serif',background:'transparent',color:'var(--text-primary)'}}>
       {showPaywall && <PaywallModal onClose={()=>setShowPaywall(false)} onSuccess={()=>setShowPaywall(false)}/>}
       {showUploadModal && <UploadModal onClose={()=>setShowUploadModal(false)} onUpload={handleUploadMoreStems}/>}
 
@@ -892,8 +900,8 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
             </div>
           </div>
           <div style={{padding:'12px 20px 16px',position:'relative'}}>
-            <div style={{cursor:'pointer',borderRadius:'6px',overflow:'hidden'}} onClick={handleTimelineSeek}>
-              <canvas ref={timelineCanvasRef} style={{width:'100%',height:'64px',display:'block'}}/>
+            <div style={{cursor:'pointer',borderRadius:'8px',overflow:'hidden',background:'rgba(8,4,16,0.55)',border:'1px solid rgba(217,70,239,0.1)'}} onClick={handleTimelineSeek}>
+              <canvas ref={timelineCanvasRef} width={1600} height={72} style={{width:'100%',height:'72px',display:'block'}}/>
             </div>
           </div>
           <div style={{padding:'0 20px 16px',display:'flex',gap:'8px',alignItems:'center'}}>
@@ -1197,7 +1205,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                     </div>
 
                     {/* Waveform */}
-                    <div className="stem-wave">
+                    <div className="stem-wave" style={{background:'rgba(8,4,16,0.3)',padding:'8px 0'}}>
                       <StemWave peaks={stem.waveformPeaks} color={color} currentTime={currentTime} duration={duration}/>
                     </div>
 
