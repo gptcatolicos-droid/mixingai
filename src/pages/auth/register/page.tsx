@@ -18,16 +18,15 @@ const RegisterPage: React.FC = () => {
   const onChange = (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement>) =>
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
-  const saveAndGo = (id: string, email: string, token?: string, refreshToken?: string) => {
+  const saveAndGo = (id: string, email: string, token?: string) => {
     const { firstName, lastName, country } = form;
     localStorage.setItem('audioMixerUser', JSON.stringify({
       id, email, firstName, lastName, country,
-      credits: 10, plan: 'free', is_pro: false,
+      credits: 0, plan: 'free', is_pro: false,
       provider: 'email',
       createdAt: new Date().toISOString(),
       username: `${firstName.toLowerCase().replace(/\s/g,'_')}_${lastName.toLowerCase().replace(/\s/g,'_')}`,
       ...(token ? { accessToken: token } : {}),
-      ...(refreshToken ? { refreshToken } : {}),
     }));
     localStorage.removeItem('mixingai_used_free');
     navigate('/');
@@ -84,7 +83,7 @@ const RegisterPage: React.FC = () => {
             last_name: lastName,
             email,
             country,
-            credits: 10,
+            credits: 0,
             plan: 'free',
             is_pro: false,
             provider: 'email',
@@ -100,7 +99,7 @@ const RegisterPage: React.FC = () => {
 
       // ── 4. Signup OK con session ──────────────────────────────
       if (accessToken && signupData.user) {
-        saveAndGo(signupData.user.id, signupData.user.email, accessToken, signupData.session?.refresh_token);
+        saveAndGo(signupData.user.id, signupData.user.email, accessToken);
         return;
       }
 
@@ -112,7 +111,7 @@ const RegisterPage: React.FC = () => {
       });
       const loginData = await loginRes.json();
       if (loginRes.ok && loginData.access_token) {
-        saveAndGo(loginData.user.id, loginData.user.email, loginData.access_token, loginData.refresh_token);
+        saveAndGo(loginData.user.id, loginData.user.email, loginData.access_token);
         return;
       }
 
@@ -166,7 +165,7 @@ const RegisterPage: React.FC = () => {
             <div style={{ fontSize:'12px', color:'rgba(248,240,255,0.65)', lineHeight:1.9 }}>
               <div>✦ 1 mezcla gratis al registrarte — sin tarjeta</div>
               <div>✦ Mezclador IA + 9 presets de género musical</div>
-              <div>✦ IA EQ 12 bandas · WAV 24-bit a -16 LUFS</div>
+              <div>✦ IA EQ 12 bandas · WAV 24-bit a -10 LUFS</div>
               <div>✦ Mezclas ilimitadas por $3.99 pago único</div>
             </div>
           </div>

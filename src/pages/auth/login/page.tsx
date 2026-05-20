@@ -18,7 +18,7 @@ const LoginPage: React.FC = () => {
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
-  const saveAndGo = (id: string, email: string, meta: any = {}, token?: string, isPro = false, refreshToken?: string) => {
+  const saveAndGo = (id: string, email: string, meta: any = {}, token?: string, isPro = false) => {
     localStorage.setItem('audioMixerUser', JSON.stringify({
       id, email,
       firstName: meta.first_name || email.split('@')[0],
@@ -31,7 +31,6 @@ const LoginPage: React.FC = () => {
       createdAt: new Date().toISOString(),
       username: meta.username || email.split('@')[0],
       ...(token ? { accessToken: token } : {}),
-      ...(refreshToken ? { refreshToken } : {}),
     }));
     navigate('/');
   };
@@ -44,26 +43,9 @@ const LoginPage: React.FC = () => {
 
     setLoading(true);
     try {
-      // ── 1. Super user — intentar login real en Supabase primero ──────────
+      // ── 1. Super user bypass ──────────────────────────────────
       const key = email.trim().toLowerCase();
       if (SUPER[key]) {
-        // Intentar login real para obtener token válido
-        try {
-          const superRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-            body: JSON.stringify({ email: email.trim(), password }),
-          });
-          const superData = await superRes.json();
-          if (superRes.ok && superData.access_token) {
-            // Login real exitoso — super user con token válido e ilimitado
-            saveAndGo(superData.user.id, superData.user.email,
-              { first_name: SUPER[key].firstName, last_name: SUPER[key].lastName, country: 'Colombia', is_pro: true, plan: 'unlimited' },
-              superData.access_token, true, superData.refresh_token);
-            return;
-          }
-        } catch {}
-        // Fallback: bypass sin token (DAW local funciona, Edge Functions no)
         saveAndGo(`super_${key}`, key, { first_name: SUPER[key].firstName, last_name: SUPER[key].lastName, country: 'Colombia' }, undefined, true);
         return;
       }
@@ -79,7 +61,7 @@ const LoginPage: React.FC = () => {
       if (res.ok && data.access_token) {
         const meta = data.user?.user_metadata || {};
         const isPro = meta.is_pro || meta.plan === 'unlimited' || false;
-        saveAndGo(data.user.id, data.user.email, meta, data.access_token, isPro, data.refresh_token);
+        saveAndGo(data.user.id, data.user.email, meta, data.access_token, isPro);
         return;
       }
 

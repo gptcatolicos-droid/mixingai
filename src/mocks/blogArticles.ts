@@ -465,7 +465,7 @@ Para más insights sobre el futuro de la producción musical, lee nuestro análi
       bio: 'Professional audio engineer and AI music technology specialist with over 10 years of experience in music production.',
       bioEs: 'Ingeniero de audio profesional y especialista en tecnología musical con IA con más de 10 años de experiencia en producción musical.'
     },
-    publishDate: 'December 15, 2025',
+    publishDate: 'December 15, 2026',
     readTime: 12,
     tags: ['AI Mixing', 'Music Production', 'Audio Engineering', 'Professional Mixing', 'Music Technology'],
     tagsEs: ['Mezcla con IA', 'Producción Musical', 'Ingeniería de Audio', 'Mezcla Profesional', 'Tecnología Musical'],
@@ -1027,7 +1027,7 @@ La clave es hacer coincidir la plataforma con tus necesidades específicas, nive
       bio: 'Music technology reviewer and audio engineer with expertise in online mixing platforms and digital audio tools.',
       bioEs: 'Revisora de tecnología musical e ingeniera de audio con experiencia en plataformas de mezcla online y herramientas de audio digital.'
     },
-    publishDate: 'December 12, 2025',
+    publishDate: 'December 12, 2026',
     readTime: 10,
     tags: ['Online Mixing', 'Music Tools', 'Mixing Software', 'Audio Platforms', 'Music Technology'],
     tagsEs: ['Mezcla Online', 'Herramientas Musicales', 'Software de Mezcla', 'Plataformas de Audio', 'Tecnología Musical'],
@@ -1609,7 +1609,7 @@ Ya sea que elijas mezclar manualmente usando estas técnicas o aprovechar plataf
       bio: 'Grammy-nominated mixing engineer with 15+ years experience working with major artists and record labels.',
       bioEs: 'Ingeniero de mezcla nominado al Grammy con más de 15 años de experiencia trabajando con artistas importantes y sellos discográficos.'
     },
-    publishDate: 'December 10, 2025',
+    publishDate: 'December 10, 2026',
     readTime: 15,
     tags: ['Mixing Techniques', 'Audio Engineering', 'Professional Mixing', 'EQ', 'Compression'],
     tagsEs: ['Técnicas de Mezcla', 'Ingeniería de Audio', 'Mezcla Profesional', 'EQ', 'Compresión'],

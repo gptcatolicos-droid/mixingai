@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import HomeHero from './components/HomeHero';
 import ProjectDashboard from './components/ProjectDashboard';
+import AIChat from './components/AIChat';
+import { MixPreset } from './components/PresetScreen';
 import MixEditor from './components/MixEditor';
 import ExportScreen from './components/ExportScreen';
-import { MixPreset, PRESETS } from './components/PresetScreen';
 
 interface ExportData {
   audioBuffer: AudioBuffer;
@@ -16,11 +17,9 @@ interface ExportData {
   iaEqPreset?: string;
 }
 
-type Screen = 'home' | 'mixer' | 'export';
+type Screen = 'home' | 'chat' | 'mixer' | 'export';
 
 let pendingExportData: ExportData | null = null;
-
-const GUEST_USER = { id:'guest', firstName:'Usuario', lastName:'', email:'', country:'', credits:999999, createdAt:'' };
 
 export default function HomePage() {
   const [user] = useState(() => {
@@ -30,18 +29,15 @@ export default function HomePage() {
     } catch { return null; }
   });
   const [screen, setScreen] = useState<Screen>('home');
-  const [selectedPreset, setSelectedPreset] = useState<MixPreset>(PRESETS[0]);
+  const [selectedPreset, setSelectedPreset] = useState<MixPreset | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [exportData, setExportData] = useState<ExportData | null>(null);
   const [projectId] = useState(() => Date.now().toString());
 
-  // Logged-in users → ProjectDashboard (has its own full flow)
-  if (user) return <ProjectDashboard />;
-
-  const handleStartMixer = (preset: MixPreset, files: File[], mode?: 'mixer' | 'daw') => {
+  const handleStartMixer = (preset: MixPreset, files: File[]) => {
     setSelectedPreset(preset);
     setUploadedFiles(files);
-    setScreen('mixer'); // Always go to mixer, never DAW
+    setScreen('mixer');
   };
 
   const handleExport = (data: ExportData) => {
@@ -50,21 +46,33 @@ export default function HomePage() {
     setScreen('export');
   };
 
+  // Logged-in users → ProjectDashboard (has its own full flow)
+  if (user) return <ProjectDashboard />;
 
-  if (screen === 'mixer') {
+  // AIChat: upload stems + pick preset → starts mixer
+  if (screen === 'chat') {
+    return (
+      <AIChat
+        user={null}
+        onStartMixer={handleStartMixer}
+        onCreditsUpdate={() => {}}
+      />
+    );
+  }
+
+  if (screen === 'mixer' && selectedPreset) {
     return (
       <MixEditor
         projectId={projectId}
-        user={GUEST_USER}
+        user={{ id:'guest', firstName:'Usuario', lastName:'', email:'', country:'', credits:999999, createdAt:'' }}
         uploadedFiles={uploadedFiles}
-        onBack={() => setScreen('home')}
+        onBack={() => setScreen('chat')}
         onCreditsUpdate={() => {}}
         onExport={handleExport}
         initialPreset={selectedPreset}
         reverbOn={selectedPreset.reverbWet > 0}
         delayOn={selectedPreset.delayWet > 0}
         stereoOn={selectedPreset.stereoWidth > 0.5}
-        onSwitchToDAW={() => setScreen('daw')}
       />
     );
   }
@@ -73,18 +81,19 @@ export default function HomePage() {
     const data = exportData || pendingExportData;
     return (
       <ExportScreen
-        user={GUEST_USER}
+        user={{ id:'guest', firstName:'Usuario', lastName:'', email:'', country:'', credits:999999, createdAt:'' }}
         projectId={projectId}
         exportData={data}
         exportProgress={data ? 100 : 0}
         exportStep={data ? '¡Listo!' : 'Preparando...'}
         onBack={() => setScreen('mixer')}
-        onNewMix={() => setScreen('home')}
-        onGoHome={() => setScreen('home')}
+        onNewMix={() => { setScreen('chat'); }}
+        onGoHome={() => { setScreen('home'); }}
         onCreditsUpdate={() => {}}
       />
     );
   }
 
+  // Default: HomeHero (all CTAs → /auth/register)
   return <HomeHero onStartMixer={handleStartMixer} />;
 }

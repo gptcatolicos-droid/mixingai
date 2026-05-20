@@ -141,11 +141,11 @@ export function drawFFTAnalyzer({
       const barGradient = ctx.createLinearGradient(0, height, 0, y);
       
       // Base del degradado - lila oscuro
-      barGradient.addColorStop(0, '#ea580c'); // Orange-600
-      barGradient.addColorStop(0.3, '#f97316'); // Orange-500
-      barGradient.addColorStop(0.6, '#fb923c'); // Orange-400
-      barGradient.addColorStop(0.8, '#fdba74'); // Orange-300
-      barGradient.addColorStop(1, '#fef08a'); // Yellow-200 fluorescent
+      barGradient.addColorStop(0, '#8b5cf6'); // Violet-500
+      barGradient.addColorStop(0.3, '#a855f7'); // Purple-500
+      barGradient.addColorStop(0.6, '#c026d3'); // Fuchsia-600
+      barGradient.addColorStop(0.8, '#d946ef'); // Fuchsia-500
+      barGradient.addColorStop(1, '#ec4899'); // Pink-500
 
       ctx.fillStyle = barGradient;
       
@@ -156,7 +156,7 @@ export function drawFFTAnalyzer({
 
       // Efecto glow sutil para barras activas
       if (value > 100) {
-        ctx.shadowColor = '#f97316';
+        ctx.shadowColor = '#d946ef';
         ctx.shadowBlur = Math.min(value / 50, 6);
         ctx.fill();
         ctx.shadowBlur = 0;

@@ -106,7 +106,7 @@ const VerifyEmailPage: React.FC = () => {
           <div style={{fontSize:'12px',color:'rgba(248,240,255,0.65)',lineHeight:1.9}}>
             <div>✦ 1 mezcla gratis lista para usar</div>
             <div>✦ Mezclador IA + 9 presets de género</div>
-            <div>✦ IA EQ 12 bandas · Exportación -16 LUFS · WAV 24-bit</div>
+            <div>✦ IA EQ 12 bandas · Exportación -10 LUFS · WAV 24-bit</div>
           </div>
         </div>
         <button onClick={()=>navigate('/')} style={{width:'100%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'16px',borderRadius:'14px',fontSize:'16px',fontWeight:700,cursor:'pointer',fontFamily:ff,boxShadow:'0 0 28px rgba(192,38,211,0.4)',marginBottom:'12px'}}>

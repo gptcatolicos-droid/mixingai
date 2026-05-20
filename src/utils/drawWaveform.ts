@@ -123,14 +123,12 @@ function drawWaveformBars(
       ctx.fillStyle = isPast ? colors.played : colors.unplayed;
     } else if (style === 'soundcloud') {
       if (isPast) {
-        // Verde fluorescente para parte reproducida
-        const progress = i / barCount;
-        const grad = ctx.createLinearGradient(0, (height-2)/2, 0, (height+2)/2);
-        grad.addColorStop(0, `rgba(74, 222, 128, ${0.6 + peak * 0.4})`); // green-400
-        grad.addColorStop(1, `rgba(34, 197, 94, ${0.5 + peak * 0.4})`);  // green-500
-        ctx.fillStyle = grad;
+        // Gradiente naranja a azul para parte reproducida
+        const progress = Math.min(1, (i / barCount) / Math.max(0.001, currentTime / duration));
+        const hue = 20 + progress * 200; // De naranja (20) a azul (220)
+        ctx.fillStyle = `hsl(${hue}, 85%, 55%)`;
       } else {
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fillStyle = colors.unplayed;
       }
     } else {
       ctx.fillStyle = isPast ? colors.played : colors.unplayed;
