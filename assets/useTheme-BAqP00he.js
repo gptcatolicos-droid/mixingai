@@ -1,0 +1,1 @@
+import{r,T as t}from"./index-CCQ5kRm7.js";const s=()=>{const e=r.useContext(t);if(!e)throw new Error("useTheme must be used within a ThemeProvider. Wrap your app with <ThemeProvider>.");return e};export{s as u};
