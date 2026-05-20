@@ -4,7 +4,6 @@ import ProjectDashboard from './components/ProjectDashboard';
 import MixEditor from './components/MixEditor';
 import ExportScreen from './components/ExportScreen';
 import { MixPreset, PRESETS } from './components/PresetScreen';
-import { useFreeSongLimit } from '../../hooks/useFreeSongLimit';
 
 interface ExportData {
   audioBuffer: AudioBuffer;
@@ -30,26 +29,19 @@ export default function HomePage() {
       return s ? JSON.parse(s) : null;
     } catch { return null; }
   });
-  
-  const freeSongLimit = useFreeSongLimit();
   const [screen, setScreen] = useState<Screen>('home');
   const [selectedPreset, setSelectedPreset] = useState<MixPreset>(PRESETS[0]);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [exportData, setExportData] = useState<ExportData | null>(null);
   const [projectId] = useState(() => Date.now().toString());
 
+  // Logged-in users → ProjectDashboard (has its own full flow)
   if (user) return <ProjectDashboard />;
 
-  const handleStartMixer = (preset: MixPreset, files: File[]) => {
-    if (freeSongLimit.isExhausted && !user) {
-      window.location.href = '/auth/register';
-      return;
-    }
-    
+  const handleStartMixer = (preset: MixPreset, files: File[], mode?: 'mixer' | 'daw') => {
     setSelectedPreset(preset);
     setUploadedFiles(files);
-    setScreen('mixer');
-    freeSongLimit.incrementCount();
+    setScreen('mixer'); // Always go to mixer, never DAW
   };
 
   const handleExport = (data: ExportData) => {
@@ -58,6 +50,7 @@ export default function HomePage() {
     setScreen('export');
   };
 
+
   if (screen === 'mixer') {
     return (
       <MixEditor
@@ -65,9 +58,13 @@ export default function HomePage() {
         user={GUEST_USER}
         uploadedFiles={uploadedFiles}
         onBack={() => setScreen('home')}
-        onExport={handleExport}
         onCreditsUpdate={() => {}}
+        onExport={handleExport}
         initialPreset={selectedPreset}
+        reverbOn={selectedPreset.reverbWet > 0}
+        delayOn={selectedPreset.delayWet > 0}
+        stereoOn={selectedPreset.stereoWidth > 0.5}
+        onSwitchToDAW={() => setScreen('daw')}
       />
     );
   }
@@ -89,5 +86,5 @@ export default function HomePage() {
     );
   }
 
-  return <HomeHero onStartMixer={handleStartMixer} freeSongsRemaining={freeSongLimit.remaining} />;
+  return <HomeHero onStartMixer={handleStartMixer} />;
 }

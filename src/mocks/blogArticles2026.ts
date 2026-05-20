@@ -6,6 +6,7 @@ export const blogArticles2026 = [
     titleEs: 'MixingMusic.AI gana el Global Recognition Award 2026',
     excerpt: 'Hemos sido reconocidos con el prestigioso Global Recognition Award 2026 por nuestra innovación en producción musical con inteligencia artificial, destacando entre el top 5.8% de 15,000 participantes globales.',
     excerptEs: 'Hemos sido reconocidos con el prestigioso Global Recognition Award 2026 por nuestra innovación en producción musical con inteligencia artificial, destacando entre el top 5.8% de 15,000 participantes globales.',
+    image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
     categoryName: 'Noticias',
     categoryNameEs: 'Noticias',
     readTime: 8,
