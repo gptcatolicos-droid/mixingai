@@ -1,0 +1,88 @@
+/* MixingStudio AI — Design Tokens (brand accent: magenta) */
+:root {
+  /* Backgrounds */
+  --bg-0: #0A0710;
+  --bg-1: #110B19;
+  --bg-2: #161020;
+  --panel-1: #1A1426;
+  --panel-2: #211930;
+  --hover:   #2A2040;
+
+  /* Borders */
+  --border:        rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.10);
+  --border-bright: rgba(255,255,255,0.18);
+
+  /* Text */
+  --text-primary:   #F5F2FA;
+  --text-secondary: #9E94B0;
+  --text-muted:     #6B6280;
+  --text-dim:       #4A4359;
+
+  /* Brand — Magenta / Violet */
+  --accent:       #D946EF;   /* magenta */
+  --accent-2:     #A855F7;   /* violet */
+  --accent-soft:  rgba(217,70,239,0.14);
+  --accent-glow:  rgba(217,70,239,0.35);
+  --accent-grad:  linear-gradient(135deg, #D946EF 0%, #A855F7 100%);
+
+  /* Track / Stem colors (muted-professional) */
+  --tc-pink:   #E36AB0;
+  --tc-green:  #6DCE7A;
+  --tc-orange: #E08254;
+  --tc-blue:   #5B9BF4;
+  --tc-yellow: #D9C566;
+  --tc-purple: #B07CF0;
+  --tc-cyan:   #4FD4D4;
+  --tc-violet: #9B7AE8;
+
+  /* Status */
+  --green:  #3BD671;
+  --red:    #F4564B;
+  --yellow: #F4B740;
+
+  /* Radii */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+
+  /* Shadows */
+  --shadow-sm:   0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md:   0 4px 12px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-lg:   0 12px 32px rgba(0,0,0,0.5);
+  --shadow-glow: 0 8px 24px rgba(217,70,239,0.30);
+
+  /* Spacing (8px grid) */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-7: 28px; --s-8: 32px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 150ms;
+  --dur:      200ms;
+  --dur-slow: 280ms;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; min-height: 100%; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'tnum';
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(1400px 700px at 80% -10%, rgba(217,70,239,0.06), transparent 60%),
+    radial-gradient(1000px 600px at -10% 30%, rgba(168,85,247,0.05), transparent 60%),
+    var(--bg-0);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input { font-family: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 8px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }

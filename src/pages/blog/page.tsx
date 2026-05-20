@@ -2,15 +2,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { blogArticles } from '../../mocks/blogArticles';
-import { blogArticles2026 } from '../../mocks/blogArticles2026';
-
-// Combinar todos los artículos y ordenar por fecha
-const allBlogArticles = [...blogArticles2026, ...blogArticles];
 
 // Función para obtener últimos artículos del blog  
 const getLatestBlogArticles = () => {
-  return allBlogArticles
-    .sort((a, b) => new Date(b.date || b.publishDate).getTime() - new Date(a.date || a.publishDate).getTime())
+  return blogArticles
+    .sort((a, b) => new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime())
     .slice(0, 6); // Top 6 más recientes
 };
 
@@ -28,8 +24,8 @@ const BlogPage: React.FC = () => {
   ];
 
   const filteredArticles = selectedCategory === 'all' 
-    ? allBlogArticles 
-    : allBlogArticles.filter(article => article.category === selectedCategory);
+    ? blogArticles 
+    : blogArticles.filter(article => article.category === selectedCategory);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
