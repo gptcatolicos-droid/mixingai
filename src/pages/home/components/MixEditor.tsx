@@ -874,8 +874,6 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
               <i className="ri-equalizer-fill" style={{fontSize:'14px'}}></i>
               ✦ Exportar Mezcla con IA
             </button>
-              </button>
-            )}
             <button onClick={onBack} style={{...C.ghostBtn,fontSize:'12px',padding:'8px 14px'}}>← Volver</button>
           </div>
         </div>
@@ -1316,7 +1314,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
       {showUpgradeModal&&(
         <UpgradeModal trigger="export" onClose={()=>setShowUpgradeModal(false)}
-          user={(()=>{try{const u=localStorage.getItem('audioMixerUser');return u?JSON.parse(u):null;}catch{return null;}})()}
+          user={user}
           onSuccess={()=>setShowUpgradeModal(false)}/>
       )}
       {showPaywall&&(
