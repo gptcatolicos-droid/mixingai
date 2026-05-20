@@ -52,9 +52,6 @@ export default function FlowHome({ user, onNavigate, onLogout }: Props) {
   };
 
   const handleOpenMixer = () => {
-    onNavigate('studio', files.length > 0 ? files : undefined, selectedPreset, 'daw');
-  };
-  const handleOpenMixer = () => {
     onNavigate('studio', files.length > 0 ? files : undefined, selectedPreset, 'mixer');
   };
 

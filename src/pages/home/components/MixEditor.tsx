@@ -909,7 +909,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                 const onUp=()=>{window.removeEventListener('mousemove',onMove);window.removeEventListener('mouseup',onUp);};
                 window.addEventListener('mousemove',onMove);
                 window.addEventListener('mouseup',onUp);
-              }} style={{cursor:'pointer'}}/>
+              }}/>
           </div>
         </div>
 
