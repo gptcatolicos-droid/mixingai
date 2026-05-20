@@ -1,1 +1,0 @@
-import{r as t}from"./index-CTfiusK2.js";const r=t.createContext(void 0),s=()=>{const e=t.useContext(r);if(!e)throw new Error("useTheme must be used within a ThemeProvider. Wrap your app with <ThemeProvider>.");return e};export{s as u};
