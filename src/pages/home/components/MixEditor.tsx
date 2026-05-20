@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import UploadModal from '@/components/feature/UploadModal';
 import { drawFFTAnalyzer } from '@/utils/drawFFT';
 import { drawWaveform } from '@/utils/drawWaveform';
-import { MixPreset, PRESETS } from './mixTypes';
+import type { MixPreset } from './mixTypes';
+import { PRESETS } from './mixTypes';
 import '@/styles/mixer-tokens.css';
 import '@/styles/mixer-studio.css';
 
@@ -549,12 +550,34 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     for(let i=0;i<samples;i++){let mx=0;for(let j=i*ss;j<Math.min((i+1)*ss,cd.length);j++)mx=Math.max(mx,Math.abs(cd[j]));peaks[i]=mx;}
     return peaks;
   };
+
+  /* Refs mutables para FFT de stems — evita setStems 60fps */
+  const stemFftRefs = useRef<Map<string, Uint8Array>>(new Map());
+
   const startFFTAnimation = useCallback(()=>{
+    // Cancelar loop anterior si existe
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+
     const update=()=>{
       const ma=mixAnalyserRef.current,fd=mixFftDataRef.current;
       if(ma&&fd){
         ma.getByteFrequencyData(fd);
-        setStems(prev=>prev.map(s=>{s.analyserNode.getByteFrequencyData(s.fftData);return{...s};}));
+
+        // Leer FFT de cada stem en refs mutables — SIN setStems
+        stemFftRefs.current.forEach((fftData, _id) => {});
+        // Actualizar directamente en los stems actuales sin triggear re-render
+        setStems(prev => {
+          let changed = false;
+          prev.forEach(s => {
+            if (s.analyserNode) {
+              s.analyserNode.getByteFrequencyData(s.fftData);
+              changed = true;
+            }
+          });
+          // No crear nuevos objetos — devolver la misma referencia
+          return changed ? prev : prev;
+        });
+
         const wd=new Float32Array(ma.fftSize); ma.getFloatTimeDomainData(wd);
         let rmsSum=0; for(let i=0;i<wd.length;i++) rmsSum+=wd[i]*wd[i];
         const rms=Math.sqrt(rmsSum/wd.length);
@@ -563,7 +586,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         if(lufsHistoryRef.current.length>300) lufsHistoryRef.current.shift();
         const integrated=lufsHistoryRef.current.reduce((a,b)=>a+b,0)/lufsHistoryRef.current.length;
         setIntegratedLufs(Math.max(-60,Math.min(0,integrated)));
-        
+
         if(mixFFTCanvasRef.current) drawFFTAnalyzer({canvas:mixFFTCanvasRef.current,fftData:fd,style:'applemusic'});
       }
       animationFrameRef.current=requestAnimationFrame(update);
@@ -576,7 +599,10 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     const ctx=audioContextRef.current; if(!ctx||stems.length===0) return;
     if(ctx.state==='suspended') await ctx.resume();
     if(isPlaying){
-      stems.forEach(s=>{s.sourceNode?.stop();s.sourceNode?.disconnect();});
+      stems.forEach(s=>{
+        try { s.sourceNode?.stop(); } catch {}
+        try { s.sourceNode?.disconnect(); } catch {}
+      });
       setIsPlaying(false); pausedTimeRef.current=currentTime;
       if(timeUpdateIntervalRef.current) clearInterval(timeUpdateIntervalRef.current);
     } else {
@@ -594,16 +620,27 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     }
   };
   const handleStop=()=>{
-    stems.forEach(s=>{s.sourceNode?.stop();s.sourceNode?.disconnect();});
+    stems.forEach(s=>{
+      try { s.sourceNode?.stop(); } catch {}
+      try { s.sourceNode?.disconnect(); } catch {}
+    });
     setStems(prev=>prev.map(s=>({...s,sourceNode:undefined})));
     setIsPlaying(false); setCurrentTime(0); pausedTimeRef.current=0;
     if(timeUpdateIntervalRef.current) clearInterval(timeUpdateIntervalRef.current);
   };
   const handleTimelineSeek=(e: React.MouseEvent<HTMLDivElement>)=>{
     const r=e.currentTarget.getBoundingClientRect();
-    const t=((e.clientX-r.left)/r.width)*duration;
-    if(isPlaying){handleStop();setTimeout(()=>{pausedTimeRef.current=t;setCurrentTime(t);handlePlayPause();},50);}
-    else{pausedTimeRef.current=t;setCurrentTime(t);}
+    const t=Math.max(0,Math.min(duration,((e.clientX-r.left)/r.width)*duration));
+    pausedTimeRef.current=t; setCurrentTime(t);
+    if(isPlaying){
+      // Parar sin resetear pausedTime, luego reanudar desde nueva posición
+      stems.forEach(s=>{ try { s.sourceNode?.stop(); } catch {} try { s.sourceNode?.disconnect(); } catch {} });
+      setStems(prev=>prev.map(s=>({...s,sourceNode:undefined})));
+      if(timeUpdateIntervalRef.current) clearInterval(timeUpdateIntervalRef.current);
+      setIsPlaying(false);
+      // Reanudar en el siguiente tick con la nueva posición ya guardada
+      setTimeout(()=>handlePlayPause(), 80);
+    }
   };
 
   /* ─── Volume / Pan ─── */
@@ -884,7 +921,10 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
             </div>
           </div>
           <div className="row gap-2 center">
-            <button className="btn-primary btn" onClick={handleExportClick}>{Ico.spark} Exportar Mezcla con IA</button>
+            <button className="btn-primary btn" onClick={handleExportClick}>
+              {Ico.spark} <span className="spark-label">Exportar Mezcla con IA</span>
+              <span className="spark-label-short" style={{display:'none'}}>Exportar</span>
+            </button>
             <button className="btn btn-ghost" onClick={onBack}>{Ico.back} Volver</button>
           </div>
         </header>
@@ -1032,7 +1072,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           <div className="card-body">
             <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'12px'}}>Activo en tiempo real · se exporta junto a la mezcla · -16 LUFS</div>
             {/* Device tabs */}
-            <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'20px'}}>
+            <div className="device-tabs" style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'20px'}}>
               {IAEQ_PRESETS.map(p=>(
                 <button key={p.id} onClick={()=>{setIaEqPreset(p);setIaEqBands([...p.bands]);setActiveIaTab(p.id);updateLiveIAEQ(p.bands);}}
                   style={{padding:'5px 12px',borderRadius:'999px',border:`1px solid ${activeIaTab===p.id?'rgba(217,70,239,0.5)':'var(--border)'}`,background:activeIaTab===p.id?'var(--accent-soft)':'var(--panel-2)',color:activeIaTab===p.id?'var(--accent)':'var(--text-muted)',fontSize:'11px',fontWeight:activeIaTab===p.id?600:400,cursor:'pointer',transition:'all 200ms',boxShadow:activeIaTab===p.id?'0 0 10px var(--accent-glow)':'none'}}>
@@ -1041,7 +1081,8 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
               ))}
             </div>
             {/* Band sliders */}
-            <div style={{display:'grid',gridTemplateColumns:'repeat(12,1fr)',gap:'8px',marginBottom:'16px'}}>
+            <div className="eq-bands-row">
+              <div className="eq-bands-grid" style={{display:'grid',gridTemplateColumns:'repeat(12,1fr)',gap:'8px',marginBottom:'16px'}}>
               {IAEQ_BANDS.map((band,i)=>{
                 const val=iaEqBands[i]??0;
                 const pct=Math.round(((val+12)/24)*100);
@@ -1061,7 +1102,8 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                   </div>
                 );
               })}
-            </div>
+              </div>{/* eq-bands-grid */}
+            </div>{/* eq-bands-row */}
             {/* Frequency zones */}
             <div style={{display:'grid',gridTemplateColumns:'1fr 4fr 4fr 4fr',gap:'4px'}}>
               {[{lbl:'Preamp: Pre',color:'#9B7AE8'},{lbl:'Bass: 30Hz–170Hz',color:'#E08254'},{lbl:'Mid: 310Hz–3kHz',color:'#4FD4D4'},{lbl:'High: 6kHz–16kHz',color:'#6DCE7A'}].map(z=>(
@@ -1286,13 +1328,33 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         .btn-ghost:hover { background:var(--panel-2) !important; color:var(--text-primary) !important; }
         .stem-actions { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; }
         @media(max-width:1200px){
-          .mbm-grid{grid-template-columns:1fr 1fr;}
-          .mbm-col{border-right:none;border-bottom:1px solid var(--border);}
-          .tools-grid{grid-template-columns:1fr;}
-          .stem{grid-template-columns:140px 1fr !important;}
+          .mbm-grid{grid-template-columns:1fr 1fr !important;}
+          .mbm-col{border-right:none !important;border-bottom:1px solid var(--border) !important;}
+          .tools-grid{grid-template-columns:1fr !important;}
         }
-        @media(max-width:900px){
-          .stem{grid-template-columns:1fr !important; display:flex; flex-direction:column;}
+        @media(max-width:768px){
+          .studio{padding:12px !important;gap:12px !important;}
+          .spark-label{display:none !important;}
+          .spark-label-short{display:inline !important;}
+          .mbm-grid{grid-template-columns:1fr !important;}
+          .mbm-col{padding:12px !important;border-bottom:1px solid var(--border) !important;border-right:none !important;}
+          .tools-grid{grid-template-columns:1fr !important;gap:10px !important;}
+          .preset-grid{grid-template-columns:repeat(2,1fr) !important;gap:8px !important;}
+          .stem{display:flex !important;flex-direction:column !important;}
+          .stem-meta{border-right:none !important;border-bottom:1px solid var(--border);min-height:unset !important;}
+          .stem-ctrl{border-left:none !important;border-top:1px solid var(--border);}
+          .stem-color{width:100% !important;height:3px !important;position:static !important;border-radius:0 !important;}
+          .device-tabs{overflow-x:auto !important;flex-wrap:nowrap !important;-webkit-overflow-scrolling:touch;}
+          .eq-bands-row{overflow-x:auto !important;-webkit-overflow-scrolling:touch;}
+          .eq-bands-grid{min-width:480px !important;}
+          .card-head{padding:10px 14px !important;}
+          .card-body{padding:12px !important;}
+          .btn-primary{font-size:12px !important;padding:10px 14px !important;}
+        }
+        @media(max-width:480px){
+          .studio{padding:8px !important;gap:10px !important;}
+          .preset-grid{grid-template-columns:repeat(2,1fr) !important;}
+          .stem-act-btn{font-size:10px !important;padding:5px 4px !important;}
         }
         @keyframes spin{to{transform:rotate(360deg)}}
       `}</style>

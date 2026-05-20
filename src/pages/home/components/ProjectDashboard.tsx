@@ -7,7 +7,8 @@ import MixEditor from './MixEditor';
 import ExportScreen from './ExportScreen';
 import NewProjectScreen from './NewProjectScreen';
 import PresetScreen from './PresetScreen';
-import { MixPreset, PRESETS } from './mixTypes';
+import type { MixPreset } from './mixTypes';
+import { PRESETS } from './mixTypes';
 import AIChat from './AIChat';
 import { useNavigate, Link } from 'react-router-dom';
 

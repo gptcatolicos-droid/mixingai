@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Header from '@/components/feature/Header';
-import { MixPreset, PRESETS } from './mixTypes';
+import type { MixPreset } from './mixTypes';
+import { PRESETS } from './mixTypes';
 
 interface User {
   id: string; firstName: string; lastName: string; email: string;

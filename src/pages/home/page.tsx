@@ -2,7 +2,7 @@ import { useState } from 'react';
 import HomeHero from './components/HomeHero';
 import ProjectDashboard from './components/ProjectDashboard';
 import AIChat from './components/AIChat';
-import { MixPreset } from './components/mixTypes';
+import type { MixPreset } from './components/mixTypes';
 import MixEditor from './components/MixEditor';
 import ExportScreen from './components/ExportScreen';
 

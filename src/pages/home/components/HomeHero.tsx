@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MixPreset, PRESETS } from './mixTypes';
+import type { MixPreset } from './mixTypes';
+import { PRESETS } from './mixTypes';
 import { blogArticles } from '../../../mocks/blogArticles';
 
 interface HomeHeroProps { onStartMixer: (preset: MixPreset, files: File[]) => void; }
