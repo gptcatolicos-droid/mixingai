@@ -122,7 +122,7 @@ export default function MasteringCheckoutPage() {
               <p>Un solo pago · no es suscripción · acceso permanente</p>
               <div className="checkout-v3-divider" />
               {!secureMasteringAccessEnabled ? (
-                <div className="checkout-v3-pending"><strong>Checkout preparado</strong><span>Se habilitará después de desplegar la seguridad V3.</span></div>
+                <div className="checkout-v3-pending"><button className="checkout-v3-paypal-preview" disabled><span>P</span>Pagar US$14.99 con PayPal</button><small>Falta conectar esta vista previa con el backend seguro antes de aceptar pagos reales.</small></div>
               ) : !sdkReady ? (
                 <div className="checkout-v3-pending"><strong>Cargando pago seguro…</strong><span>Conectando con PayPal.</span></div>
               ) : (

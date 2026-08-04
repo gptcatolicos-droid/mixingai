@@ -78,7 +78,7 @@ export default function HomeHeroV3() {
           <a href="#funciones">Funciones</a>
           <button className="v3-nav-link" onClick={() => navigate('/capacidades')}>Capacidades</button>
           <button className="v3-nav-link" onClick={() => navigate('/conceptos-audio')}>Conceptos</button>
-          <a href="#planes">Planes</a>
+          <a href="/pricing">Planes</a>
           <button className="v3-nav-login" onClick={() => navigate('/auth/login')}>Ingresar</button>
           <button className="v3-button v3-button-small" onClick={() => begin('master')}>Probar gratis</button>
         </div>
@@ -244,7 +244,7 @@ export default function HomeHeroV3() {
           <h2>Todo lo que necesitas, desde los stems hasta el álbum.</h2>
           <p>Consulta en una sola vista qué puedes hacer gratis y qué desbloqueas con Unlimited.</p>
         </div>
-        <button className="v3-button v3-button-outline" onClick={() => navigate('/capacidades')}>Ver Funciones MixingMusic <span>→</span></button>
+        <button className="v3-button v3-button-accent" onClick={() => navigate('/capacidades')}>Ver Funciones MixingMusic <span>→</span></button>
       </section>
 
       <section className="v3-section v3-why">
@@ -336,15 +336,6 @@ export default function HomeHeroV3() {
         </a>
       </section>
 
-      <footer className="v3-footer">
-        <img src="/logo-brand.png" alt="MixingMusic.AI" />
-        <p>Mezcla y mastering para artistas independientes.</p>
-        <div>
-          <a href="/terms">Términos</a>
-          <a href="/privacy">Privacidad</a>
-          <a href="/blog">Blog</a>
-        </div>
-      </footer>
     </main>
   );
 }

@@ -39,6 +39,12 @@ const targetAverageDbfs: Record<LoudnessProfile, number> = {
   competitive: -12.5,
 };
 
+const targetIntegratedLufs: Record<LoudnessProfile, number> = {
+  streaming: -16,
+  balanced: -14,
+  competitive: -11,
+};
+
 const clamp = (value: number, minimum: number, maximum: number) => Math.max(minimum, Math.min(maximum, value));
 const dbToGain = (db: number) => 10 ** (db / 20);
 const gainToDb = (gain: number) => gain > 0 ? 20 * Math.log10(gain) : -120;
@@ -103,6 +109,27 @@ function enforceSamplePeakCeiling(buffer: AudioBuffer, ceilingDbfs: number) {
 
   const rms = sampleCount ? Math.sqrt(sumSquares / sampleCount) * correction : 0;
   return { peakDbfs: gainToDb(peak), averageDbfs: gainToDb(rms) };
+}
+
+async function renderLoudnessCorrection(buffer: AudioBuffer, gainDb: number) {
+  const context = new OfflineAudioContext(2, buffer.length, buffer.sampleRate);
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  const gain = context.createGain();
+  gain.gain.value = dbToGain(gainDb);
+  const limiter = context.createDynamicsCompressor();
+  limiter.threshold.value = -2.2;
+  limiter.knee.value = 0;
+  limiter.ratio.value = 20;
+  limiter.attack.value = .001;
+  limiter.release.value = .075;
+  source.connect(gain);
+  gain.connect(limiter);
+  limiter.connect(context.destination);
+  source.start();
+  const corrected = await context.startRendering();
+  enforceSamplePeakCeiling(corrected, -1.2);
+  return corrected;
 }
 
 export async function createMaster(
@@ -175,14 +202,24 @@ export async function createMaster(
   onProgress?.(28, 'Aplicando balance tonal');
   source.start();
   const progressTimer = window.setInterval(() => onProgress?.(58, 'Controlando dinámica y amplitud'), 500);
-  const rendered = await offline.startRendering();
+  let rendered = await offline.startRendering();
   window.clearInterval(progressTimer);
   onProgress?.(82, 'Protegiendo el pico de salida');
-  const outputLevels = enforceSamplePeakCeiling(rendered, -1.2);
+  enforceSamplePeakCeiling(rendered, -1.2);
   onProgress?.(86, 'Midiendo loudness integrado');
-  const integratedLufs = await measureIntegratedLufs(rendered, (progress) => {
+  let integratedLufs = await measureIntegratedLufs(rendered, (progress) => {
     onProgress?.(86 + progress * 5, 'Midiendo loudness integrado');
   });
+  const targetLufs = targetIntegratedLufs[configuration.loudness];
+  let loudnessCorrectionDb = 0;
+  for (let pass = 0; pass < 3 && Math.abs(targetLufs - integratedLufs) > .25; pass += 1) {
+    const correction = clamp(targetLufs - integratedLufs, -5, 5);
+    loudnessCorrectionDb += correction;
+    onProgress?.(90 + pass, `Ajustando loudness a ${targetLufs} LUFS`);
+    rendered = await renderLoudnessCorrection(rendered, correction);
+    integratedLufs = await measureIntegratedLufs(rendered);
+  }
+  const outputLevels = enforceSamplePeakCeiling(rendered, -1.2);
   onProgress?.(92, 'Generando WAV de 24 bits');
   const wav24 = encodeWav24(rendered, true);
   onProgress?.(94, 'Generando MP3 de 320 kbps');
@@ -199,7 +236,7 @@ export async function createMaster(
     averageDbfs: outputLevels.averageDbfs,
     integratedLufs,
     loudnessMatchGainDb: clamp(analysis.integratedLufs - integratedLufs, -18, 18),
-    appliedGainDb,
+    appliedGainDb: appliedGainDb + loudnessCorrectionDb,
     samplePeakCeilingDbfs: -1.2,
   };
 }

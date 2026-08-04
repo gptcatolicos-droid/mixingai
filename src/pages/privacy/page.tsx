@@ -47,7 +47,7 @@ const PrivacyPage: React.FC = () => {
           <div className="mt-8 bg-green-50 border-l-4 border-green-500 p-6 rounded-r-xl">
             <p className="text-green-800 font-semibold">
               <i className="ri-shield-check-line mr-2"></i>
-              Última actualización: 15 de enero de 2024
+              Última actualización: 4 de agosto de 2026
             </p>
           </div>
         </div>
@@ -69,7 +69,7 @@ const PrivacyPage: React.FC = () => {
                   <li>• Nombre y apellido</li>
                   <li>• Dirección de correo electrónico</li>
                   <li>• País de residencia</li>
-                  <li>• Información de pago (procesada por Stripe)</li>
+                  <li>• Confirmación y referencia de pago (procesadas por PayPal)</li>
                   <li>• Preferencias de usuario</li>
                 </ul>
               </div>
@@ -192,7 +192,7 @@ const PrivacyPage: React.FC = () => {
                 Cuando compartimos
               </h3>
               <ul className="space-y-2 text-blue-700">
-                <li>• Con procesadores de pago (Stripe) para transacciones seguras</li>
+                <li>• Con PayPal para procesar y verificar transacciones seguras</li>
                 <li>• Con proveedores de infraestructura bajo estrictos contratos de confidencialidad</li>
                 <li>• Cuando sea requerido por ley o autoridades competentes</li>
                 <li>• Con tu consentimiento explícito para casos específicos</li>

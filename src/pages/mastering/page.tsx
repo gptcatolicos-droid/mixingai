@@ -777,9 +777,9 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
             )}
             <h2>¿Qué quieres hacer ahora?</h2>
             <div className="master-next-grid">
-              <button onClick={() => navigate('/')}><i>≋</i><strong>Hacer otra mezcla</strong><span>Subir stems separados</span><b>Crear mezcla →</b></button>
-              <button onClick={() => isUnlimited ? reset() : navigate('/checkout-v3')}><i>◇</i><strong>Masterizar otra mezcla</strong><span>{isUnlimited ? 'Subir una premezcla' : 'Requiere Unlimited'}</span><b>{isUnlimited ? 'Subir mezcla →' : 'Activar Unlimited →'}</b></button>
-              <button onClick={() => isUnlimited ? navigate('/mastering/album') : navigate('/checkout-v3')}><i>▦</i><strong>Masterizar un álbum</strong><span>{isUnlimited ? 'Hasta 12 canciones' : 'Requiere Unlimited'}</span><b>{isUnlimited ? 'Crear álbum →' : 'Activar Unlimited →'}</b></button>
+              <button style={{'--next-color':'#10B981'} as React.CSSProperties} onClick={() => navigate('/')}><div className="master-next-wave">{[.5,.9,.4,.8,.5,.9,.4,.8,.5,.9,.4,.8].map((height,index)=><em key={index} style={{height:`${height*100}%`}} />)}</div><i>≋</i><strong>Hacer otra mezcla</strong><span>Subir stems separados</span><b>Crear mezcla →</b></button>
+              <button style={{'--next-color':'#6366F1'} as React.CSSProperties} onClick={() => isUnlimited ? reset() : navigate('/checkout-v3')}><div className="master-next-wave">{[.9,.2,.9,.2,.9,.2,.9,.2,.9,.2,.9,.2].map((height,index)=><em key={index} style={{height:`${height*100}%`}} />)}</div><i>◇</i><strong>Masterizar otra mezcla</strong><span>{isUnlimited ? 'Subir una premezcla' : 'Requiere Unlimited'}</span><b>{isUnlimited ? 'Subir mezcla →' : 'Activar Unlimited →'}</b></button>
+              <button style={{'--next-color':'#EC4899'} as React.CSSProperties} onClick={() => isUnlimited ? navigate('/mastering/album') : navigate('/checkout-v3')}><div className="master-next-wave">{[.3,.5,.7,.9,.8,.6,.5,.7,.8,.6,.4,.5].map((height,index)=><em key={index} style={{height:`${height*100}%`}} />)}</div><i>▦</i><strong>Masterizar un álbum</strong><span>{isUnlimited ? 'Hasta 12 canciones' : 'Requiere Unlimited'}</span><b>{isUnlimited ? 'Crear álbum →' : 'Activar Unlimited →'}</b></button>
             </div>
             <button className="master-home-button" onClick={() => navigate('/')}>← Volver al home</button>
           </section>

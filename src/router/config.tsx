@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router-dom';
 import { lazy } from 'react';
+import SiteLayout from '../components/feature/SiteFooter';
 
 const HomePage = lazy(() => import('../pages/home/page'));
 const LoginPage = lazy(() => import('../pages/auth/login/page'));
@@ -25,7 +26,7 @@ const MasteringCheckoutPage = lazy(() => import('../pages/mastering/checkout/pag
 const CapabilitiesPage = lazy(() => import('../pages/capabilities/page'));
 const AudioConceptsPage = lazy(() => import('../pages/concepts/page'));
 
-const routes: RouteObject[] = [
+const appRoutes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
   { path: '/auth/login', element: <LoginPage /> },
   { path: '/auth/register', element: <RegisterPage /> },
@@ -51,5 +52,7 @@ const routes: RouteObject[] = [
   { path: '/cookies', element: <CookiesPage /> },
   { path: '*', element: <NotFoundPage /> },
 ];
+
+const routes: RouteObject[] = [{ element: <SiteLayout />, children: appRoutes }];
 
 export default routes;

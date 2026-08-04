@@ -534,6 +534,15 @@
   padding: 118px 0;
 }
 
+.v3-section.v3-capabilities-teaser {
+  margin-top: 86px;
+  margin-bottom: 82px;
+  padding: 58px 54px;
+  border-color: rgba(239,74,168,.58);
+  background: radial-gradient(circle at 90% 0,rgba(181,87,243,.3),transparent 38%),linear-gradient(120deg,rgba(239,74,168,.23),rgba(181,87,243,.15));
+  box-shadow: 0 24px 70px rgba(239,74,168,.1);
+}
+
 .v3-section-heading {
   max-width: 700px;
   margin: 0 auto 54px;

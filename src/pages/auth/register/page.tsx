@@ -134,6 +134,7 @@ const RegisterPage: React.FC = () => {
 
   return (
     <main className="auth-v3-page">
+      <style>{`.auth-v3-login{color:#fff;font-weight:800;border-color:rgba(239,74,168,.75);background:linear-gradient(110deg,#ef4aa8,#b557f3);box-shadow:0 10px 25px rgba(239,74,168,.22)}.auth-v3-login-bottom{margin-top:17px;min-height:45px;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid rgba(239,74,168,.4);border-radius:11px;background:rgba(239,74,168,.08);color:#c5b8cc;font-size:11px;text-decoration:none}.auth-v3-login-bottom strong{color:#ef64b3}`}</style>
       <header className="auth-v3-header">
         <Link to="/" className="auth-v3-brand">
           <img src="/logo-brand.png" alt="MixingMusic.AI" />
@@ -186,6 +187,7 @@ const RegisterPage: React.FC = () => {
           </form>
           <div className="auth-v3-included"><span>✓ 3 mezclas desde stems</span><span>✓ 1 master MP3</span><span>✓ Sin tarjeta</span></div>
           <p className="auth-v3-legal">Al continuar aceptas los <Link to="/terms">Términos</Link> y la <Link to="/privacy">Privacidad</Link>.</p>
+          <Link to={loginTarget} className="auth-v3-login-bottom">¿Ya tienes cuenta? <strong>Iniciar sesión →</strong></Link>
         </section>
       </div>
     </main>
