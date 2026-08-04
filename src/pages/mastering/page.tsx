@@ -15,7 +15,7 @@ import { createMaster } from './masteringEngine';
 import type { LoudnessProfile, MasteringResult } from './masteringEngine';
 import './mastering.css';
 
-type Stage = 'upload' | 'analyzing' | 'configure' | 'processing' | 'compare';
+type Stage = 'upload' | 'analyzing' | 'configure' | 'processing' | 'compare' | 'complete';
 
 interface SavedMasteringConfiguration {
   id: string;
@@ -52,6 +52,12 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const originalCompareRef = useRef<HTMLAudioElement>(null);
   const masterCompareRef = useRef<HTMLAudioElement>(null);
+  const liveMeterCanvasRef = useRef<HTMLCanvasElement>(null);
+  const meterContextRef = useRef<AudioContext | null>(null);
+  const meterSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const meterAnalyserRef = useRef<AnalyserNode | null>(null);
+  const meterAnimationRef = useRef<number | null>(null);
+  const meterEnergyRef = useRef({ sum: 0, count: 0 });
   const [stage, setStage] = useState<Stage>('upload');
   const [dragging, setDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -69,6 +75,10 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
   const [masterMp3Url, setMasterMp3Url] = useState('');
   const [volumeMatched, setVolumeMatched] = useState(true);
   const [downloadGrantedForCurrentResult, setDownloadGrantedForCurrentResult] = useState(false);
+  const [sourceWasGeneratedMix, setSourceWasGeneratedMix] = useState(false);
+  const [downloadedFormat, setDownloadedFormat] = useState<'MP3' | 'WAV 24-bit' | null>(null);
+  const [liveMomentary, setLiveMomentary] = useState(-60);
+  const [liveIntegrated, setLiveIntegrated] = useState(-60);
   const [savedConfigurations, setSavedConfigurations] = useState<SavedMasteringConfiguration[]>(() => {
     const user = getStoredUser();
     const key = user.id || user.email || 'guest';
@@ -133,6 +143,101 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     if (masterMp3Url) URL.revokeObjectURL(masterMp3Url);
   }, [masterMp3Url]);
 
+  useEffect(() => () => {
+    if (meterAnimationRef.current) cancelAnimationFrame(meterAnimationRef.current);
+    meterContextRef.current?.close().catch(() => {});
+  }, []);
+
+  const drawLiveMeter = (lufs: number) => {
+    const canvas = liveMeterCanvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const { width, height } = canvas;
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = '#0b0910';
+    context.fillRect(0, 0, width, height);
+    const normalized = Math.max(0, Math.min(1, (lufs + 48) / 43));
+    const barHeight = Math.round((height - 18) * normalized);
+    const gradient = context.createLinearGradient(0, height, 0, 0);
+    gradient.addColorStop(0, '#42d58b');
+    gradient.addColorStop(.66, '#42d58b');
+    gradient.addColorStop(.82, '#f2b84b');
+    gradient.addColorStop(.94, '#ef4aa8');
+    gradient.addColorStop(1, '#f06767');
+    context.fillStyle = gradient;
+    context.fillRect(11, height - 9 - barHeight, 24, barHeight);
+    context.fillRect(43, height - 9 - Math.round(barHeight * .96), 24, Math.round(barHeight * .96));
+    context.strokeStyle = 'rgba(255,255,255,.16)';
+    context.setLineDash([3, 3]);
+    const targetY = height - 9 - Math.round((height - 18) * ((-14 + 48) / 43));
+    context.beginPath(); context.moveTo(5, targetY); context.lineTo(width - 5, targetY); context.stroke();
+    context.setLineDash([]);
+  };
+
+  const stopLiveMeter = () => {
+    if (meterAnimationRef.current) cancelAnimationFrame(meterAnimationRef.current);
+    meterAnimationRef.current = null;
+  };
+
+  const releaseLiveMeter = () => {
+    stopLiveMeter();
+    meterContextRef.current?.close().catch(() => {});
+    meterContextRef.current = null;
+    meterSourceRef.current = null;
+    meterAnalyserRef.current = null;
+  };
+
+  const startLiveMeter = async () => {
+    const element = masterCompareRef.current;
+    if (!element) return;
+    let context = meterContextRef.current;
+    if (!context) {
+      context = new AudioContext();
+      meterContextRef.current = context;
+    }
+    if (context.state === 'suspended') await context.resume();
+    if (!meterSourceRef.current) {
+      const source = context.createMediaElementSource(element);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = .62;
+      source.connect(analyser);
+      analyser.connect(context.destination);
+      meterSourceRef.current = source;
+      meterAnalyserRef.current = analyser;
+    }
+    meterEnergyRef.current = { sum: 0, count: 0 };
+    setLiveMomentary(-60);
+    setLiveIntegrated(-60);
+    stopLiveMeter();
+    const analyser = meterAnalyserRef.current;
+    if (!analyser) return;
+    const samples = new Float32Array(analyser.fftSize);
+    const loop = () => {
+      analyser.getFloatTimeDomainData(samples);
+      let sum = 0;
+      for (let index = 0; index < samples.length; index += 1) sum += samples[index] * samples[index];
+      const rms = Math.sqrt(sum / samples.length);
+      const momentary = rms > .00001 ? Math.max(-60, Math.min(0, 20 * Math.log10(rms) - .691)) : -60;
+      setLiveMomentary(momentary);
+      if (momentary > -55) {
+        meterEnergyRef.current.sum += 10 ** (momentary / 10);
+        meterEnergyRef.current.count += 1;
+        setLiveIntegrated(10 * Math.log10(meterEnergyRef.current.sum / meterEnergyRef.current.count));
+      }
+      drawLiveMeter(momentary);
+      meterAnimationRef.current = requestAnimationFrame(loop);
+    };
+    loop();
+  };
+
+  useEffect(() => {
+    if (stage !== 'compare') return;
+    const frame = requestAnimationFrame(() => drawLiveMeter(-60));
+    return () => cancelAnimationFrame(frame);
+  }, [stage]);
+
   useEffect(() => {
     const original = originalCompareRef.current;
     const mastered = masterCompareRef.current;
@@ -159,6 +264,11 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     if (masterMp3Url) URL.revokeObjectURL(masterMp3Url);
     setMasterMp3Url('');
     setDownloadGrantedForCurrentResult(false);
+    setSourceWasGeneratedMix(false);
+    setDownloadedFormat(null);
+    releaseLiveMeter();
+    setLiveMomentary(-60);
+    setLiveIntegrated(-60);
     setVolumeMatched(true);
     setError('');
   };
@@ -193,6 +303,14 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     }
   };
 
+  const downloadGeneratedMix = () => {
+    if (!audioUrl || !file) return;
+    const link = document.createElement('a');
+    link.href = audioUrl;
+    link.download = 'mezcla-v3-mixingmusic-24bit.wav';
+    link.click();
+  };
+
   const downloadWav = () => {
     if (!masterUrl || !file) return;
     if (!isUnlimited) {
@@ -203,6 +321,8 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     link.href = masterUrl;
     link.download = `${file.name.replace(/\.[^.]+$/, '')}-master-mixingmusic-24bit.wav`;
     link.click();
+    setDownloadedFormat('WAV 24-bit');
+    setStage('complete');
   };
 
   const downloadMp3 = async () => {
@@ -218,6 +338,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
             : code === 'SECURE_SESSION_REQUIRED'
               ? 'Ingresa nuevamente a tu cuenta para validar tu descarga gratuita.'
               : 'No pudimos validar la descarga. Inténtalo nuevamente.');
+          if (code === 'FREE_MASTER_LIMIT_REACHED') navigate('/checkout-v3');
           return;
         }
       } else {
@@ -226,6 +347,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
         const usageKey = `mixingmusic_free_master_v3_${identity}`;
         if (localStorage.getItem(usageKey) === 'used') {
           setError('Ya utilizaste la descarga master incluida en el plan Gratis. Unlimited incluye masters y descargas sin límite.');
+          navigate('/checkout-v3');
           return;
         }
         localStorage.setItem(usageKey, 'used');
@@ -236,6 +358,8 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     link.href = masterMp3Url;
     link.download = `${file.name.replace(/\.[^.]+$/, '')}-master-mixingmusic-320kbps.mp3`;
     link.click();
+    setDownloadedFormat('MP3');
+    setStage('complete');
   };
 
   const saveConfiguration = async () => {
@@ -336,9 +460,11 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
   };
 
   useEffect(() => {
-    const incomingFile = (location.state as { file?: File } | null)?.file;
+    const incomingState = location.state as { file?: File; fromMix?: boolean } | null;
+    const incomingFile = incomingState?.file;
     if (!incomingFile || incomingFileHandled.current) return;
     incomingFileHandled.current = true;
+    setSourceWasGeneratedMix(incomingState?.fromMix === true);
     processFile(incomingFile);
     window.history.replaceState({}, document.title, window.location.pathname);
   }, [location.state]);
@@ -362,7 +488,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
       <div className="master-shell">
         <div className="master-progress" aria-label="Progreso del mastering">
           {['Cargar mezcla', 'Definir sonido', 'Comparar', 'Exportar'].map((step, index) => {
-            const activeIndex = stage === 'upload' || stage === 'analyzing' ? 0 : stage === 'configure' || stage === 'processing' ? 1 : 2;
+            const activeIndex = stage === 'upload' || stage === 'analyzing' ? 0 : stage === 'configure' || stage === 'processing' ? 1 : stage === 'compare' ? 2 : 3;
             return (
               <div className={index <= activeIndex ? 'active' : ''} key={step}>
                 <i>{index + 1}</i><span>{step}</span>
@@ -429,6 +555,12 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
 
         {stage === 'configure' && analysis && file && (
           <section className="master-configure">
+            {sourceWasGeneratedMix && (
+              <div className="master-mix-ready">
+                <div><span className="master-kicker">MEZCLA GENERADA CON IA</span><h1>Tu mezcla está lista.</h1><p>Escúchala, descárgala si quieres conservar el premaster y define abajo cómo masterizarla.</p></div>
+                <button onClick={downloadGeneratedMix}>Descargar mezcla WAV 24-bit ↓</button>
+              </div>
+            )}
             <div className="master-filebar">
               <div className="master-file-icon">♫</div>
               <div>
@@ -510,7 +642,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                   </div>
                 </div>
                 <div className="master-safe"><i>✓</i><span><strong>Protección de pico digital</strong>El master inicial no superará −1.2 dBFS. La medición True Peak se validará por separado.</span></div>
-                <button className="master-continue" onClick={processMaster}>Procesar master <span>→</span></button>
+                <button className="master-continue" onClick={processMaster}>MASTERIZAR CON IA <span>→</span></button>
               </div>
             </div>
             {error && <div className="master-info">{error}</div>}
@@ -550,7 +682,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                   ref={originalCompareRef}
                   controls
                   src={audioUrl}
-                  onPlay={() => masterCompareRef.current?.pause()}
+                  onPlay={() => { masterCompareRef.current?.pause(); stopLiveMeter(); }}
                   onTimeUpdate={(event) => {
                     const other = masterCompareRef.current;
                     if (other && !event.currentTarget.paused && Math.abs(other.currentTime - event.currentTarget.currentTime) > 0.35) other.currentTime = event.currentTarget.currentTime;
@@ -563,13 +695,24 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                   ref={masterCompareRef}
                   controls
                   src={masterUrl}
-                  onPlay={() => originalCompareRef.current?.pause()}
+                  onPlay={() => { originalCompareRef.current?.pause(); startLiveMeter(); }}
+                  onPause={stopLiveMeter}
+                  onEnded={() => { stopLiveMeter(); setLiveMomentary(-60); setLiveIntegrated(-60); drawLiveMeter(-60); }}
                   onTimeUpdate={(event) => {
                     const other = originalCompareRef.current;
                     if (other && !event.currentTarget.paused && Math.abs(other.currentTime - event.currentTarget.currentTime) > 0.35) other.currentTime = event.currentTarget.currentTime;
                   }}
                 />
               </article>
+            </div>
+            <div className="master-live-meter">
+              <div className="master-live-title"><span><i className={masterCompareRef.current?.paused === false ? 'live' : ''} />MEDICIÓN DEL MASTER EN TIEMPO REAL</span><small>Reproduce MASTER V3 para activar la lectura</small></div>
+              <div className="master-live-grid">
+                <canvas ref={liveMeterCanvasRef} width="78" height="150" aria-label="Medidor VU en tiempo real" />
+                <div><strong>{liveMomentary.toFixed(1)}</strong><span>LUFS momentáneos</span><small>Nivel actual</small></div>
+                <div><strong>{liveIntegrated.toFixed(1)}</strong><span>LUFS integrados</span><small>Promedio durante reproducción</small></div>
+                <div><strong>{masterResult.peakDbfs.toFixed(1)}</strong><span>dBFS pico</span><small>Techo {masterResult.samplePeakCeilingDbfs.toFixed(1)} dBFS</small></div>
+              </div>
             </div>
             <div className="master-result-metrics">
               <Metric label="Preset" value={selectedPreset.name} note={`${strength}% de intensidad`} />
@@ -578,13 +721,39 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
               <Metric label="Loudness integrado" value={`${masterResult.integratedLufs.toFixed(1)} LUFS`} note={`ITU-R BS.1770 · ${(analysis!.sampleRate / 1000).toFixed(1)} kHz`} />
             </div>
             <div className="master-compare-actions">
-              <button className="master-secondary" onClick={() => { setError(''); setStage('configure'); }}>← Ajustar sonido</button>
+              <button className="master-secondary" onClick={() => { releaseLiveMeter(); setError(''); setStage('configure'); }}>← Ajustar sonido</button>
               <button className="master-download" onClick={downloadMp3}>Descargar MP3 320 kbps ↓</button>
               <button className="master-download" onClick={downloadWav}>Descargar WAV 24-bit {isUnlimited ? '↓' : '· Unlimited'}</button>
             </div>
             {!isUnlimited && <p className="master-free-export">Plan Gratis: descarga este master en MP3. WAV real de 24 bits es exclusivo Unlimited.</p>}
             <p className="master-free-export">Codificación MP3 con <a href="https://lame.sourceforge.io/" target="_blank" rel="noreferrer">LAME</a> mediante Mediabunny.</p>
             {error && <div className="master-info">{error}</div>}
+          </section>
+        )}
+
+        {stage === 'complete' && masterResult && file && (
+          <section className="master-complete">
+            <div className="master-complete-check">✓</div>
+            <span className="master-kicker">PROCESO TERMINADO</span>
+            <h1>Tu master se ha generado.</h1>
+            <p>Descargaste {downloadedFormat}. El archivo original permanece intacto y tu master está listo para publicar.</p>
+            <div className="master-complete-summary">
+              <div><span>PRESET</span><strong>{selectedPreset.name}</strong></div>
+              <div><span>LOUDNESS</span><strong>{masterResult.integratedLufs.toFixed(1)} LUFS</strong></div>
+              <div><span>PICO</span><strong>{masterResult.peakDbfs.toFixed(1)} dBFS</strong></div>
+            </div>
+            {!isUnlimited && (
+              <div className="master-complete-upgrade">
+                <div><span>UNLIMITED PARA SIEMPRE</span><strong>US$14.99 · un solo pago</strong><small>No es suscripción. Sin mensualidades ni renovación.</small></div>
+                <button onClick={() => navigate('/checkout-v3')}>Activar Unlimited con PayPal →</button>
+              </div>
+            )}
+            <h2>¿Qué quieres hacer ahora?</h2>
+            <div className="master-next-grid">
+              <button onClick={() => navigate('/')}><i>≋</i><strong>Hacer otra mezcla</strong><span>Subir stems separados</span></button>
+              <button onClick={() => isUnlimited ? reset() : navigate('/checkout-v3')}><i>◇</i><strong>Masterizar otra mezcla</strong><span>{isUnlimited ? 'Subir una premezcla' : 'Requiere Unlimited'}</span></button>
+              <button onClick={() => isUnlimited ? navigate('/mastering/album') : navigate('/checkout-v3')}><i>▦</i><strong>Masterizar un álbum</strong><span>{isUnlimited ? 'Hasta 12 canciones' : 'Requiere Unlimited'}</span></button>
+            </div>
           </section>
         )}
       </div>

@@ -1,10 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-
-// Variable de módulo — sync, garantizada entre renders
-let pendingExportData: any = null;
+import { useState, useEffect } from 'react';
 import Header from '@/components/feature/Header';
 import MixEditor from './MixEditor';
-import ExportScreen from './ExportScreen';
 import NewProjectScreen from './NewProjectScreen';
 import PresetScreen from './PresetScreen';
 import type { MixPreset } from './mixTypes';
@@ -12,6 +8,7 @@ import { PRESETS } from './mixTypes';
 import AIChat from './AIChat';
 import { useNavigate, Link } from 'react-router-dom';
 import MasteringPage from '../../mastering/page';
+import { encodeWav24 } from '../../mastering/wav24';
 import './dashboard-v3.css';
 
 interface User {
@@ -28,7 +25,7 @@ interface ExportData {
   finalLufs: number; mp3Url?: string; wavUrl?: string;
 }
 
-type Screen = 'dashboard'|'chat'|'newProject'|'preset'|'mixer'|'export'|'mastering';
+type Screen = 'dashboard'|'chat'|'newProject'|'preset'|'mixer'|'mastering';
 
 export default function ProjectDashboard() {
   const [user, setUser] = useState<User|null>(null);
@@ -40,8 +37,6 @@ export default function ProjectDashboard() {
   const [reverbOn, setReverbOn] = useState(false);
   const [delayOn, setDelayOn] = useState(false);
   const [stereoOn, setStereoOn] = useState(false);
-  const [exportData, setExportData] = useState<ExportData|null>(null);
-  const exportDataRef = useRef<ExportData|null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -94,14 +89,13 @@ export default function ProjectDashboard() {
   };
 
   const handleExport = (data: ExportData) => {
-    pendingExportData = data; // sync
-    exportDataRef.current = data;
-    setExportData(data);
-    setCurrentScreen('export');
+    const wav = encodeWav24(data.audioBuffer);
+    const generatedMix = new File([wav], 'mezcla-v3-mixingmusic.wav', { type:'audio/wav' });
+    navigate('/mastering', { state: { file: generatedMix, fromMix: true } });
   };
 
   const handleBackToDashboard = () => {
-    setCurrentScreen('dashboard'); setSelectedProject(null); setUploadedFiles([]); setExportData(null);
+    setCurrentScreen('dashboard'); setSelectedProject(null); setUploadedFiles([]);
   };
 
   // PANTALLA: Chat AI — pantalla principal para usuarios logueados
@@ -127,20 +121,6 @@ export default function ProjectDashboard() {
       onBack={handleBackToDashboard} onCreditsUpdate={handleCreditsUpdate} onExport={handleExport}
       initialPreset={selectedPreset} reverbOn={reverbOn} delayOn={delayOn} stereoOn={stereoOn}
     />;
-
-  // PANTALLA: Export — sin condición de user/project para evitar pantalla negra
-  if (currentScreen === 'export') {
-    const expData = pendingExportData || exportDataRef.current || exportData;
-    const expUser = user || { id:'guest', firstName:'Usuario', lastName:'', email:'', country:'', credits:999999, createdAt:'' };
-    const expProject = selectedProject || 'export';
-    return <ExportScreen user={expUser} projectId={expProject} exportData={expData}
-      exportProgress={expData ? 100 : 0} exportStep={expData ? '¡Listo!' : 'Preparando...'}
-      onBack={() => setCurrentScreen('mixer')}
-      onNewMix={() => setCurrentScreen('newProject')}
-      onGoHome={() => setCurrentScreen('dashboard')}
-      onMasterMix={(file) => navigate('/mastering', { state: { file } })}
-      onCreditsUpdate={handleCreditsUpdate} />;
-  }
 
   // PANTALLA: Dashboard principal
   const S = {

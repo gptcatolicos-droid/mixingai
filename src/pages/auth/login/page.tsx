@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import './login-v3.css';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -104,82 +105,63 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const ff = "'Outfit',system-ui,sans-serif";
-  const inputS: React.CSSProperties = {
-    width: '100%', background: 'rgba(8,4,16,0.6)', border: '1px solid rgba(192,38,211,0.2)',
-    borderRadius: '10px', padding: '11px 14px', color: '#F8F0FF', fontSize: '14px',
-    fontFamily: ff, boxSizing: 'border-box' as const,
-  };
-
   return (
-    <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#0D0A14,#1a0a2e,#0d1a3a)', fontFamily:ff, color:'#F8F0FF' }}>
+    <main className="login-v3-page">
+      <header className="login-v3-header">
+        <Link to="/" className="login-v3-brand"><img src="/logo-brand.png" alt="MixingMusic.AI" /><span>V3</span></Link>
+        <Link to={registerTarget} className="login-v3-register">Crear cuenta gratis</Link>
+      </header>
 
-      {/* Header */}
-      <div style={{ background:'rgba(13,10,20,0.95)', backdropFilter:'blur(12px)', borderBottom:'1px solid rgba(192,38,211,0.15)', padding:'0 24px', height:'60px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:100 }}>
-        <Link to="/" style={{ display:'flex', alignItems:'center', gap:'10px', textDecoration:'none' }}>
-          <div style={{ width:'32px', height:'32px', background:'linear-gradient(135deg,#EC4899,#C026D3)', borderRadius:'9px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <i className="ri-equalizer-fill" style={{ color:'#fff', fontSize:'15px' }}></i>
+      <div className="login-v3-shell">
+        <section className="login-v3-story">
+          <span className="login-v3-kicker">VUELVE A TU ESTUDIO</span>
+          <h1>Tu música sigue esperando <strong>el sonido final.</strong></h1>
+          <p>Continúa una mezcla, masteriza una premezcla o prepara hasta 12 canciones con Modo Álbum.</p>
+          <div className="login-v3-benefits">
+            <div><i>≋</i><span><strong>Crear mezclas</strong>Desde stems separados</span></div>
+            <div><i>◇</i><span><strong>Masterizar</strong>Con presets MixingMusic</span></div>
+            <div><i>▦</i><span><strong>Modo álbum</strong>Identidad sonora coherente</span></div>
           </div>
-          <span style={{ fontWeight:700, fontSize:'15px', background:'linear-gradient(90deg,#EC4899,#C026D3)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>mixingmusic.ai</span>
-        </Link>
-        <Link to={registerTarget} style={{ background:'linear-gradient(135deg,#EC4899,#C026D3)', color:'#fff', padding:'8px 18px', borderRadius:'980px', fontSize:'13px', fontWeight:600, textDecoration:'none' }}>
-          Crear Cuenta
-        </Link>
-      </div>
+          <div className="login-v3-proof"><span>GRA</span><p><strong>Ganadores Global Recognition Award 2026</strong>Innovación en IA para producción musical.</p></div>
+        </section>
 
-      {/* Form */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'calc(100vh - 60px)', padding:'40px 20px' }}>
-        <div style={{ background:'rgba(26,16,40,0.9)', border:'1px solid rgba(192,38,211,0.2)', borderRadius:'24px', padding:'36px 32px', maxWidth:'440px', width:'100%', boxShadow:'0 0 60px rgba(192,38,211,0.1)' }}>
-
-          <div style={{ textAlign:'center', marginBottom:'28px' }}>
-            <div style={{ width:'64px', height:'64px', background:'linear-gradient(135deg,#EC4899,#C026D3)', borderRadius:'20px', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px', fontSize:'28px', boxShadow:'0 0 28px rgba(192,38,211,0.4)' }}>🎛️</div>
-            <h1 style={{ fontSize:'26px', fontWeight:800, color:'#F8F0FF', marginBottom:'6px', letterSpacing:'-0.5px' }}>¡Bienvenido de vuelta!</h1>
-            <p style={{ fontSize:'14px', color:'rgba(155,126,200,0.8)' }}>Accede a tu estudio de mezclas</p>
+        <section className="login-v3-card">
+          <div className="login-v3-card-head">
+            <span>ACCESO SEGURO</span>
+            <h2>Bienvenido de vuelta</h2>
+            <p>Ingresa para continuar en MixingMusic V3.</p>
           </div>
 
           {error && (
-            <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:'10px', padding:'10px 14px', marginBottom:'18px', display:'flex', gap:'8px' }}>
-              <span style={{ color:'#f87171', flexShrink:0 }}>⚠</span>
-              <span style={{ fontSize:'13px', color:'#fca5a5', lineHeight:1.5 }}>{error}</span>
+            <div className="login-v3-error">
+              <span>!</span><p>{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
+          <form onSubmit={handleSubmit} className="login-v3-form">
             <div>
-              <label style={{ fontSize:'12px', fontWeight:600, color:'rgba(155,126,200,0.8)', display:'block', marginBottom:'6px' }}>Correo Electrónico</label>
-              <input type="email" name="email" value={form.email} onChange={onChange} placeholder="tu@email.com" disabled={loading} required autoComplete="email" style={inputS} />
+              <label>Correo electrónico</label>
+              <input type="email" name="email" value={form.email} onChange={onChange} placeholder="tu@email.com" disabled={loading} required autoComplete="email" />
             </div>
             <div>
-              <label style={{ fontSize:'12px', fontWeight:600, color:'rgba(155,126,200,0.8)', display:'block', marginBottom:'6px' }}>Contraseña</label>
-              <input type="password" name="password" value={form.password} onChange={onChange} placeholder="Tu contraseña" disabled={loading} required autoComplete="current-password" style={inputS} />
+              <label>Contraseña</label>
+              <input type="password" name="password" value={form.password} onChange={onChange} placeholder="Tu contraseña" disabled={loading} required autoComplete="current-password" />
             </div>
 
-            <button type="submit" disabled={loading} style={{
-              width:'100%', border:'none', color:'#fff', padding:'15px', borderRadius:'14px',
-              fontSize:'16px', fontWeight:700, fontFamily:ff,
-              background: loading ? 'rgba(192,38,211,0.35)' : 'linear-gradient(135deg,#EC4899,#C026D3)',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              boxShadow: loading ? 'none' : '0 0 28px rgba(192,38,211,0.45)',
-              display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
-            }}>
+            <button type="submit" disabled={loading}>
               {loading
-                ? <><span style={{ width:'16px', height:'16px', border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', display:'inline-block', animation:'spin 0.7s linear infinite' }} />Iniciando sesión...</>
-                : 'Iniciar Sesión'}
+                ? <><span className="login-v3-spinner" />Ingresando…</>
+                : 'Ingresar a mi estudio →'}
             </button>
           </form>
 
-          <p style={{ textAlign:'center', fontSize:'13px', color:'rgba(155,126,200,0.7)', marginTop:'20px' }}>
-            ¿No tienes cuenta?{' '}
-            <Link to={registerTarget} style={{ color:'#EC4899', fontWeight:700, textDecoration:'none' }}>Crear cuenta gratis →</Link>
-          </p>
-          <p style={{ textAlign:'center', fontSize:'11px', color:'rgba(155,126,200,0.4)', marginTop:'8px' }}>
-            ¿Problemas para entrar?{' '}
-            <a href="mailto:support@mixingmusic.ai" style={{ color:'#9B7EC8', textDecoration:'none' }}>support@mixingmusic.ai</a>
-          </p>
-        </div>
+          <div className="login-v3-links">
+            <p>¿No tienes cuenta? <Link to={registerTarget}>Crear cuenta gratis →</Link></p>
+            <a href="mailto:support@mixingmusic.ai">¿Problemas para entrar? Escríbenos</a>
+          </div>
+        </section>
       </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} input:focus{border-color:rgba(192,38,211,0.5)!important;outline:none}`}</style>
-    </div>
+    </main>
   );
 };
 

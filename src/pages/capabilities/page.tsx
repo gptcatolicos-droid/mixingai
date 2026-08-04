@@ -45,13 +45,19 @@ export default function CapabilitiesPage() {
         </div>
       </header>
 
+      <section className="cap-highlights">
+        <article><strong>3</strong><span>flujos conectados</span><small>Mezcla · Mejora · Mastering</small></article>
+        <article><strong>24-bit</strong><span>exportación profesional</span><small>WAV PCM real en Unlimited</small></article>
+        <article><strong>12</strong><span>canciones por álbum</span><small>Una identidad sonora</small></article>
+      </section>
+
       <section className="cap-table-wrap" aria-label="Comparación de planes MixingMusic">
         <div className="cap-table-head"><span>Funcionalidad</span><strong>Gratis</strong><strong>Unlimited</strong></div>
         {rows.map(([feature, free, unlimited]) => (
           <div className="cap-row" key={feature}>
             <span>{feature}</span>
-            <span className={free === '—' ? 'cap-no' : ''}>{free}</span>
-            <strong>{unlimited}</strong>
+            <span className={free === '—' ? 'cap-no' : ''}><small>GRATIS</small>{free}</span>
+            <strong><small>UNLIMITED</small>{unlimited}</strong>
           </div>
         ))}
       </section>

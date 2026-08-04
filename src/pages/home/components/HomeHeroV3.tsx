@@ -303,9 +303,9 @@ export default function HomeHeroV3() {
           </article>
           <article className="v3-price-card v3-price-featured">
             <div className="v3-founders">PRECIO FUNDADOR</div>
-            <div className="v3-plan-name">UNLIMITED</div>
+            <div className="v3-plan-name">ILIMITADO PARA SIEMPRE</div>
             <div className="v3-price"><sup>$</sup>14.99</div>
-            <p>Pago único · acceso permanente.</p>
+            <p>Un solo pago · no es suscripción · acceso permanente.</p>
             <ul>
               <li>Mezclas y masters ilimitados</li>
               <li>MP3 + WAV real de 24 bits</li>
@@ -316,6 +316,18 @@ export default function HomeHeroV3() {
             <small>Precio regular posterior: US$29.99</small>
           </article>
         </div>
+      </section>
+
+      <section className="v3-guitarraia" aria-label="GuitarraIA">
+        <div className="v3-guitarraia-copy">
+          <span className="v3-kicker">OTRA EXPERIENCIA MUSICAL CON IA</span>
+          <h2>¿También tocas guitarra?</h2>
+          <p>Descubre acordes, canciones, tablaturas y afinación con inteligencia artificial en GuitarraIA.</p>
+          <a href="https://www.guitarraia.com" target="_blank" rel="noreferrer">Conocer GuitarraIA <span>↗</span></a>
+        </div>
+        <a className="v3-guitarraia-image" href="https://www.guitarraia.com" target="_blank" rel="noreferrer" aria-label="Visitar GuitarraIA">
+          <img src="/guitarraia-promo.jpeg" alt="GuitarraIA, la IA que te hace tocar más" />
+        </a>
       </section>
 
       <footer className="v3-footer">

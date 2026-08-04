@@ -105,18 +105,19 @@
 .v3-capabilities-teaser {
   margin-top: 100px;
   padding: 44px 48px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 40px;
   border: 1px solid rgba(181, 87, 243, .25);
   border-radius: 22px;
   background: linear-gradient(120deg, rgba(181, 87, 243, .1), rgba(239, 74, 168, .05));
 }
 
+.v3-capabilities-teaser > div { min-width: 0; }
 .v3-capabilities-teaser h2 { max-width: 700px; margin: 12px 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.05; letter-spacing: -.04em; }
 .v3-capabilities-teaser p { margin: 0; color: var(--v3-muted); }
-.v3-capabilities-teaser .v3-button { flex: 0 0 auto; }
+.v3-capabilities-teaser .v3-button { width: auto; white-space: nowrap; }
 
 .v3-reason-grid,
 .v3-testimonial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
@@ -274,15 +275,40 @@
 }
 
 .v3-function-strip > div {
+  position: relative;
   min-height: 112px;
-  padding: 20px;
+  padding: 24px 22px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(145deg, rgba(255,255,255,.028), transparent);
+  transition: background .18s ease, transform .18s ease;
 }
 
+.v3-function-strip > div:hover { background: linear-gradient(145deg, rgba(181,87,243,.11), rgba(239,74,168,.045)); }
+.v3-function-strip > div::before { content:''; position:absolute; left:22px; right:22px; bottom:0; height:2px; opacity:.6; background:linear-gradient(90deg,#ef4aa8,#b557f3,transparent); }
 .v3-function-strip > div:last-child { border-right: 0; }
-.v3-function-strip span { color: #d879f2; font: 700 10px/1 'DM Mono', monospace; }
+.v3-function-strip span { width:26px; height:26px; display:grid; place-items:center; border:1px solid rgba(216,121,242,.3); border-radius:8px; color: #e58ef2; background:rgba(181,87,243,.08); font: 700 9px/1 'DM Mono', monospace; }
 .v3-function-strip strong { display: block; margin: 10px 0 6px; font-size: 15px; }
 .v3-function-strip small { display: block; color: #92899d; font-size: 11px; line-height: 1.45; }
+
+.v3-guitarraia {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto 110px;
+  padding: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 390px);
+  align-items: center;
+  gap: 64px;
+  overflow: hidden;
+  border: 1px solid rgba(255,111,36,.3);
+  border-radius: 28px;
+  background: radial-gradient(circle at 85% 50%,rgba(255,99,25,.18),transparent 35%),linear-gradient(125deg,rgba(15,13,18,.98),rgba(13,9,18,.94));
+  box-shadow: 0 35px 100px rgba(0,0,0,.4);
+}
+.v3-guitarraia-copy h2 { margin:14px 0 16px; font-size:clamp(42px,5vw,66px); line-height:1; letter-spacing:-.055em; }
+.v3-guitarraia-copy p { max-width:560px; color:#aaa1b5; font-size:16px; line-height:1.7; }
+.v3-guitarraia-copy a { margin-top:24px; min-height:52px; padding:0 24px; display:inline-flex; align-items:center; gap:16px; border:1px solid rgba(255,112,39,.55); border-radius:12px; background:rgba(255,100,24,.1); color:#ff9a62; text-decoration:none; font-weight:800; }
+.v3-guitarraia-image { display:block; overflow:hidden; border:1px solid rgba(255,132,64,.25); border-radius:20px; transform:rotate(1.2deg); box-shadow:0 25px 70px rgba(0,0,0,.5),0 0 35px rgba(255,94,20,.12); }
+.v3-guitarraia-image img { width:100%; max-height:510px; display:block; object-fit:cover; object-position:top; }
 
 .v3-mode-grid {
   position: relative;
@@ -796,7 +822,10 @@
 
   .v3-reason-grid,
   .v3-testimonial-grid { grid-template-columns: 1fr; }
-  .v3-capabilities-teaser { align-items: flex-start; flex-direction: column; }
+  .v3-capabilities-teaser { grid-template-columns:1fr; align-items: flex-start; }
+  .v3-capabilities-teaser .v3-button { width:100%; white-space:normal; }
+  .v3-guitarraia { grid-template-columns:1fr; padding:38px 30px; gap:34px; }
+  .v3-guitarraia-image { max-width:430px; margin:auto; transform:none; }
 
   .v3-function-strip > div { border-right: 0; border-bottom: 1px solid rgba(255,255,255,.08); }
   .v3-function-strip > div:last-child { border-bottom: 0; }
@@ -896,9 +925,13 @@
 
   .v3-section,
   .v3-presets-section,
-  .v3-album {
+  .v3-album,
+  .v3-guitarraia {
     width: calc(100% - 28px);
   }
+
+  .v3-guitarraia { padding:30px 22px; margin-bottom:70px; }
+  .v3-guitarraia-copy h2 { font-size:40px; }
 
   .v3-section {
     padding: 88px 0;

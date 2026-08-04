@@ -96,8 +96,8 @@ export default function MasteringCheckoutPage() {
       </header>
       <div className="checkout-v3-shell">
         <section className="checkout-v3-summary">
-          <span className="checkout-v3-kicker">MIXINGMUSIC V3 UNLIMITED</span>
-          <h1>Tu música, sin límites.</h1>
+          <span className="checkout-v3-kicker">MIXINGMUSIC V3 · ILIMITADO PARA SIEMPRE</span>
+          <h1>Tu música, sin límites. Para siempre.</h1>
           <p>Activa permanentemente la mezcla y el mastering profesional. Sin mensualidades ni renovación automática.</p>
           <ul>
             <li><i>✓</i><span><strong>Mezclas y masters ilimitados</strong>Procesa stems o premezclas completas.</span></li>
@@ -119,7 +119,7 @@ export default function MasteringCheckoutPage() {
             <>
               <div className="checkout-v3-price-label">PRECIO FUNDADOR</div>
               <div className="checkout-v3-price"><sup>US$</sup>14.99</div>
-              <p>Un solo pago · acceso permanente</p>
+              <p>Un solo pago · no es suscripción · acceso permanente</p>
               <div className="checkout-v3-divider" />
               {!secureMasteringAccessEnabled ? (
                 <div className="checkout-v3-pending"><strong>Checkout preparado</strong><span>Se habilitará después de desplegar la seguridad V3.</span></div>
@@ -130,6 +130,7 @@ export default function MasteringCheckoutPage() {
               )}
               {status === 'processing' && <div className="checkout-v3-processing">Verificando operación…</div>}
               {error && <div className="checkout-v3-error">{error}</div>}
+              <div className="checkout-v3-paypal-only">Pago único procesado de forma segura por PayPal</div>
               <small>El acceso se activa únicamente después de que PayPal confirma el pago. No almacenamos los datos de tu tarjeta.</small>
             </>
           )}
