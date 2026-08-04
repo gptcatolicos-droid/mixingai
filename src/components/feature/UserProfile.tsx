@@ -137,7 +137,7 @@ export default function UserProfile({ user, isOpen, onClose, onLogout }: UserPro
                   <p className="text-xs text-slate-400 mb-3">Incluye 1 mezcla completa gratis · WAV 24-bit</p>
                   <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-lg p-3">
                     <p className="text-xs text-purple-300 font-medium mb-1">✦ Mezclas Ilimitadas — $3.99</p>
-                    <p className="text-xs text-slate-400">Pago único · PayPal o Mercado Pago</p>
+                    <p className="text-xs text-slate-400">Pago único de US$14.99 · PayPal</p>
                   </div>
                 </>
               )}

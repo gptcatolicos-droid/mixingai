@@ -1,4 +1,6 @@
 
+import { seoArticles } from './seoArticles';
+
 export interface BlogArticle {
   id: string;
   slug: string;
@@ -2275,6 +2277,7 @@ Las interfaces Focusrite siguen siendo la elección inteligente para home studio
       en: ['Focusrite interface setup', 'home studio recording', 'Scarlett configuration', 'audio interface guide', 'professional recording', 'Focusrite optimization'],
       es: ['configuración interfaz Focusrite', 'grabación home studio', 'configuración Scarlett', 'guía interfaz audio', 'grabación profesional', 'optimización Focusrite']
     }
-  }
+  },
+  ...seoArticles
   // Se pueden agregar más artículos aquí...
 ];

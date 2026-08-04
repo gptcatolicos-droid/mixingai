@@ -5,9 +5,9 @@ import { blogArticles } from '../../../mocks/blogArticles';
 const BlogArticlePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
-  const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'es'>('en');
+  const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'es'>('es');
 
-  // Get language from URL params or default to English
+  // Spanish is the default; English remains available through ?lang=en.
   useEffect(() => {
     const lang = searchParams.get('lang') as 'en' | 'es';
     if (lang === 'en' || lang === 'es') {
@@ -58,6 +58,8 @@ const BlogArticlePage: React.FC = () => {
     }
     metaKeywords.setAttribute('content', keywords.join(', '));
 
+    const canonicalUrl = `https://mixingmusic.ai/blog/${article.slug}`;
+
     // Add Open Graph tags
     let ogTitle = document.querySelector('meta[property="og:title"]');
     if (!ogTitle) {
@@ -83,11 +85,69 @@ const BlogArticlePage: React.FC = () => {
     }
     ogImage.setAttribute('content', article.image);
 
+    const setMeta = (selector: string, attribute: 'name' | 'property', key: string, value: string) => {
+      let element = document.querySelector<HTMLMetaElement>(selector);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute(attribute, key);
+        document.head.appendChild(element);
+      }
+      element.content = value;
+    };
+    setMeta('meta[property="og:type"]', 'property', 'og:type', 'article');
+    setMeta('meta[property="og:url"]', 'property', 'og:url', canonicalUrl);
+    setMeta('meta[property="article:published_time"]', 'property', 'article:published_time', new Date(article.publishDate).toISOString());
+    setMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image');
+    setMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
+    setMeta('meta[name="twitter:description"]', 'name', 'twitter:description', metaDescription);
+    setMeta('meta[name="twitter:image"]', 'name', 'twitter:image', article.image);
+
+    let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.rel = 'canonical';
+      document.head.appendChild(canonical);
+    }
+    canonical.href = canonicalUrl;
+
+    document.head.querySelectorAll('link[data-article-hreflang]').forEach((node) => node.remove());
+    for (const lang of ['es', 'en']) {
+      const alternate = document.createElement('link');
+      alternate.rel = 'alternate';
+      alternate.hreflang = lang;
+      alternate.href = `${canonicalUrl}?lang=${lang}`;
+      alternate.dataset.articleHreflang = 'true';
+      document.head.appendChild(alternate);
+    }
+
+    const schema = document.createElement('script');
+    schema.type = 'application/ld+json';
+    schema.dataset.articleSchema = 'true';
+    schema.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: title,
+      description: metaDescription,
+      image: article.image,
+      datePublished: new Date(article.publishDate).toISOString(),
+      inLanguage: selectedLanguage,
+      mainEntityOfPage: canonicalUrl,
+      author: { '@type': 'Person', name: article.author.name },
+      publisher: {
+        '@type': 'Organization',
+        name: 'MixingMusic.AI',
+        url: 'https://mixingmusic.ai',
+        logo: { '@type': 'ImageObject', url: 'https://mixingmusic.ai/logo-brand.png' },
+      },
+    });
+    document.head.querySelectorAll('script[data-article-schema]').forEach((node) => node.remove());
+    document.head.appendChild(schema);
+
     // Cleanup function
     return () => {
-      document.title = 'MixingMusic.ai - AI Music Mixing Platform';
+      document.head.querySelectorAll('script[data-article-schema], link[data-article-hreflang]').forEach((node) => node.remove());
     };
-  }, [title, metaDescription, keywords, article.image]);
+  }, [title, metaDescription, keywords, article, selectedLanguage]);
 
   // Process content for better display
   const formatContent = (content: string) => {

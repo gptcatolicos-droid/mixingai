@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PRESETS } from './mixTypes';
+import { pressMentions } from '../../../content/pressMentions';
 import './home-v3.css';
 
 const benefits = [
@@ -78,6 +79,7 @@ export default function HomeHeroV3() {
           <a href="#funciones">Funciones</a>
           <button className="v3-nav-link" onClick={() => navigate('/capacidades')}>Capacidades</button>
           <button className="v3-nav-link" onClick={() => navigate('/conceptos-audio')}>Conceptos</button>
+          <button className="v3-nav-link" onClick={() => navigate('/prensa')}>Prensa</button>
           <a href="/pricing">Planes</a>
           <button className="v3-nav-login" onClick={() => navigate('/auth/login')}>Ingresar</button>
           <button className="v3-button v3-button-small" onClick={() => begin('master')}>Probar gratis</button>
@@ -175,6 +177,22 @@ export default function HomeHeroV3() {
         <div className="v3-award-image">
           <img src="/winner3.png" alt="MixingMusic.AI, ganador del 2026 Global Recognition Award por innovación en inteligencia artificial aplicada a la producción musical" />
         </div>
+      </section>
+
+      <section className="v3-section v3-press-home" aria-labelledby="press-home-title">
+        <div className="v3-section-heading">
+          <span className="v3-kicker">MIXINGMUSIC.AI EN LOS MEDIOS</span>
+          <h2 id="press-home-title">La inteligencia artificial colombiana que transforma la producción musical.</h2>
+          <p>Caracol Radio, A Vivir y Blu Radio han contado cómo MixingMusic.AI acerca mezcla y mastering a músicos independientes.</p>
+        </div>
+        <div className="v3-press-home-grid">
+          {pressMentions.map((mention) => (
+            <a key={mention.url} href={mention.url} target="_blank" rel="noreferrer" style={{ '--press-color': mention.color } as React.CSSProperties}>
+              <span>{mention.type} · {mention.date}</span><strong>{mention.outlet}</strong><p>{mention.title}</p><i>Leer o escuchar ↗</i>
+            </a>
+          ))}
+        </div>
+        <button className="v3-button v3-button-accent" onClick={() => navigate('/prensa')}>Ver prensa y reconocimiento <span>→</span></button>
       </section>
 
       <section className="v3-section v3-workflow" id="funciones">

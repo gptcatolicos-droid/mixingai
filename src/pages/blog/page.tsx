@@ -1,11 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { blogArticles } from '../../mocks/blogArticles';
+import { pressMentions } from '../../content/pressMentions';
+import './press-blog.css';
 
 // Función para obtener últimos artículos del blog  
 const getLatestBlogArticles = () => {
-  return blogArticles
+  return [...blogArticles]
     .sort((a, b) => new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime())
     .slice(0, 6); // Top 6 más recientes
 };
@@ -15,6 +17,17 @@ const BlogPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  useEffect(() => {
+    document.title = 'Blog de mezcla y mastering con IA | MixingMusic.AI';
+    const description = 'Guías de mezcla musical, mastering con IA, LUFS, referencias de mezcla, producción de voz e instrumentos y noticias de MixingMusic.AI.';
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+    if (!meta) { meta = document.createElement('meta'); meta.name = 'description'; document.head.appendChild(meta); }
+    meta.content = description;
+    let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical); }
+    canonical.href = 'https://mixingmusic.ai/blog';
+  }, []);
+
   const categories = [
     { id: 'all', name: 'All Articles', nameEs: 'Todos los Artículos' },
     { id: 'mixing', name: 'Mixing Techniques', nameEs: 'Técnicas de Mezcla' },
@@ -23,9 +36,11 @@ const BlogPage: React.FC = () => {
     { id: 'tutorials', name: 'Tutorials', nameEs: 'Tutoriales' },
   ];
 
-  const filteredArticles = selectedCategory === 'all' 
-    ? blogArticles 
-    : blogArticles.filter(article => article.category === selectedCategory);
+  const filteredArticles = (selectedCategory === 'all'
+    ? blogArticles
+    : blogArticles.filter(article => article.category === selectedCategory))
+    .slice()
+    .sort((a, b) => new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime());
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
@@ -174,6 +189,12 @@ const BlogPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <section className="blog-press-v3">
+        <div><span>PRENSA Y RECONOCIMIENTO</span><h2>MixingMusic.AI en los medios</h2><p>Entrevistas y publicaciones sobre innovación colombiana en producción musical con inteligencia artificial.</p></div>
+        <div className="blog-press-v3-grid">{pressMentions.map((mention)=><a key={mention.url} href={mention.url} target="_blank" rel="noreferrer" style={{'--press-color':mention.color} as React.CSSProperties}><span>{mention.outlet}</span><strong>{mention.title}</strong><small>{mention.date} · Ver fuente ↗</small></a>)}</div>
+        <Link to="/prensa">Ver reconocimiento y cobertura completa →</Link>
+      </section>
 
       {/* Categories Filter */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
