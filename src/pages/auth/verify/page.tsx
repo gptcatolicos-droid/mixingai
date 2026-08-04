@@ -72,6 +72,7 @@ const VerifyEmailPage: React.FC = () => {
           createdAt: data.user.created_at,
           needsVerification: false,
           accessToken: data.access_token,
+          refreshToken: data.refresh_token,
         }));
       }
       setStatus('success');

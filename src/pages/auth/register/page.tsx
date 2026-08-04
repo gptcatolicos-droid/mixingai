@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -11,6 +11,10 @@ const COUNTRIES = [
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedMode = searchParams.get('mode') === 'checkout' ? 'checkout' : searchParams.get('mode') === 'album' ? 'album' : searchParams.get('mode') === 'master' ? 'master' : 'mix';
+  const destination = requestedMode === 'checkout' ? '/checkout-v3' : requestedMode === 'album' ? '/mastering/album' : requestedMode === 'master' ? '/mastering' : '/';
+  const loginTarget = requestedMode === 'mix' ? '/auth/login' : `/auth/login?mode=${requestedMode}`;
   const [form, setForm] = useState({ firstName:'', lastName:'', email:'', password:'', country:'Colombia' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -18,7 +22,7 @@ const RegisterPage: React.FC = () => {
   const onChange = (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement>) =>
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
-  const saveAndGo = (id: string, email: string, token?: string) => {
+  const saveAndGo = (id: string, email: string, token?: string, refreshToken?: string) => {
     const { firstName, lastName, country } = form;
     localStorage.setItem('audioMixerUser', JSON.stringify({
       id, email, firstName, lastName, country,
@@ -27,9 +31,10 @@ const RegisterPage: React.FC = () => {
       createdAt: new Date().toISOString(),
       username: `${firstName.toLowerCase().replace(/\s/g,'_')}_${lastName.toLowerCase().replace(/\s/g,'_')}`,
       ...(token ? { accessToken: token } : {}),
+      ...(refreshToken ? { refreshToken } : {}),
     }));
     localStorage.removeItem('mixingai_used_free');
-    navigate('/');
+    navigate(destination);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,7 +104,7 @@ const RegisterPage: React.FC = () => {
 
       // ── 4. Signup OK con session ──────────────────────────────
       if (accessToken && signupData.user) {
-        saveAndGo(signupData.user.id, signupData.user.email, accessToken);
+        saveAndGo(signupData.user.id, signupData.user.email, accessToken, signupData.refresh_token);
         return;
       }
 
@@ -111,7 +116,7 @@ const RegisterPage: React.FC = () => {
       });
       const loginData = await loginRes.json();
       if (loginRes.ok && loginData.access_token) {
-        saveAndGo(loginData.user.id, loginData.user.email, loginData.access_token);
+        saveAndGo(loginData.user.id, loginData.user.email, loginData.access_token, loginData.refresh_token);
         return;
       }
 
@@ -145,7 +150,7 @@ const RegisterPage: React.FC = () => {
           </div>
           <span style={{ fontWeight:700, fontSize:'15px', background:'linear-gradient(90deg,#EC4899,#C026D3)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>mixingmusic.ai</span>
         </Link>
-        <Link to="/auth/login" style={{ color:'#9B7EC8', fontSize:'13px', textDecoration:'none', border:'1px solid rgba(192,38,211,0.25)', padding:'7px 16px', borderRadius:'980px', fontWeight:600 }}>
+        <Link to={loginTarget} style={{ color:'#9B7EC8', fontSize:'13px', textDecoration:'none', border:'1px solid rgba(192,38,211,0.25)', padding:'7px 16px', borderRadius:'980px', fontWeight:600 }}>
           Iniciar Sesión
         </Link>
       </div>
@@ -157,16 +162,19 @@ const RegisterPage: React.FC = () => {
           <div style={{ textAlign:'center', marginBottom:'28px' }}>
             <div style={{ width:'64px', height:'64px', background:'linear-gradient(135deg,#EC4899,#C026D3)', borderRadius:'20px', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px', fontSize:'28px', boxShadow:'0 0 28px rgba(192,38,211,0.4)' }}>🎛️</div>
             <h1 style={{ fontSize:'26px', fontWeight:800, color:'#F8F0FF', marginBottom:'6px', letterSpacing:'-0.5px' }}>Crea tu Cuenta</h1>
-            <p style={{ fontSize:'14px', color:'rgba(155,126,200,0.8)' }}>Regístrate y haz tu primera mezcla gratis</p>
+            <p style={{ fontSize:'14px', color:'rgba(155,126,200,0.8)' }}>
+              {requestedMode === 'checkout' ? 'Crea tu cuenta para activar Unlimited' : requestedMode === 'album' ? 'Ingresa para preparar el master de tu álbum' : requestedMode === 'master' ? 'Regístrate y prepara tu primer master' : 'Regístrate y mezcla tus primeras canciones gratis'}
+            </p>
           </div>
 
           {/* Perks */}
           <div style={{ background:'rgba(74,222,128,0.06)', border:'1px solid rgba(74,222,128,0.15)', borderRadius:'12px', padding:'12px 16px', marginBottom:'22px' }}>
             <div style={{ fontSize:'12px', color:'rgba(248,240,255,0.65)', lineHeight:1.9 }}>
-              <div>✦ 1 mezcla gratis al registrarte — sin tarjeta</div>
+              <div>✦ 3 mezclas gratis al registrarte — sin tarjeta</div>
+              <div>✦ 1 master descargable en MP3</div>
               <div>✦ Mezclador IA + 9 presets de género musical</div>
               <div>✦ IA EQ 12 bandas · WAV 24-bit a -16 LUFS</div>
-              <div>✦ Mezclas ilimitadas por $3.99 pago único</div>
+              <div>✦ Unlimited desde $14.99 · pago único</div>
             </div>
           </div>
 
@@ -176,7 +184,7 @@ const RegisterPage: React.FC = () => {
               <span style={{ color:'#f87171', flexShrink:0 }}>⚠</span>
               <span style={{ fontSize:'13px', color:'#fca5a5', lineHeight:1.5 }}>
                 {error}
-                {error.includes('registrado') && <>{' '}<Link to="/auth/login" style={{ color:'#EC4899', fontWeight:700 }}>Iniciar Sesión →</Link></>}
+                {error.includes('registrado') && <>{' '}<Link to={loginTarget} style={{ color:'#EC4899', fontWeight:700 }}>Iniciar Sesión →</Link></>}
               </span>
             </div>
           )}
@@ -229,7 +237,7 @@ const RegisterPage: React.FC = () => {
           </p>
           <p style={{ fontSize:'13px', color:'rgba(155,126,200,0.7)', textAlign:'center', marginTop:'12px' }}>
             ¿Ya tienes cuenta?{' '}
-            <Link to="/auth/login" style={{ color:'#EC4899', fontWeight:700, textDecoration:'none' }}>Iniciar Sesión →</Link>
+            <Link to={loginTarget} style={{ color:'#EC4899', fontWeight:700, textDecoration:'none' }}>Iniciar Sesión →</Link>
           </p>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import HomeHero from './components/HomeHero';
+import HomeHeroV3 from './components/HomeHeroV3';
 import ProjectDashboard from './components/ProjectDashboard';
 import AIChat from './components/AIChat';
 import type { MixPreset } from './components/mixTypes';
@@ -94,6 +94,7 @@ export default function HomePage() {
     );
   }
 
-  // Default: HomeHero (all CTAs → /auth/register)
-  return <HomeHero onStartMixer={handleStartMixer} />;
+  // V3 public home. The previous home remains available in the codebase so the
+  // launch can be rolled back without touching the existing mixer flow.
+  return <HomeHeroV3 />;
 }

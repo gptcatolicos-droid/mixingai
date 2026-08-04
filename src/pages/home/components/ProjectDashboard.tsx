@@ -11,6 +11,7 @@ import type { MixPreset } from './mixTypes';
 import { PRESETS } from './mixTypes';
 import AIChat from './AIChat';
 import { useNavigate, Link } from 'react-router-dom';
+import MasteringPage from '../../mastering/page';
 
 interface User {
   id: string; firstName: string; lastName: string; email: string;
@@ -26,7 +27,7 @@ interface ExportData {
   finalLufs: number; mp3Url?: string; wavUrl?: string;
 }
 
-type Screen = 'dashboard'|'chat'|'newProject'|'preset'|'mixer'|'export';
+type Screen = 'dashboard'|'chat'|'newProject'|'preset'|'mixer'|'export'|'mastering';
 
 export default function ProjectDashboard() {
   const [user, setUser] = useState<User|null>(null);
@@ -103,6 +104,10 @@ export default function ProjectDashboard() {
   };
 
   // PANTALLA: Chat AI — pantalla principal para usuarios logueados
+  if (currentScreen === 'mastering' && user)
+    return <MasteringPage />;
+
+  // PANTALLA: Chat AI — pantalla principal para usuarios logueados
   if (currentScreen === 'chat' && user)
     return <AIChat user={user} onStartMixer={handleChatStartMixer} onCreditsUpdate={handleCreditsUpdate} />;
 
@@ -167,7 +172,7 @@ export default function ProjectDashboard() {
                 Hola, {user.firstName}
               </h1>
               <p style={{color:'#9B7EC8',fontSize:'14px'}}>
-                {(user.is_pro || user.plan === 'unlimited') ? 'Mezclas ilimitadas · Plan Pro activo ∞' : 'Plan Gratis · 1 mezcla incluida'}
+                {(user.is_pro || user.plan === 'unlimited') ? 'Mezclas y masters ilimitados · Plan Unlimited activo ∞' : 'Plan Gratis · 3 mezclas + 1 master MP3'}
               </p>
             </div>
 
@@ -182,6 +187,12 @@ export default function ProjectDashboard() {
               style={{width:'100%',background:'transparent',border:'1px solid rgba(192,38,211,0.2)',color:'#9B7EC8',padding:'12px 24px',borderRadius:'16px',fontSize:'14px',cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}>
               <i className="ri-upload-cloud-line"></i>
               Subir stems directamente
+            </button>
+            <button onClick={() => setCurrentScreen('mastering')}
+              style={{width:'100%',marginTop:'12px',background:'linear-gradient(135deg,rgba(239,74,168,.13),rgba(181,87,243,.12))',border:'1px solid rgba(239,74,168,.28)',color:'#e8c8f2',padding:'16px 24px',borderRadius:'16px',fontSize:'14px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:'9px'}}>
+              <i className="ri-disc-line" style={{fontSize:'18px'}}></i>
+              Mejorar y masterizar una mezcla
+              <span style={{padding:'3px 7px',borderRadius:'980px',background:'rgba(239,74,168,.17)',color:'#f08dc5',fontSize:'8px',letterSpacing:'.08em'}}>NUEVO V3</span>
             </button>
 
             {/* Proyectos recientes */}

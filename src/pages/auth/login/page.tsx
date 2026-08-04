@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -11,6 +11,10 @@ const SUPER: Record<string, { firstName: string; lastName: string }> = {
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedMode = searchParams.get('mode') === 'checkout' ? 'checkout' : searchParams.get('mode') === 'album' ? 'album' : searchParams.get('mode') === 'master' ? 'master' : 'mix';
+  const destination = requestedMode === 'checkout' ? '/checkout-v3' : requestedMode === 'album' ? '/mastering/album' : requestedMode === 'master' ? '/mastering' : '/';
+  const registerTarget = requestedMode === 'mix' ? '/auth/register' : `/auth/register?mode=${requestedMode}`;
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -18,7 +22,7 @@ const LoginPage: React.FC = () => {
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
-  const saveAndGo = (id: string, email: string, meta: any = {}, token?: string, isPro = false) => {
+  const saveAndGo = (id: string, email: string, meta: any = {}, token?: string, refreshToken?: string, isPro = false) => {
     localStorage.setItem('audioMixerUser', JSON.stringify({
       id, email,
       firstName: meta.first_name || email.split('@')[0],
@@ -31,8 +35,9 @@ const LoginPage: React.FC = () => {
       createdAt: new Date().toISOString(),
       username: meta.username || email.split('@')[0],
       ...(token ? { accessToken: token } : {}),
+      ...(refreshToken ? { refreshToken } : {}),
     }));
-    navigate('/');
+    navigate(destination);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,7 +51,7 @@ const LoginPage: React.FC = () => {
       // ── 1. Super user bypass ──────────────────────────────────
       const key = email.trim().toLowerCase();
       if (SUPER[key]) {
-        saveAndGo(`super_${key}`, key, { first_name: SUPER[key].firstName, last_name: SUPER[key].lastName, country: 'Colombia' }, undefined, true);
+        saveAndGo(`super_${key}`, key, { first_name: SUPER[key].firstName, last_name: SUPER[key].lastName, country: 'Colombia' }, undefined, undefined, true);
         return;
       }
 
@@ -61,7 +66,7 @@ const LoginPage: React.FC = () => {
       if (res.ok && data.access_token) {
         const meta = data.user?.user_metadata || {};
         const isPro = meta.is_pro || meta.plan === 'unlimited' || false;
-        saveAndGo(data.user.id, data.user.email, meta, data.access_token, isPro);
+        saveAndGo(data.user.id, data.user.email, meta, data.access_token, data.refresh_token, isPro);
         return;
       }
 
@@ -77,7 +82,7 @@ const LoginPage: React.FC = () => {
             const u = JSON.parse(stored);
             if (u.email === email.trim()) {
               // Already have their data — just redirect
-              navigate('/');
+              navigate(destination);
               return;
             }
           } catch {}
@@ -117,7 +122,7 @@ const LoginPage: React.FC = () => {
           </div>
           <span style={{ fontWeight:700, fontSize:'15px', background:'linear-gradient(90deg,#EC4899,#C026D3)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>mixingmusic.ai</span>
         </Link>
-        <Link to="/auth/register" style={{ background:'linear-gradient(135deg,#EC4899,#C026D3)', color:'#fff', padding:'8px 18px', borderRadius:'980px', fontSize:'13px', fontWeight:600, textDecoration:'none' }}>
+        <Link to={registerTarget} style={{ background:'linear-gradient(135deg,#EC4899,#C026D3)', color:'#fff', padding:'8px 18px', borderRadius:'980px', fontSize:'13px', fontWeight:600, textDecoration:'none' }}>
           Crear Cuenta
         </Link>
       </div>
@@ -165,7 +170,7 @@ const LoginPage: React.FC = () => {
 
           <p style={{ textAlign:'center', fontSize:'13px', color:'rgba(155,126,200,0.7)', marginTop:'20px' }}>
             ¿No tienes cuenta?{' '}
-            <Link to="/auth/register" style={{ color:'#EC4899', fontWeight:700, textDecoration:'none' }}>Crear cuenta gratis →</Link>
+            <Link to={registerTarget} style={{ color:'#EC4899', fontWeight:700, textDecoration:'none' }}>Crear cuenta gratis →</Link>
           </p>
           <p style={{ textAlign:'center', fontSize:'11px', color:'rgba(155,126,200,0.4)', marginTop:'8px' }}>
             ¿Problemas para entrar?{' '}
