@@ -19,6 +19,9 @@ const NotFoundPage = lazy(() => import('../pages/NotFound'));
 const BlogPage = lazy(() => import('../pages/blog/page'));
 const BlogArticlePage = lazy(() => import('../pages/blog/article/page'));
 const PaymentConfirmationPage = lazy(() => import('../pages/payment-confirmation/page'));
+const MasteringPage = lazy(() => import('../pages/mastering/page'));
+const AlbumMasteringPage = lazy(() => import('../pages/mastering/album/page'));
+const MasteringCheckoutPage = lazy(() => import('../pages/mastering/checkout/page'));
 
 const routes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
@@ -34,6 +37,9 @@ const routes: RouteObject[] = [
   { path: '/admin', element: <AdminPage /> },
   { path: '/admin/dashboard', element: <AdminPage /> },
   { path: '/payment-confirmation', element: <PaymentConfirmationPage /> },
+  { path: '/mastering', element: <MasteringPage /> },
+  { path: '/mastering/album', element: <AlbumMasteringPage /> },
+  { path: '/checkout-v3', element: <MasteringCheckoutPage /> },
   { path: '/blog', element: <BlogPage /> },
   { path: '/blog/:slug', element: <BlogArticlePage /> },
   { path: '/terms', element: <TermsPage /> },
