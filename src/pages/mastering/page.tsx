@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { PRESETS } from '../home/components/mixTypes';
 import type { MixPreset } from '../home/components/mixTypes';
 import { analyzeAudioFile, formatDuration, formatFileSize } from './audioAnalysis';
@@ -46,6 +46,8 @@ function getStoredUser() {
 
 export default function MasteringPage({ onExit }: { onExit?: () => void }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const incomingFileHandled = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const originalCompareRef = useRef<HTMLAudioElement>(null);
@@ -332,6 +334,14 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
       setStage('upload');
     }
   };
+
+  useEffect(() => {
+    const incomingFile = (location.state as { file?: File } | null)?.file;
+    if (!incomingFile || incomingFileHandled.current) return;
+    incomingFileHandled.current = true;
+    processFile(incomingFile);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }, [location.state]);
 
   const status = analysis?.isClipping
     ? { tone: 'danger', title: 'La mezcla presenta clipping', text: 'Podemos trabajar con ella, pero el resultado será mejor si exportas el premaster sin limitador.' }

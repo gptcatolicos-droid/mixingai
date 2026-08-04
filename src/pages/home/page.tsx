@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import HomeHeroV3 from './components/HomeHeroV3';
 import ProjectDashboard from './components/ProjectDashboard';
 import AIChat from './components/AIChat';
@@ -22,6 +23,7 @@ type Screen = 'home' | 'chat' | 'mixer' | 'export';
 let pendingExportData: ExportData | null = null;
 
 export default function HomePage() {
+  const navigate = useNavigate();
   const [user] = useState(() => {
     try {
       const s = localStorage.getItem('audioMixerUser');
@@ -55,6 +57,7 @@ export default function HomePage() {
       <AIChat
         user={null}
         onStartMixer={handleStartMixer}
+        onStartMastering={(file) => navigate('/mastering', { state: { file } })}
         onCreditsUpdate={() => {}}
       />
     );
@@ -89,6 +92,7 @@ export default function HomePage() {
         onBack={() => setScreen('mixer')}
         onNewMix={() => { setScreen('chat'); }}
         onGoHome={() => { setScreen('home'); }}
+        onMasterMix={(file) => navigate('/mastering', { state: { file } })}
         onCreditsUpdate={() => {}}
       />
     );

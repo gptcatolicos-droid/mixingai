@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PRESETS } from './mixTypes';
 import './home-v3.css';
@@ -34,8 +34,29 @@ const albumFeatures = [
   'Ajustes individuales antes de exportar',
 ];
 
+const reasons = [
+  { icon: '◇', title: 'Decisiones más rápidas', text: 'La IA analiza balance, dinámica y tono en segundos para que dediques el tiempo a la música.' },
+  { icon: '≋', title: 'Consistencia técnica', text: 'Cada resultado revisa loudness, true peak, claridad y compatibilidad antes de exportar.' },
+  { icon: '⌘', title: 'Tú conservas el control', text: 'Elige presets, compara el antes y después y ajusta el carácter final sin perder tu intención.' },
+];
+
+const testimonials = [
+  { quote: 'La voz y el coro quedaron claros sin perder la emoción. Pude terminar una canción que llevaba semanas detenida.', name: 'Carlos M.', role: 'Productor gospel · Colombia' },
+  { quote: 'Subí mi mezcla, elegí el carácter y el master salió con más fuerza y amplitud, pero seguía sonando a mí.', name: 'Valeria R.', role: 'Cantautora · México' },
+  { quote: 'La rapidez ayuda muchísimo y todavía puedo tomar decisiones. No se siente como una caja negra.', name: 'DJ Fontana', role: 'DJ y productor · Argentina' },
+];
+
+const faqs = [
+  { question: '¿Cuál es la diferencia entre mezclar y masterizar?', answer: 'Mezclar combina tus stems separados y define el balance de la canción. Masterizar trabaja sobre una mezcla estéreo terminada para mejorar tono, dinámica, amplitud y nivel final.' },
+  { question: '¿Qué incluye el plan gratis?', answer: 'Puedes crear tres mezclas desde stems y masterizar una canción, con descarga del master en MP3. No necesitas tarjeta.' },
+  { question: '¿El WAV Unlimited es realmente de 24 bits?', answer: 'Sí. En Unlimited la exportación se codifica como WAV PCM real de 24 bits; no es un archivo de 16 bits renombrado.' },
+  { question: '¿Qué hace el modo álbum?', answer: 'Procesa hasta 12 mezclas como un conjunto para mantener volumen percibido, balance tonal y rango dinámico coherentes, conservando ajustes individuales por canción.' },
+  { question: '¿MixingMusic reemplaza mis decisiones?', answer: 'No. La IA propone un punto de partida técnico y musical basado en nuestros presets; tú comparas, ajustas y eliges el resultado final.' },
+];
+
 export default function HomeHeroV3() {
   const navigate = useNavigate();
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   useEffect(() => {
     document.body.classList.add('page-home', 'page-home-v3');
@@ -55,6 +76,7 @@ export default function HomeHeroV3() {
         </a>
         <div className="v3-nav-actions">
           <a href="#funciones">Funciones</a>
+          <button className="v3-nav-link" onClick={() => navigate('/capacidades')}>Capacidades</button>
           <a href="#planes">Planes</a>
           <button className="v3-nav-login" onClick={() => navigate('/auth/login')}>Ingresar</button>
           <button className="v3-button v3-button-small" onClick={() => begin('master')}>Probar gratis</button>
@@ -120,6 +142,11 @@ export default function HomeHeroV3() {
         <p className="v3-free-note">
           <span>Gratis:</span> mezcla 3 canciones y descarga 1 master en MP3. No necesitas tarjeta.
         </p>
+        <button className="v3-album-hero" onClick={() => navigate('/mastering/album')}>
+          <span>MODO ÁLBUM</span>
+          <strong>Masteriza hasta 12 canciones con una identidad sonora coherente</strong>
+          <i>Explorar →</i>
+        </button>
       </section>
 
       <section className="v3-trust" aria-label="Beneficios principales">
@@ -202,6 +229,56 @@ export default function HomeHeroV3() {
             {albumFeatures.map((feature) => <li key={feature}>{feature}</li>)}
           </ul>
           <button className="v3-button v3-button-accent" onClick={() => navigate('/mastering/album')}>Crear master de álbum <span>→</span></button>
+        </div>
+      </section>
+
+      <section className="v3-section v3-capabilities-teaser">
+        <div>
+          <span className="v3-kicker">UNA PLATAFORMA COMPLETA</span>
+          <h2>Todo lo que necesitas, desde los stems hasta el álbum.</h2>
+          <p>Consulta en una sola vista qué puedes hacer gratis y qué desbloqueas con Unlimited.</p>
+        </div>
+        <button className="v3-button v3-button-outline" onClick={() => navigate('/capacidades')}>Ver todas las capacidades <span>→</span></button>
+      </section>
+
+      <section className="v3-section v3-why">
+        <div className="v3-section-heading">
+          <span className="v3-kicker">POR QUÉ USAR IA</span>
+          <h2>La tecnología se ocupa de lo repetitivo. Tú decides cómo debe sentirse.</h2>
+        </div>
+        <div className="v3-reason-grid">
+          {reasons.map((reason) => (
+            <article key={reason.title}><span>{reason.icon}</span><h3>{reason.title}</h3><p>{reason.text}</p></article>
+          ))}
+        </div>
+      </section>
+
+      <section className="v3-section v3-testimonials">
+        <div className="v3-section-heading">
+          <span className="v3-kicker">ARTISTAS Y PRODUCTORES</span>
+          <h2>Resultados que ayudan a terminar y publicar música.</h2>
+        </div>
+        <div className="v3-testimonial-grid">
+          {testimonials.map((item) => (
+            <figure key={item.name}><blockquote>“{item.quote}”</blockquote><figcaption><strong>{item.name}</strong><span>{item.role}</span></figcaption></figure>
+          ))}
+        </div>
+      </section>
+
+      <section className="v3-section v3-faq">
+        <div className="v3-section-heading">
+          <span className="v3-kicker">PREGUNTAS FRECUENTES</span>
+          <h2>Antes de subir tu música.</h2>
+        </div>
+        <div className="v3-faq-list">
+          {faqs.map((item, index) => (
+            <article className={openFaq === index ? 'is-open' : ''} key={item.question}>
+              <button onClick={() => setOpenFaq(openFaq === index ? null : index)} aria-expanded={openFaq === index}>
+                <span>{item.question}</span><i>{openFaq === index ? '−' : '+'}</i>
+              </button>
+              {openFaq === index && <p>{item.answer}</p>}
+            </article>
+          ))}
         </div>
       </section>
 

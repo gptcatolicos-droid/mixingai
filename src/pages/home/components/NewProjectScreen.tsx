@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import Header from '@/components/feature/Header';
+import './new-project-v3.css';
 
 interface User {
   id: string; firstName: string; lastName: string; email: string;
@@ -78,16 +79,27 @@ export default function NewProjectScreen({ user, onBack, onUploadComplete, hasUn
     <div style={S.page}>
       <Header user={user} onLogout={() => {}} onCreditsUpdate={() => {}} />
 
-      <div style={{maxWidth:'620px',margin:'0 auto',padding:'32px 16px 60px'}}>
+      <div className="np-v3-shell">
+        <aside className="np-v3-intro">
+          <span>CREAR UNA MEZCLA</span>
+          <h1>Convierte tus pistas separadas en una mezcla completa.</h1>
+          <p>Sube cada instrumento y voz por separado. Después elegirás el preset y podrás revisar el resultado en el estudio V3.</p>
+          <ol>
+            <li className="active"><i>1</i><div><strong>Subir stems</strong><small>Hasta 12 archivos</small></div></li>
+            <li><i>2</i><div><strong>Elegir sonido</strong><small>Presets MixingMusic</small></div></li>
+            <li><i>3</i><div><strong>Revisar y masterizar</strong><small>Un flujo conectado</small></div></li>
+          </ol>
+        </aside>
+        <section className="np-v3-uploader">
 
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'28px'}}>
           <button onClick={onBack} style={{...S.ghostBtn,padding:'8px 14px',fontSize:'12px'}}>← Volver</button>
           <div>
             <h1 style={{fontSize:'22px',fontWeight:700,letterSpacing:'-0.5px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>
-              Nuevo Proyecto
+              Sube tus stems
             </h1>
-            <p style={{fontSize:'12px',color:'#9B7EC8',marginTop:'2px'}}>Sube tus stems para comenzar</p>
+            <p style={{fontSize:'12px',color:'#9B7EC8',marginTop:'2px'}}>Una pista por instrumento o voz</p>
           </div>
         </div>
 
@@ -181,6 +193,7 @@ export default function NewProjectScreen({ user, onBack, onUploadComplete, hasUn
             </div>
           ))}
         </div>
+        </section>
       </div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>

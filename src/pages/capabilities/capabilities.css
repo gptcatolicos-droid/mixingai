@@ -1,0 +1,26 @@
+.capabilities-page { margin: 0; background: #09070d !important; }
+.cap-v3 { --line: rgba(255,255,255,.1); min-height: 100vh; padding-bottom: 100px; overflow: hidden; background: radial-gradient(circle at 50% 0, rgba(181,87,243,.2), transparent 30%), linear-gradient(rgba(9,7,13,.9), rgba(9,7,13,.98)), url('/studio-bg.png') center top / cover fixed; color: #fffaf5; font-family: 'DM Sans', system-ui, sans-serif; }
+.cap-nav { width: min(1160px, calc(100% - 40px)); height: 88px; margin: auto; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.cap-brand { display: flex; align-items: center; gap: 10px; border: 0; background: transparent; color: white; cursor: pointer; }
+.cap-brand img { width: 186px; }
+.cap-brand span { padding: 3px 7px; border: 1px solid rgba(239,74,168,.4); border-radius: 6px; color: #ff8bc8; font: 700 10px 'DM Mono', monospace; }
+.cap-back { border: 0; background: transparent; color: #bcb3c6; cursor: pointer; }
+.cap-hero { width: min(980px, calc(100% - 40px)); margin: auto; padding: 110px 0 72px; text-align: center; }
+.cap-kicker { color: #d6a6f7; font: 700 11px 'DM Mono', monospace; letter-spacing: .15em; }
+.cap-hero h1 { margin: 22px 0; font-size: clamp(48px, 6vw, 78px); line-height: 1; letter-spacing: -.055em; }
+.cap-hero h1 strong { color: transparent; background: linear-gradient(100deg,#fff,#ef84c4,#bb71ed,#ff9a56); -webkit-background-clip: text; background-clip: text; }
+.cap-hero p { max-width: 680px; margin: auto; color: #aaa1b5; font-size: 18px; line-height: 1.65; }
+.cap-actions { margin-top: 34px; display: flex; justify-content: center; gap: 12px; }
+.cap-actions button,.cap-album button { min-height: 50px; padding: 0 22px; border: 1px solid rgba(181,87,243,.35); border-radius: 11px; background: rgba(181,87,243,.1); color: white; font-weight: 800; cursor: pointer; }
+.cap-actions button:first-child,.cap-album button { border: 0; background: linear-gradient(135deg,#ef4aa8,#a84ff0); }
+.cap-table-wrap { width: min(1060px, calc(100% - 40px)); margin: auto; overflow: hidden; border: 1px solid var(--line); border-radius: 22px; background: rgba(16,13,22,.91); box-shadow: 0 30px 90px rgba(0,0,0,.38); }
+.cap-table-head,.cap-row { display: grid; grid-template-columns: 1.5fr .7fr .8fr; gap: 20px; align-items: center; padding: 20px 28px; }
+.cap-table-head { color: #d9a7f5; background: rgba(181,87,243,.08); font: 700 11px 'DM Mono', monospace; letter-spacing: .1em; text-transform: uppercase; }
+.cap-row { min-height: 68px; border-top: 1px solid rgba(255,255,255,.07); color: #b8aebe; font-size: 14px; }
+.cap-row > span:first-child { color: #f4edf5; font-weight: 650; }
+.cap-row strong { color: #f27bc1; }
+.cap-row .cap-no { color: #655d6d; }
+.cap-album { width: min(1060px, calc(100% - 40px)); margin: 70px auto 0; padding: 42px; display: grid; grid-template-columns: 1.1fr 1fr auto; align-items: center; gap: 35px; border: 1px solid rgba(255,138,61,.25); border-radius: 22px; background: linear-gradient(120deg,rgba(255,138,61,.09),rgba(181,87,243,.08)); }
+.cap-album h2 { margin: 12px 0 0; font-size: 34px; line-height: 1.05; letter-spacing: -.04em; }
+.cap-album p { margin: 0; color: #aaa1b5; line-height: 1.7; }
+@media (max-width:760px){.cap-nav{height:72px}.cap-brand img{width:150px}.cap-hero{padding-top:80px}.cap-actions{flex-direction:column}.cap-table-wrap{overflow-x:auto}.cap-table-head,.cap-row{min-width:680px}.cap-album{grid-template-columns:1fr;padding:30px}.cap-hero h1{font-size:46px}}

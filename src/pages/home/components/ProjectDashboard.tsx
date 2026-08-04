@@ -12,6 +12,7 @@ import { PRESETS } from './mixTypes';
 import AIChat from './AIChat';
 import { useNavigate, Link } from 'react-router-dom';
 import MasteringPage from '../../mastering/page';
+import './dashboard-v3.css';
 
 interface User {
   id: string; firstName: string; lastName: string; email: string;
@@ -109,7 +110,7 @@ export default function ProjectDashboard() {
 
   // PANTALLA: Chat AI — pantalla principal para usuarios logueados
   if (currentScreen === 'chat' && user)
-    return <AIChat user={user} onStartMixer={handleChatStartMixer} onCreditsUpdate={handleCreditsUpdate} />;
+    return <AIChat user={user} onStartMixer={handleChatStartMixer} onStartMastering={(file) => navigate('/mastering', { state: { file } })} onCreditsUpdate={handleCreditsUpdate} />;
 
   // PANTALLA: Nuevo proyecto
   if (currentScreen === 'newProject' && user)
@@ -137,6 +138,7 @@ export default function ProjectDashboard() {
       onBack={() => setCurrentScreen('mixer')}
       onNewMix={() => setCurrentScreen('newProject')}
       onGoHome={() => setCurrentScreen('dashboard')}
+      onMasterMix={(file) => navigate('/mastering', { state: { file } })}
       onCreditsUpdate={handleCreditsUpdate} />;
   }
 
@@ -149,7 +151,7 @@ export default function ProjectDashboard() {
   return (
     <div style={S.page}>
       <Header user={user} onLogout={handleLogout} onCreditsUpdate={handleCreditsUpdate} />
-      <div style={{maxWidth:'680px',margin:'0 auto',padding:'40px 16px'}}>
+      <div className="dash-v3-shell">
         {!user ? (
           <div style={{textAlign:'center',paddingTop:'60px'}}>
             <h1 style={{fontSize:'40px',fontWeight:700,letterSpacing:'-1px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:'12px'}}>
@@ -166,38 +168,32 @@ export default function ProjectDashboard() {
             </div>
           </div>
         ) : (
-          <>
-            <div style={{marginBottom:'32px'}}>
-              <h1 style={{fontSize:'28px',fontWeight:600,letterSpacing:'-0.5px',color:'#F8F0FF',marginBottom:'4px'}}>
-                Hola, {user.firstName}
-              </h1>
-              <p style={{color:'#9B7EC8',fontSize:'14px'}}>
-                {(user.is_pro || user.plan === 'unlimited') ? 'Mezclas y masters ilimitados · Plan Unlimited activo ∞' : 'Plan Gratis · 3 mezclas + 1 master MP3'}
-              </p>
+          <div className="dash-v3">
+            <div className="dash-v3-heading">
+              <span>TU ESTUDIO V3</span>
+              <h1>Hola, {user.firstName}. ¿Qué quieres crear?</h1>
+              <p>{(user.is_pro || user.plan === 'unlimited') ? 'Unlimited activo · mezclas, masters y álbumes sin límite.' : 'Plan Gratis · 3 mezclas desde stems + 1 master descargable en MP3.'}</p>
             </div>
 
-            {/* Upload Area */}
-            {/* Botón ir al chat IA */}
-            <button onClick={() => setCurrentScreen('chat')}
-              style={{width:'100%',background:'linear-gradient(135deg,#EC4899,#C026D3)',border:'none',color:'#fff',padding:'18px 24px',borderRadius:'16px',fontSize:'15px',fontWeight:700,cursor:'pointer',boxShadow:'0 0 24px rgba(192,38,211,0.5)',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px',marginBottom:'12px'}}>
-              <i className="ri-sparkling-2-fill" style={{fontSize:'20px'}}></i>
-              Mezclar con IA — Hablar con Mix
-            </button>
-            <button onClick={() => setCurrentScreen('newProject')}
-              style={{width:'100%',background:'transparent',border:'1px solid rgba(192,38,211,0.2)',color:'#9B7EC8',padding:'12px 24px',borderRadius:'16px',fontSize:'14px',cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}>
-              <i className="ri-upload-cloud-line"></i>
-              Subir stems directamente
-            </button>
-            <button onClick={() => setCurrentScreen('mastering')}
-              style={{width:'100%',marginTop:'12px',background:'linear-gradient(135deg,rgba(239,74,168,.13),rgba(181,87,243,.12))',border:'1px solid rgba(239,74,168,.28)',color:'#e8c8f2',padding:'16px 24px',borderRadius:'16px',fontSize:'14px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:'9px'}}>
-              <i className="ri-disc-line" style={{fontSize:'18px'}}></i>
-              Mejorar y masterizar una mezcla
-              <span style={{padding:'3px 7px',borderRadius:'980px',background:'rgba(239,74,168,.17)',color:'#f08dc5',fontSize:'8px',letterSpacing:'.08em'}}>NUEVO V3</span>
+            <div className="dash-v3-grid">
+              <button className="dash-v3-card mix" onClick={() => setCurrentScreen('newProject')}>
+                <i>≋</i><span>CREAR UNA MEZCLA</span><h2>Subir stems</h2><p>Voz, batería, bajo, guitarras y demás pistas separadas.</p><b>Hasta 12 stems <em>→</em></b>
+              </button>
+              <button className="dash-v3-card master" onClick={() => setCurrentScreen('mastering')}>
+                <i>◇</i><span>MASTERIZAR</span><h2>Subir premezcla</h2><p>Mejora claridad, fuerza, amplitud, dinámica y loudness.</p><b>Mezcla estéreo <em>→</em></b>
+              </button>
+              <button className="dash-v3-card album" onClick={() => navigate('/mastering/album')}>
+                <i>▦</i><span>MODO ÁLBUM</span><h2>Masterizar álbum</h2><p>Hasta 12 canciones con identidad sonora coherente.</p><b>Solo Unlimited <em>→</em></b>
+              </button>
+            </div>
+
+            <button className="dash-v3-mix-assistant" onClick={() => setCurrentScreen('chat')}>
+              <span className="dash-v3-ai-icon">✦</span><div><strong>¿No sabes por dónde empezar? Habla con Mix</strong><small>Tu asistente de producción te guía para mezclar o masterizar.</small></div><i>→</i>
             </button>
 
             {/* Proyectos recientes */}
             {projects.length > 0 && (
-              <div style={{marginTop:'32px'}}>
+              <div className="dash-v3-recent">
                 <div style={{fontSize:'11px',fontWeight:600,letterSpacing:'1px',textTransform:'uppercase',color:'#9B7EC8',marginBottom:'12px'}}>Proyectos recientes</div>
                 <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                   {projects.slice(0,3).map(p => (
@@ -213,7 +209,7 @@ export default function ProjectDashboard() {
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

@@ -22,6 +22,7 @@ const PaymentConfirmationPage = lazy(() => import('../pages/payment-confirmation
 const MasteringPage = lazy(() => import('../pages/mastering/page'));
 const AlbumMasteringPage = lazy(() => import('../pages/mastering/album/page'));
 const MasteringCheckoutPage = lazy(() => import('../pages/mastering/checkout/page'));
+const CapabilitiesPage = lazy(() => import('../pages/capabilities/page'));
 
 const routes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
@@ -40,6 +41,7 @@ const routes: RouteObject[] = [
   { path: '/mastering', element: <MasteringPage /> },
   { path: '/mastering/album', element: <AlbumMasteringPage /> },
   { path: '/checkout-v3', element: <MasteringCheckoutPage /> },
+  { path: '/capacidades', element: <CapabilitiesPage /> },
   { path: '/blog', element: <BlogPage /> },
   { path: '/blog/:slug', element: <BlogArticlePage /> },
   { path: '/terms', element: <TermsPage /> },
