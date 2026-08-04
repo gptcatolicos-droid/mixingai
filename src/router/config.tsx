@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router-dom';
 import { lazy } from 'react';
+import SiteLayout from '../components/feature/SiteFooter';
 
 const HomePage = lazy(() => import('../pages/home/page'));
 const LoginPage = lazy(() => import('../pages/auth/login/page'));
@@ -19,8 +20,28 @@ const NotFoundPage = lazy(() => import('../pages/NotFound'));
 const BlogPage = lazy(() => import('../pages/blog/page'));
 const BlogArticlePage = lazy(() => import('../pages/blog/article/page'));
 const PaymentConfirmationPage = lazy(() => import('../pages/payment-confirmation/page'));
+const MasteringPage = lazy(() => import('../pages/mastering/page'));
+const AlbumMasteringPage = lazy(() => import('../pages/mastering/album/page'));
+const MasteringCheckoutPage = lazy(() => import('../pages/mastering/checkout/page'));
+const CapabilitiesPage = lazy(() => import('../pages/capabilities/page'));
+const AudioConceptsPage = lazy(() => import('../pages/concepts/page'));
+const PressPage = lazy(() => import('../pages/press/page'));
+const SeoLandingPage = lazy(() => import('../pages/seo-landings/page'));
 
-const routes: RouteObject[] = [
+const seoLandingPaths = [
+  '/mezcla-con-ia',
+  '/mezclador-musica-online',
+  '/mastering-con-ia',
+  '/masterizar-cancion-online',
+  '/mastering-albumes',
+  '/ai-music-mixing',
+  '/online-music-mixer',
+  '/ai-mastering',
+  '/master-song-online',
+  '/album-mastering',
+];
+
+const appRoutes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
   { path: '/auth/login', element: <LoginPage /> },
   { path: '/auth/register', element: <RegisterPage /> },
@@ -34,6 +55,13 @@ const routes: RouteObject[] = [
   { path: '/admin', element: <AdminPage /> },
   { path: '/admin/dashboard', element: <AdminPage /> },
   { path: '/payment-confirmation', element: <PaymentConfirmationPage /> },
+  { path: '/mastering', element: <MasteringPage /> },
+  { path: '/mastering/album', element: <AlbumMasteringPage /> },
+  { path: '/checkout-v3', element: <MasteringCheckoutPage /> },
+  { path: '/capacidades', element: <CapabilitiesPage /> },
+  { path: '/conceptos-audio', element: <AudioConceptsPage /> },
+  { path: '/prensa', element: <PressPage /> },
+  ...seoLandingPaths.map((path) => ({ path, element: <SeoLandingPage /> })),
   { path: '/blog', element: <BlogPage /> },
   { path: '/blog/:slug', element: <BlogArticlePage /> },
   { path: '/terms', element: <TermsPage /> },
@@ -41,5 +69,7 @@ const routes: RouteObject[] = [
   { path: '/cookies', element: <CookiesPage /> },
   { path: '*', element: <NotFoundPage /> },
 ];
+
+const routes: RouteObject[] = [{ element: <SiteLayout />, children: appRoutes }];
 
 export default routes;

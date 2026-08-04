@@ -248,13 +248,13 @@ const CookiesPage: React.FC = () => {
                     <i className="ri-secure-payment-line text-white text-xl"></i>
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">Stripe (Pagos)</h3>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">PayPal (Pagos)</h3>
                     <p className="text-gray-700 mb-3 text-sm">
                       Procesamiento seguro de pagos y prevención de fraudes.
                     </p>
                     <div className="flex items-center space-x-4 text-xs">
                       <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Esencial</span>
-                      <a href="https://stripe.com/privacy" className="text-blue-600 hover:text-blue-800">Política de Stripe</a>
+                      <a href="https://www.paypal.com/privacy" className="text-blue-600 hover:text-blue-800">Política de PayPal</a>
                     </div>
                   </div>
                 </div>

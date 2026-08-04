@@ -4,7 +4,8 @@ import { PRESETS } from './mixTypes';
 
 interface User { id: string; firstName: string; lastName: string; email: string; country: string; credits: number; provider?: string; createdAt: string; username?: string; avatar?: string; }
 interface Message { id: string; role: 'ai'|'user'; text: string; presets?: MixPreset[]; stems?: File[]; showUploadCard?: boolean; showProgress?: boolean; showMixerBtn?: boolean; }
-interface AIChatProps { user?: User|null; onStartMixer: (preset: MixPreset, files: File[]) => void; onCreditsUpdate?: (n: number) => void; }
+type Workflow = 'mix' | 'master';
+interface AIChatProps { user?: User|null; onStartMixer: (preset: MixPreset, files: File[]) => void; onStartMastering?: (file: File) => void; onCreditsUpdate?: (n: number) => void; }
 
 const ICON = (size=18) => (
   <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
@@ -19,6 +20,8 @@ const ICON = (size=18) => (
 
 const getResponse = (msg: string, preset: MixPreset|null) => {
   const m = msg.toLowerCase();
+  if (/(master|premix|premezcla|mezcla final|est[eé]reo|lufs|volumen final)/.test(m)) return { text:'Perfecto: si ya tienes una mezcla estéreo, la analizaremos y la llevaremos al master final sin perder su carácter. **Sube una sola mezcla** para continuar.', showUploadCard:true, workflow:'master' as Workflow };
+  if (/(pol[ií]tica|receta|clima|programaci[oó]n|marketing)/.test(m)) return { text:'Puedo ayudarte exclusivamente con producción musical: mezcla, EQ, dinámica, estéreo, loudness y mastering. ¿Quieres **crear una mezcla** desde stems o **masterizar una mezcla** estéreo?', showUploadCard:true };
   const map = [
     {keys:['gospel','cristiano','catolic','iglesia','coro','worship','alabanza'],id:'gospel'},
     {keys:['reggaeton','urbano','dembow','bad bunny','maluma','perreo'],id:'reggaeton'},
@@ -37,7 +40,7 @@ const getResponse = (msg: string, preset: MixPreset|null) => {
   return { text:`¡Cuéntame más! ¿Qué género es tu canción?\n\nPor ejemplo: *"reggaeton estilo Bad Bunny"*, *"gospel de iglesia"*, *"balada romántica"*... 🎛️` };
 };
 
-export default function AIChat({ user, onStartMixer }: AIChatProps) {
+export default function AIChat({ user, onStartMixer, onStartMastering }: AIChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -45,6 +48,7 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [chatStarted, setChatStarted] = useState(false);
+  const [workflow, setWorkflow] = useState<Workflow>('mix');
 
   // Clase en body para fondo más visible en home
   useEffect(() => {
@@ -60,17 +64,33 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
     <span key={li}>{line.split(/\*\*(.*?)\*\*/g).map((p,i)=>i%2===1?<strong key={i} style={{color:'#EC4899'}}>{p}</strong>:p)}{li<text.split('\n').length-1&&<br/>}</span>
   ));
 
-  const send = (text?: string) => {
+  const send = async (text?: string) => {
     const msg = (text||input).trim(); if (!msg||isTyping) return;
     setInput(''); if (!chatStarted) setChatStarted(true);
     setMessages(prev=>[...prev,{id:Date.now().toString(),role:'user',text:msg}]);
     setIsTyping(true);
-    setTimeout(()=>{
-      const res = getResponse(msg, selectedPreset);
+    const local = getResponse(msg, selectedPreset);
+    if ('workflow' in local && local.workflow) setWorkflow(local.workflow);
+    try {
+      const supabaseUrl = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_URL;
+      const anonKey = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !anonKey) throw new Error('AI_NOT_CONFIGURED');
+      const history = [...messages, { id:'current', role:'user' as const, text:msg }].slice(-8).map(item => ({ role:item.role === 'ai' ? 'assistant' : 'user', content:item.text }));
+      const response = await fetch(`${supabaseUrl}/functions/v1/ai-chat`, { method:'POST', headers:{'Content-Type':'application/json','apikey':anonKey,'Authorization':`Bearer ${anonKey}`}, body:JSON.stringify({messages:history}) });
+      if (!response.ok) throw new Error('AI_UNAVAILABLE');
+      const data = await response.json();
+      const res = { ...local, text: data.text || local.text, showUploadCard:true };
       if (res.presets?.[0]&&!selectedPreset) setSelectedPreset(res.presets[0]);
       setMessages(prev=>[...prev,{id:(Date.now()+1).toString(),role:'ai',...res}]);
-      setIsTyping(false);
-    }, 700+Math.random()*400);
+    } catch {
+      if (local.presets?.[0]&&!selectedPreset) setSelectedPreset(local.presets[0]);
+      setMessages(prev=>[...prev,{id:(Date.now()+1).toString(),role:'ai',...local,showUploadCard:true}]);
+    } finally { setIsTyping(false); }
+  };
+
+  const chooseWorkflow = (next: Workflow) => {
+    setWorkflow(next); setChatStarted(true);
+    setMessages(prev=>[...prev,{id:Date.now().toString(),role:'ai',text:next==='mix'?'Perfecto. **Sube entre 2 y 12 stems** y te ayudaré a elegir el carácter de la mezcla.':'Perfecto. **Sube una mezcla estéreo** y la llevaremos al resultado final de mastering.',showUploadCard:true}]);
   };
 
   const selectPreset = (p: MixPreset) => {
@@ -80,8 +100,14 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const files = Array.from(e.target.files).filter(f=>(f.type.startsWith('audio/')||/\.(wav|mp3|flac|aac|m4a)$/i.test(f.name))&&f.size<=300*1024*1024).slice(0,12);
+    const files = Array.from(e.target.files).filter(f=>(f.type.startsWith('audio/')||/\.(wav|mp3|flac|aac|m4a)$/i.test(f.name))&&f.size<=600*1024*1024).slice(0,workflow==='master'?1:12);
     if (!files.length) return;
+    if (workflow === 'master') {
+      setUploadedFiles(files);
+      setMessages(prev=>[...prev,{id:Date.now().toString(),role:'user',text:`Subí mi mezcla: ${files[0].name}`,stems:files},{id:(Date.now()+1).toString(),role:'ai',text:'✅ Mezcla recibida. Abriré el módulo V3 para analizar headroom, loudness, dinámica y estéreo.'}]);
+      setTimeout(()=>onStartMastering?.(files[0]),500);
+      e.target.value=''; return;
+    }
     setUploadedFiles(files);
     const names = files.slice(0,3).map(f=>f.name.replace(/\.[^.]+$/,'')).join(', ');
     setMessages(prev=>[...prev,{id:Date.now().toString(),role:'user',text:`Subí ${files.length} pista${files.length>1?'s':''}: ${names}${files.length>3?'...':''}`,stems:files}]);
@@ -129,8 +155,8 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
     <div onClick={()=>fileInputRef.current?.click()}
       style={{background:'linear-gradient(135deg,rgba(236,72,153,0.08),rgba(124,58,237,0.08))',border:'1.5px dashed rgba(192,38,211,0.35)',borderRadius:'16px',padding:'20px',marginTop:'12px',textAlign:'center',cursor:'pointer'}}>
       <div style={{width:'48px',height:'48px',background:'linear-gradient(135deg,#EC4899,#C026D3,#7C3AED)',borderRadius:'14px',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 10px',boxShadow:'0 0 18px rgba(192,38,211,0.4)',fontSize:'22px'}}>⬆</div>
-      <div style={{fontSize:'17px',fontWeight:700,color:'#F8F0FF',marginBottom:'4px',letterSpacing:'-0.3px'}}>Sube tus Pistas</div>
-      <div style={{fontSize:'12px',color:'#9B7EC8',marginBottom:'10px'}}>Arrastra aquí o toca para seleccionar</div>
+      <div style={{fontSize:'17px',fontWeight:700,color:'#F8F0FF',marginBottom:'4px',letterSpacing:'-0.3px'}}>{workflow==='mix'?'Sube tus stems':'Sube tu mezcla estéreo'}</div>
+      <div style={{fontSize:'12px',color:'#9B7EC8',marginBottom:'10px'}}>{workflow==='mix'?'Entre 2 y 12 pistas separadas':'Un archivo terminado para analizar y masterizar'}</div>
       <div style={{display:'flex',gap:'4px',justifyContent:'center',flexWrap:'wrap'}}>
         {['WAV','MP3','FLAC','AAC','M4A'].map(f=><span key={f} style={{fontSize:'10px',fontWeight:700,padding:'2px 8px',borderRadius:'980px',background:'rgba(192,38,211,0.1)',border:'1px solid rgba(192,38,211,0.25)',color:'#C026D3'}}>{f}</span>)}
       </div>
@@ -149,7 +175,7 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
   );
 
   return (
-    <div style={S.page}>
+    <div className="studio-v3-page" style={S.page}>
       {/* Ondas de audio sobre el fondo */}
       {[300,550,800].map((s,i)=>(
         <div key={i} style={{position:'fixed',width:`${s}px`,height:`${s}px`,top:'40%',left:'50%',borderRadius:'50%',border:'1px solid rgba(192,38,211,0.05)',animation:'expand 8s infinite',animationDelay:`${i*2.5}s`,transform:'translate(-50%,-50%)',pointerEvents:'none',zIndex:0}}></div>
@@ -165,7 +191,7 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
         </div>
       </div>
 
-      <input ref={fileInputRef} type="file" multiple accept="audio/*,.wav,.mp3,.flac,.aac,.m4a" onChange={handleFiles} style={{display:'none'}} />
+      <input ref={fileInputRef} type="file" multiple={workflow==='mix'} accept="audio/*,.wav,.mp3,.flac,.aac,.m4a" onChange={handleFiles} style={{display:'none'}} />
 
       {/* HERO + CHAT — todo en una sola columna centrada */}
       <div style={{flex:1,display:'flex',flexDirection:'column',maxWidth:'680px',width:'100%',margin:'0 auto',padding:'0 16px',position:'relative',zIndex:1}}>
@@ -176,20 +202,24 @@ export default function AIChat({ user, onStartMixer }: AIChatProps) {
             {/* Badge */}
             <div style={{display:'inline-flex',alignItems:'center',gap:'6px',background:'rgba(192,38,211,0.1)',border:'1px solid rgba(192,38,211,0.25)',borderRadius:'980px',padding:'5px 16px',marginBottom:'24px'}}>
               <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'#4ade80'}}></div>
-              <span style={{fontSize:'12px',color:'#C026D3',fontWeight:700}}>Mezclas Ilimitadas — Completamente Gratis</span>
+              <span style={{fontSize:'12px',color:'#C026D3',fontWeight:700}}>Asistente especializado en producción musical</span>
             </div>
             {/* Título grande */}
             <h1 style={{fontSize:'clamp(32px,7vw,64px)',fontWeight:700,letterSpacing:'-2px',lineHeight:1.05,marginBottom:'20px'}}>
-              <span style={{background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Mezcla tu música</span>
+              <span style={{background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Habla con Mix</span>
               <br/>
               <span style={{color:'#F8F0FF'}}>como un profesional</span>
             </h1>
             <p style={{fontSize:'clamp(14px,2vw,18px)',color:'#9B7EC8',marginBottom:'36px',lineHeight:1.6,maxWidth:'520px',margin:'0 auto 36px'}}>
-              Sube tus pistas, nuestra IA las mezcla con calidad de estudio. Sin límites, sin costo, sin complicaciones.
+              Cuéntale qué sonido buscas. Mix te orienta y te lleva al flujo correcto para crear una mezcla o masterizar una premezcla.
             </p>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',maxWidth:'520px',margin:'0 auto 28px'}}>
+              <button onClick={()=>chooseWorkflow('mix')} style={{padding:'14px',borderRadius:'13px',border:'1px solid rgba(181,87,243,.35)',background:'rgba(181,87,243,.12)',color:'#f3eafa',fontWeight:700,cursor:'pointer'}}>≋ Crear una mezcla<br/><small style={{fontWeight:400,color:'#9B7EC8'}}>Subir stems</small></button>
+              <button onClick={()=>chooseWorkflow('master')} style={{padding:'14px',borderRadius:'13px',border:'1px solid rgba(239,74,168,.35)',background:'rgba(239,74,168,.1)',color:'#f3eafa',fontWeight:700,cursor:'pointer'}}>◇ Masterizar<br/><small style={{fontWeight:400,color:'#9B7EC8'}}>Subir mezcla estéreo</small></button>
+            </div>
             {/* Stats */}
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'10px',maxWidth:'420px',margin:'0 auto 40px'}}>
-              {[{val:'∞',label:'Mezclas ilimitadas'},{val:'100%',label:'Completamente gratis'},{val:'-14',label:'LUFS Streaming'}].map(s=>(
+              {[{val:'12',label:'stems por mezcla'},{val:'1',label:'master MP3 gratis'},{val:'24',label:'bits en Unlimited'}].map(s=>(
                 <div key={s.label} style={{background:'rgba(26,16,40,0.8)',border:'1px solid rgba(192,38,211,0.12)',borderRadius:'12px',padding:'14px 8px',textAlign:'center',backdropFilter:'blur(8px)'}}>
                   <div style={{fontFamily:"'DM Mono',monospace",fontSize:'22px',fontWeight:600,background:'linear-gradient(90deg,#EC4899,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{s.val}</div>
                   <div style={{fontSize:'11px',color:'#9B7EC8',marginTop:'3px'}}>{s.label}</div>

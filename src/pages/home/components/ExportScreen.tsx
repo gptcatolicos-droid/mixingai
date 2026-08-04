@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Header from '@/components/feature/Header';
 import { drawWaveform, handleWaveformClick } from '@/utils/drawWaveform';
+import { encodeWav24 } from '../../mastering/wav24';
+import { encodeMp3 } from '../../mastering/mp3Encoder';
 
 interface User { id:string; firstName:string; lastName:string; email:string; country:string; credits:number; provider?:string; createdAt:string; }
 interface ExportScreenProps {
@@ -10,6 +12,7 @@ interface ExportScreenProps {
   onBack: () => void;
   onNewMix?: () => void;   // "Nueva mezcla" → va al chat/upload
   onGoHome?: () => void;   // "Volver al inicio" → va al dashboard/home
+  onMasterMix?: (file: File) => void;
   onCreditsUpdate: (n:number) => void;
 }
 
@@ -26,7 +29,7 @@ const S = {
   progressTrack: {background:'#241636',borderRadius:'8px',height:'6px',overflow:'hidden' as const},
 };
 
-export default function ExportScreen({ user, exportData, exportProgress, exportStep, onBack, onNewMix, onGoHome, onCreditsUpdate }: ExportScreenProps) {
+export default function ExportScreen({ user, exportData, exportProgress, exportStep, onBack, onNewMix, onGoHome, onMasterMix, onCreditsUpdate }: ExportScreenProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [curTime, setCurTime] = useState(0);
   const [pausedTime, setPausedTime] = useState(0);
@@ -156,6 +159,13 @@ export default function ExportScreen({ user, exportData, exportProgress, exportS
     setIsDownloading(false); setDlProgress(0); setDlFormat(null);
   };
 
+  const handleMasterMix = () => {
+    if (!exportData || !onMasterMix) return;
+    stopAll();
+    const wav = encodeWav24(exportData.audioBuffer);
+    onMasterMix(new File([wav], 'mezcla-v3-mixingmusic.wav', { type:'audio/wav' }));
+  };
+
   const stopAll=()=>{if(srcNode){try{srcNode.stop();srcNode.disconnect();}catch{}}analyserRef.current=null;if(vuAnimRef.current)cancelAnimationFrame(vuAnimRef.current);if(timerRef.current)clearInterval(timerRef.current);};
   const dur=exportData?.audioBuffer?.duration??0;
 
@@ -166,7 +176,7 @@ export default function ExportScreen({ user, exportData, exportProgress, exportS
 
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
           <div>
-            <h1 style={{fontSize:'26px',fontWeight:600,letterSpacing:'-0.5px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Tu Mezcla Final</h1>
+            <h1 style={{fontSize:'26px',fontWeight:600,letterSpacing:'-0.5px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Tu Mezcla V3</h1>
             <p style={{color:'#9B7EC8',fontSize:'13px',marginTop:'4px'}}>
               IA Mixing · {exportData?.iaEqPreset?`IA EQ: ${exportData.iaEqPreset} · `:''}44.1kHz/24bit · {exportData?.finalLufs?.toFixed(1)} LUFS
             </p>
@@ -249,6 +259,13 @@ export default function ExportScreen({ user, exportData, exportProgress, exportS
               </button>
             </div>
 
+            {onMasterMix && (
+              <div style={{margin:'22px 0',padding:'20px',border:'1px solid rgba(239,74,168,.28)',borderRadius:'16px',background:'linear-gradient(135deg,rgba(239,74,168,.1),rgba(181,87,243,.09))',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'18px',flexWrap:'wrap'}}>
+                <div><span style={{display:'block',fontSize:'9px',fontWeight:800,letterSpacing:'.13em',color:'#d9a4ef'}}>SIGUIENTE PASO RECOMENDADO</span><strong style={{display:'block',margin:'7px 0 4px',fontSize:'17px'}}>Masterizar esta mezcla</strong><small style={{color:'#9b91a4'}}>Compara A/B y crea el master final. El plan Gratis incluye 1 descarga MP3.</small></div>
+                <button onClick={handleMasterMix} style={{background:'linear-gradient(110deg,#ef4aa8,#b557f3)',border:0,color:'#fff',padding:'13px 20px',borderRadius:'11px',fontWeight:800,cursor:'pointer'}}>Continuar al mastering →</button>
+              </div>
+            )}
+
             {/* Post-download CTAs for pro users */}
             {downloadDone && isPro && (
               <div style={{background:'linear-gradient(135deg,rgba(26,12,46,0.95),rgba(36,18,58,0.95))',border:'1px solid rgba(192,38,211,0.3)',borderRadius:'16px',padding:'20px',marginBottom:'12px',textAlign:'center'}}>
@@ -314,18 +331,6 @@ export default function ExportScreen({ user, exportData, exportProgress, exportS
 }
 
 async function createAudioBlob(buffer:AudioBuffer,format:'mp3'|'wav'):Promise<Blob>{
-  const length=buffer.length,channels=buffer.numberOfChannels,sampleRate=buffer.sampleRate;
-  const ba=channels*2,br=sampleRate*ba,ds=length*ba,bs=44+ds;
-  const ab=new ArrayBuffer(bs),view=new DataView(ab);
-  const ws=(o:number,s:string)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
-  ws(0,'RIFF');view.setUint32(4,bs-8,true);ws(8,'WAVE');ws(12,'fmt ');
-  view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,channels,true);
-  view.setUint32(24,sampleRate,true);view.setUint32(28,br,true);
-  view.setUint16(32,ba,true);view.setUint16(34,16,true);ws(36,'data');view.setUint32(40,ds,true);
-  let offset=44;
-  for(let i=0;i<length;i++) for(let c=0;c<channels;c++){
-    view.setInt16(offset,Math.round(Math.max(-1,Math.min(1,buffer.getChannelData(c)[i]))*32767),true);
-    offset+=2;
-  }
-  return new Blob([ab],{type:format==='mp3'?'audio/mp3':'audio/wav'});
+  const wav24 = encodeWav24(buffer);
+  return format === 'wav' ? wav24 : encodeMp3(wav24);
 }

@@ -114,7 +114,7 @@ export default function Header({ user, onLogout, onCreditsUpdate }: HeaderProps)
                   <div style={S.avatar}>{user.firstName.charAt(0).toUpperCase()}</div>
                   <div>
                     <div style={{fontSize:'14px',fontWeight:600,color:'#F8F0FF'}}>{user.firstName} {user.lastName}</div>
-                    <div style={{fontSize:'12px',color:'#9B7EC8'}}>{(user.is_pro || user.plan === 'unlimited') ? 'Mezclas Ilimitadas ∞' : 'Plan Gratis · 1 mezcla'}</div>
+                    <div style={{fontSize:'12px',color:'#9B7EC8'}}>{(user.is_pro || user.plan === 'unlimited') ? 'Mezclas y masters ilimitados ∞' : 'Plan Gratis · 3 mezclas + 1 master MP3'}</div>
                   </div>
                 </div>
                 <button onClick={() => { navigate('/'); setMobileOpen(false); }} style={{...S.navBtn,textAlign:'left',width:'100%',padding:'10px 14px'}}>Inicio</button>

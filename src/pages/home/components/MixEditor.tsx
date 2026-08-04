@@ -104,65 +104,21 @@ interface MixEditorProps {
   reverbOn?: boolean; delayOn?: boolean; stereoOn?: boolean;
 }
 
-/* ─── Paywall Modal — untouched ─── */
-function PaywallModal({ onClose, onSuccess }: { onClose:()=>void; onSuccess:()=>void }) {
-  const [step, setStep] = useState<'choose'|'processing'|'done'>('choose');
-  const [method, setMethod] = useState<'paypal'|'mp'|null>(null);
-  const [mpError, setMpError] = useState('');
-  const getUser = () => { try { const s = localStorage.getItem('audioMixerUser'); return s ? JSON.parse(s) : null; } catch { return null; } };
-  const markPro = () => { try { const stored = localStorage.getItem('audioMixerUser'); const u = stored ? JSON.parse(stored) : {}; u.is_pro = true; u.plan = 'unlimited'; localStorage.setItem('audioMixerUser', JSON.stringify(u)); localStorage.removeItem('mixingai_used_free'); } catch {} };
-  const pay = async (m: 'paypal'|'mp') => {
-    const u = getUser(); setMethod(m); setStep('processing'); setMpError('');
-    if (m === 'paypal') { window.location.href = 'https://www.paypal.com/ncp/payment/HDU4UAXJCNVXW'; return; }
-    try {
-      const MP_TOKEN = (import.meta as any).env?.VITE_MP_ACCESS_TOKEN;
-      if (!MP_TOKEN) throw new Error('MercadoPago no configurado');
-      const userEmail = u?.email || 'cliente@mixingmusic.ai';
-      const userId = u?.id || u?.email || 'guest';
-      const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MP_TOKEN}` },
-        body: JSON.stringify({ items: [{ id:'unlimited_mixes', title:'MixingMusic.AI — Mezclas Ilimitadas', description:'Acceso ilimitado al mezclador IA', quantity:1, unit_price:3.99, currency_id:'USD' }], payer:{ email:userEmail }, external_reference:userId, back_urls:{ success:`${window.location.origin}/payment-confirmation?status=success&provider=mp`, failure:`${window.location.origin}/payment-confirmation?status=failed&provider=mp`, pending:`${window.location.origin}/payment-confirmation?status=pending&provider=mp` }, auto_return:'approved', statement_descriptor:'MIXINGMUSIC' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || data?.error || JSON.stringify(data));
-      const mpUrl = data?.init_point || data?.sandbox_init_point;
-      if (mpUrl) { window.location.href = mpUrl; } else { throw new Error('MercadoPago no devolvió URL'); }
-    } catch (e: any) { setMpError(e.message || 'Error'); setStep('choose'); }
-  };
+/* ─── Paywall Modal — V3 one-time checkout ─── */
+function PaywallModal({ onClose }: { onClose:()=>void }) {
   const ov: React.CSSProperties = { position:'fixed', inset:0, background:'rgba(5,1,10,0.96)', backdropFilter:'blur(14px)', zIndex:1100, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' };
   const bx: React.CSSProperties = { background:'var(--panel-1)', border:'1px solid rgba(217,70,239,0.35)', borderRadius:'24px', padding:'36px 32px', maxWidth:'420px', width:'100%', textAlign:'center', boxShadow:'0 0 60px rgba(217,70,239,0.2)' };
   return (
     <div style={ov}>
       <div style={bx}>
-        {step==='choose' && <>
-          <div style={{fontSize:'36px',marginBottom:'14px'}}>🎛️</div>
-          <h2 style={{fontSize:'22px',fontWeight:700,color:'var(--text-primary)',marginBottom:'6px'}}>Mezclas Ilimitadas</h2>
-          <p style={{fontSize:'13px',color:'var(--text-secondary)',marginBottom:'4px'}}>Tu primera mezcla fue gratis.</p>
-          <p style={{fontSize:'13px',color:'var(--text-secondary)',marginBottom:'24px'}}>Solo <span style={{color:'var(--accent)',fontSize:'22px',fontWeight:800}}>$3.99</span></p>
-          {mpError && <p style={{fontSize:'12px',color:'#f87171',marginBottom:'12px',background:'rgba(239,68,68,0.08)',padding:'8px 12px',borderRadius:'8px'}}>{mpError}</p>}
-          <button style={{width:'100%',background:'#0070BA',border:'none',color:'#fff',padding:'14px',borderRadius:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer',marginBottom:'10px',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'}} onClick={()=>pay('paypal')}>
-            <span style={{background:'#fff',borderRadius:'4px',padding:'2px 6px',color:'#003087',fontWeight:900,fontSize:'13px'}}>P</span> Pagar con PayPal
-          </button>
-          <button style={{width:'100%',background:'linear-gradient(135deg,#009EE3,#00B1EA)',border:'none',color:'#fff',padding:'14px',borderRadius:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'}} onClick={()=>pay('mp')}>
-            <span style={{fontSize:'18px'}}>💳</span> Pagar con Mercado Pago
-          </button>
-          <button onClick={onClose} style={{marginTop:'14px',background:'none',border:'none',color:'var(--text-muted)',fontSize:'12px',cursor:'pointer'}}>Cancelar</button>
-        </>}
-        {step==='processing' && <>
-          <div style={{fontSize:'32px',marginBottom:'16px'}}>⏳</div>
-          <h2 style={{fontSize:'18px',fontWeight:700,color:'var(--text-primary)',marginBottom:'8px'}}>Redirigiendo...</h2>
-          <p style={{fontSize:'13px',color:'var(--text-secondary)',marginBottom:'20px'}}>Conectando con {method==='paypal'?'PayPal':'Mercado Pago'}...</p>
-          <div style={{height:'4px',background:'rgba(217,70,239,0.15)',borderRadius:'2px',overflow:'hidden'}}>
-            <div style={{height:'100%',background:'var(--accent-grad)',animation:'pay-prog 2s ease forwards',borderRadius:'2px'}}></div>
-          </div>
-          <style>{`@keyframes pay-prog{from{width:0}to{width:95%}}`}</style>
-        </>}
-        {step==='done' && <>
-          <div style={{fontSize:'32px',marginBottom:'16px'}}>✅</div>
-          <h2 style={{fontSize:'18px',fontWeight:700,color:'var(--green)',marginBottom:'8px'}}>¡Pago exitoso!</h2>
-          <p style={{fontSize:'13px',color:'var(--text-secondary)',marginBottom:'20px'}}>Ya tienes mezclas ilimitadas.</p>
-          <button style={{width:'100%',background:'var(--accent-grad)',border:'none',color:'#fff',padding:'14px',borderRadius:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer'}} onClick={()=>{ markPro(); onSuccess(); }}>Continuar →</button>
-        </>}
+        <div style={{fontSize:'36px',marginBottom:'14px'}}>🎛️</div>
+        <h2 style={{fontSize:'22px',fontWeight:700,color:'var(--text-primary)',marginBottom:'6px'}}>Unlimited para siempre</h2>
+        <p style={{fontSize:'13px',color:'var(--text-secondary)',marginBottom:'4px'}}>Ya utilizaste las 3 mezclas incluidas en Gratis.</p>
+        <p style={{fontSize:'13px',color:'var(--text-secondary)',marginBottom:'24px'}}>Pago único de <span style={{color:'var(--accent)',fontSize:'22px',fontWeight:800}}>US$14.99</span> · sin suscripción</p>
+        <button style={{width:'100%',background:'var(--accent-grad)',border:'none',color:'#fff',padding:'14px',borderRadius:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer',marginBottom:'10px'}} onClick={()=>{ window.location.href='/checkout-v3'; }}>
+          Activar Unlimited con PayPal →
+        </button>
+        <button onClick={onClose} style={{marginTop:'8px',background:'none',border:'none',color:'var(--text-muted)',fontSize:'12px',cursor:'pointer'}}>Volver a mi mezcla</button>
       </div>
     </div>
   );
@@ -701,15 +657,16 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         if (UNLIMITED_EMAILS.includes(u.email)) return { allowed:true, isPro:true };
         if (u.is_pro || u.plan==='unlimited') return { allowed:true, isPro:true };
         const fp = getDeviceFingerprint();
-        const fpUsed = localStorage.getItem(`mixingai_fp_${fp}`)==='1';
-        const emailUsed = u.email && localStorage.getItem(`mixingai_used_free_${u.email}`)==='1';
-        if (!fpUsed && !emailUsed) return { allowed:true, isPro:false, email:u.email, fp };
+        const identity = u.id || u.email || fp;
+        const legacyCount = localStorage.getItem(`mixingai_used_free_${u.email}`)==='1' ? 1 : 0;
+        const count = Number(localStorage.getItem(`mixingai_free_mix_count_${identity}`) || legacyCount);
+        if (count < 3) return { allowed:true, isPro:false, identity, count };
         return { allowed:false, isPro:false };
       }
       const fp=getDeviceFingerprint();
-      const fpUsed=localStorage.getItem(`mixingai_fp_${fp}`)==='1';
-      const legacyUsed=localStorage.getItem('mixingai_used_free')==='1';
-      if(!fpUsed&&!legacyUsed) return { allowed:true, isPro:false, fp };
+      const legacyCount = localStorage.getItem('mixingai_used_free')==='1' ? 1 : 0;
+      const count = Number(localStorage.getItem(`mixingai_free_mix_count_${fp}`) || legacyCount);
+      if(count < 3) return { allowed:true, isPro:false, identity:fp, count };
       return { allowed:false, isPro:false };
     } catch { return { allowed:true, isPro:false }; }
   };
@@ -718,8 +675,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     if (!access.allowed) { setShowPaywall(true); return; }
     if (!access.isPro) {
       const a = access as any;
-      if (a.email) localStorage.setItem(`mixingai_used_free_${a.email}`,'1');
-      else { localStorage.setItem('mixingai_used_free','1'); if(a.fp) localStorage.setItem(`mixingai_fp_${a.fp}`,'1'); }
+      localStorage.setItem(`mixingai_free_mix_count_${a.identity}`, String((a.count || 0) + 1));
     }
     handleExportMix();
   };
@@ -864,35 +820,23 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
   /* ════ LOADING SCREEN ════ */
   if(isLoading) return(
-    <div style={{minHeight:'100vh',background:'transparent',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'24px',fontFamily:'Inter,system-ui,sans-serif'}}>
-      <div style={{fontSize:'48px'}}>🎛️</div>
-      <div style={{textAlign:'center'}}>
-        <h2 style={{fontSize:'18px',fontWeight:600,color:'var(--text-primary)',marginBottom:'8px'}}>{loadingStep}</h2>
-        <p style={{fontSize:'13px',color:'var(--text-muted)',marginBottom:'24px'}}>{allFiles.length} stems cargando...</p>
-        <div style={{width:'280px',height:'4px',background:'var(--panel-2)',borderRadius:'2px',overflow:'hidden'}}>
-          <div style={{height:'100%',width:`${loadingProgress}%`,background:'var(--accent-grad)',borderRadius:'2px',transition:'width 0.3s'}}/>
-        </div>
-        <p style={{fontSize:'12px',color:'var(--text-dim)',marginTop:'8px'}}>{loadingProgress}%</p>
-      </div>
+    <div className="studio-v3-page v3-process-screen">
+      <div className="v3-process-orbit"><i /><b>{loadingProgress}%</b></div>
+      <span>PREPARANDO MEZCLA</span>
+      <h1>{loadingStep}</h1>
+      <p>Analizamos y alineamos {allFiles.length} stems antes de abrir tu sesión.</p>
+      <div className="v3-process-line"><i style={{width:`${Math.max(12,loadingProgress)}%`,animation:'none'}} /></div>
     </div>
   );
 
   /* ════ EXPORT OVERLAY ════ */
   if(isExporting) return(
-    <div style={{minHeight:'100vh',background:'transparent',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'24px',fontFamily:'Inter,system-ui,sans-serif'}}>
-      <div style={{fontSize:'48px'}}>🎚️</div>
-      <div style={{textAlign:'center',maxWidth:'360px'}}>
-        <h2 style={{fontSize:'18px',fontWeight:600,color:'var(--text-primary)',marginBottom:'8px'}}>{exportStep}</h2>
-        <div style={{width:'320px',height:'6px',background:'var(--panel-2)',borderRadius:'3px',overflow:'hidden',margin:'0 auto 8px'}}>
-          <div style={{height:'100%',width:`${exportProgress}%`,background:'var(--accent-grad)',borderRadius:'3px',transition:'width 0.4s'}}/>
-        </div>
-        <p style={{fontSize:'12px',color:'var(--text-muted)'}}>{exportProgress}% · WAV 24-bit · -16 LUFS</p>
-        <div style={{marginTop:'16px',display:'flex',justifyContent:'center',gap:'8px'}}>
-          {['IA EQ','Compresión','Limiter','-16 LUFS'].map((step,i)=>(
-            <span key={step} style={{padding:'4px 10px',borderRadius:'20px',fontSize:'11px',background:exportProgress>i*25?'rgba(217,70,239,0.2)':'var(--panel-1)',color:exportProgress>i*25?'var(--accent)':'var(--text-muted)',border:`1px solid ${exportProgress>i*25?'rgba(217,70,239,0.4)':'var(--border)'}`}}>{step}</span>
-          ))}
-        </div>
-      </div>
+    <div className="studio-v3-page v3-process-screen">
+      <div className="v3-process-orbit"><i /><b>{exportProgress}%</b></div>
+      <span>GENERANDO MEZCLA</span>
+      <h1>{exportStep}</h1>
+      <p>Aplicamos el preset elegido y preparamos el archivo que pasará directamente a mastering.</p>
+      <div className="v3-process-line"><i style={{width:`${Math.max(12,exportProgress)}%`,animation:'none'}} /></div>
     </div>
   );
 
@@ -900,8 +844,8 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
   /* ════ MAIN RENDER ════ */
   return (
-    <div style={{minHeight:'100vh',fontFamily:'Inter,-apple-system,system-ui,sans-serif',background:'transparent',color:'var(--text-primary)'}}>
-      {showPaywall && <PaywallModal onClose={()=>setShowPaywall(false)} onSuccess={()=>setShowPaywall(false)}/>}
+    <div className="studio-v3-page" style={{minHeight:'100vh',fontFamily:'Inter,-apple-system,system-ui,sans-serif',background:'transparent',color:'var(--text-primary)'}}>
+      {showPaywall && <PaywallModal onClose={()=>setShowPaywall(false)}/>}
       {showUploadModal && <UploadModal onClose={()=>setShowUploadModal(false)} onUpload={handleUploadMoreStems}/>}
 
       <div className="studio">

@@ -5,6 +5,10 @@ Disallow: /admin/
 Disallow: /admin/dashboard
 Disallow: /api/
 Disallow: /auth/verify
+Disallow: /profile
+Disallow: /billing
+Disallow: /checkout-v3
+Disallow: /payment-confirmation
 
 # Allow Google to crawl everything else
 User-agent: Googlebot

@@ -12,6 +12,7 @@ interface User {
 interface PresetScreenProps {
   user: User;
   stemCount: number;
+  recommendedPresetId?: string;
   onBack: () => void;
   onConfirm: (preset: MixPreset, reverbOn: boolean, delayOn: boolean, stereoOn: boolean) => void;
 }
@@ -50,18 +51,25 @@ function WaveCanvas({ pattern, color, selected }: { pattern: number[], color: st
   return <canvas ref={canvasRef} width={280} height={56} style={{width:'100%',height:'40px',display:'block',borderRadius:'6px'}} />;
 }
 
-export default function PresetScreen({ user, stemCount, onBack, onConfirm }: PresetScreenProps) {
-  const [selected, setSelected] = useState<string>('pop');
+export default function PresetScreen({ user, stemCount, recommendedPresetId = 'pop', onBack, onConfirm }: PresetScreenProps) {
+  const [selected, setSelected] = useState<string>(recommendedPresetId);
+  const [isOpening, setIsOpening] = useState(false);
   const [reverbOn, setReverbOn] = useState(false);
   const [delayOn, setDelayOn] = useState(false);
   const [stereoOn, setStereoOn] = useState(false);
 
   const preset = PRESETS.find(p => p.id === selected)!;
 
-  const handleConfirm = () => onConfirm(preset, reverbOn, delayOn, stereoOn);
+  const recommended = PRESETS.find((item) => item.id === recommendedPresetId) ?? PRESETS[0];
+  const handleConfirm = () => {
+    setIsOpening(true);
+    setTimeout(() => onConfirm(preset, reverbOn, delayOn, stereoOn), 850);
+  };
+
+  if (isOpening) return <div className="studio-v3-page v3-process-screen"><div className="v3-process-orbit"><i /><b>IA</b></div><span>PREPARANDO EL ESTUDIO</span><h1>Aplicando el carácter {preset.name}</h1><p>Configuramos balance, efectos y controles antes de abrir el mezclador.</p><div className="v3-process-line"><i /></div></div>;
 
   return (
-    <div style={S.page}>
+    <div className="studio-v3-page" style={S.page}>
       <Header user={user} onLogout={() => {}} onCreditsUpdate={() => {}} />
 
       <div style={{maxWidth:'900px',margin:'0 auto',padding:'24px 16px 60px'}}>
@@ -78,6 +86,12 @@ export default function PresetScreen({ user, stemCount, onBack, onConfirm }: Pre
           <p style={{fontSize:'14px',color:'#9B7EC8'}}>La IA ajusta EQ, compresión y efectos según el género. Los cambios son reales.</p>
         </div>
 
+        <div className="preset-ai-recommendation" style={{'--recommend-color':recommended.color} as React.CSSProperties}>
+          <div className="preset-ai-wave">{recommended.wavePattern.slice(0,10).map((height,index)=><i key={index} style={{height:`${Math.max(18,height*100)}%`}} />)}</div>
+          <div><span>✦ RECOMENDACIÓN IA</span><strong>{recommended.name}</strong><p>Analizamos los nombres y la estructura de los {stemCount} stems. Es el punto de partida recomendado; puedes escoger cualquier otro preset.</p></div>
+          <button onClick={()=>setSelected(recommended.id)}>Usar recomendado</button>
+        </div>
+
         {/* Grid de presets */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:'10px',marginBottom:'20px'}}>
           {PRESETS.map(p => {
@@ -85,6 +99,7 @@ export default function PresetScreen({ user, stemCount, onBack, onConfirm }: Pre
             return (
               <div key={p.id} onClick={() => setSelected(p.id)}
                 style={{background:'rgba(26,16,40,0.82)',border:`1.5px solid ${isSel ? p.color : 'rgba(192,38,211,0.1)'}`,borderRadius:'14px',padding:'14px',cursor:'pointer',transition:'border-color 0.2s',boxShadow:isSel?`0 0 16px ${p.color}33`:'none',position:'relative'}}>
+                {p.id===recommended.id && <div className="preset-ai-badge">IA RECOMIENDA</div>}
                 {isSel && (
                   <div style={{position:'absolute',top:'8px',right:'8px',width:'18px',height:'18px',borderRadius:'50%',background:p.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',color:'#fff',fontWeight:700}}>✓</div>
                 )}
@@ -167,6 +182,7 @@ export default function PresetScreen({ user, stemCount, onBack, onConfirm }: Pre
           </button>
         </div>
       </div>
+      <style>{`.preset-ai-recommendation{margin-bottom:18px;padding:18px;display:grid;grid-template-columns:110px 1fr auto;align-items:center;gap:18px;border:1px solid color-mix(in srgb,var(--recommend-color) 45%,transparent);border-radius:16px;background:color-mix(in srgb,var(--recommend-color) 8%,rgba(18,13,26,.94))}.preset-ai-wave{height:52px;display:flex;align-items:center;gap:3px}.preset-ai-wave i{flex:1;max-height:100%;min-height:3px;border-radius:3px;background:var(--recommend-color)}.preset-ai-recommendation span,.preset-ai-recommendation strong{display:block}.preset-ai-recommendation span{color:var(--recommend-color);font:800 9px 'DM Mono',monospace;letter-spacing:.12em}.preset-ai-recommendation strong{margin-top:6px;font-size:20px}.preset-ai-recommendation p{margin:4px 0 0;color:#9b91a5;font-size:11px;line-height:1.5}.preset-ai-recommendation button{min-height:40px;padding:0 14px;border:1px solid color-mix(in srgb,var(--recommend-color) 45%,transparent);border-radius:9px;background:color-mix(in srgb,var(--recommend-color) 12%,transparent);color:#fff;font-weight:800;cursor:pointer}.preset-ai-badge{position:absolute;left:9px;top:8px;padding:4px 6px;border-radius:6px;background:rgba(74,222,128,.14);color:#69df9c;font:800 7px 'DM Mono',monospace;letter-spacing:.08em}@media(max-width:650px){.preset-ai-recommendation{grid-template-columns:1fr}.preset-ai-wave{width:120px}.preset-ai-recommendation button{width:100%}}`}</style>
     </div>
   );
 }
