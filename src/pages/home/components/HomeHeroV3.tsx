@@ -21,6 +21,12 @@ const benefits = [
   },
 ];
 
+const coreFunctions = [
+  { number: '01', title: 'Crear una mezcla', text: 'Sube los stems separados y construye una mezcla completa con IA.' },
+  { number: '02', title: 'Mejorar una mezcla', text: 'Corrige balance, claridad, amplitud y dinámica de tu premezcla.' },
+  { number: '03', title: 'Masterizar una mezcla', text: 'Lleva el resultado al nivel final de loudness y exportación profesional.' },
+];
+
 const albumFeatures = [
   'Hasta 12 canciones por proyecto',
   'Volumen percibido consistente',
@@ -58,17 +64,21 @@ export default function HomeHeroV3() {
       <section className="v3-hero" id="inicio">
         <div className="v3-hero-glow v3-hero-glow-one" />
         <div className="v3-hero-glow v3-hero-glow-two" />
-        <div className="v3-eyebrow">
-          <span /> Mezcla y mastering en una sola plataforma
-        </div>
+        <div className="v3-eyebrow"><span /> Tres funciones profesionales · dos caminos simples</div>
         <h1>
-          De tus pistas a un sonido
-          <strong> listo para publicar.</strong>
+          Crea una mezcla.
+          <strong> O masteriza una mezcla.</strong>
         </h1>
         <p className="v3-hero-copy">
-          Mezcla stems o mejora una mezcla estéreo con los presets de MixingMusic.
-          Sin suscripciones y sin instalar nada.
+          Si tienes pistas separadas, crea la mezcla completa. Si ya tienes una mezcla estéreo,
+          mejórala y masterízala para dejarla lista para publicar.
         </p>
+
+        <div className="v3-function-strip" aria-label="Las tres funciones de MixingMusic">
+          {coreFunctions.map((item) => (
+            <div key={item.number}><span>{item.number}</span><strong>{item.title}</strong><small>{item.text}</small></div>
+          ))}
+        </div>
 
         <div className="v3-mode-grid" aria-label="Selecciona un flujo de trabajo">
           <article className="v3-mode-card v3-mode-mix">
@@ -76,7 +86,7 @@ export default function HomeHeroV3() {
               <span className="v3-mode-icon" aria-hidden="true">≋</span>
               <span className="v3-mode-label">MIXING</span>
             </div>
-            <h2>Mezclar mis stems</h2>
+            <h2>Crear una mezcla</h2>
             <p>Sube voz, batería, bajo, guitarras y demás pistas. La IA prepara el balance y tú conservas el control.</p>
             <ul>
               <li>Hasta 12 stems</li>
@@ -84,7 +94,7 @@ export default function HomeHeroV3() {
               <li>Editor multipista</li>
             </ul>
             <button className="v3-button v3-button-primary" onClick={() => begin('mix')}>
-              Comenzar una mezcla <span>→</span>
+              Crear una mezcla <span>→</span>
             </button>
           </article>
 
@@ -94,15 +104,15 @@ export default function HomeHeroV3() {
               <span className="v3-mode-icon" aria-hidden="true">◇</span>
               <span className="v3-mode-label">MASTERING</span>
             </div>
-            <h2>Mejorar mi mezcla</h2>
-            <p>Sube tu premezcla y obtén claridad, fuerza, dinámica y volumen competitivo sin perder su carácter.</p>
+            <h2>Masterizar una mezcla</h2>
+            <p>Sube tu premezcla, mejora claridad, fuerza y dinámica, y llévala al volumen final sin perder su carácter.</p>
             <ul>
-              <li>Análisis técnico automático</li>
+              <li>Mejora tonal y dinámica</li>
               <li>Presets MixingMusic</li>
               <li>MP3 y WAV 24 bits</li>
             </ul>
             <button className="v3-button v3-button-accent" onClick={() => begin('master')}>
-              Masterizar una canción <span>→</span>
+              Masterizar una mezcla <span>→</span>
             </button>
           </article>
         </div>
@@ -119,9 +129,24 @@ export default function HomeHeroV3() {
         <div><strong>1 pago</strong><span>sin suscripción</span></div>
       </section>
 
+      <section className="v3-award" aria-label="Global Recognition Award 2026">
+        <div className="v3-award-copy">
+          <span className="v3-kicker">RECONOCIMIENTO INTERNACIONAL</span>
+          <h2>Ganadores del 2026 Global Recognition Award.</h2>
+          <p>
+            MixingMusic.AI fue reconocida globalmente por innovación en inteligencia artificial
+            aplicada a la producción musical. Tecnología creada para democratizar resultados profesionales.
+          </p>
+          <div className="v3-award-seal"><span>GRA</span><strong>WINNER 2026</strong></div>
+        </div>
+        <div className="v3-award-image">
+          <img src="/winner3.png" alt="MixingMusic.AI, ganador del 2026 Global Recognition Award por innovación en inteligencia artificial aplicada a la producción musical" />
+        </div>
+      </section>
+
       <section className="v3-section v3-workflow" id="funciones">
         <div className="v3-section-heading">
-          <span className="v3-kicker">UN FLUJO, DOS PUNTOS DE PARTIDA</span>
+          <span className="v3-kicker">DOS CAMINOS, TRES FUNCIONES</span>
           <h2>Menos técnica. Más decisiones musicales.</h2>
           <p>MixingMusic analiza el audio y propone un resultado; tú eliges el carácter final.</p>
         </div>

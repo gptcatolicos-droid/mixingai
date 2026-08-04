@@ -105,7 +105,7 @@ export default function ProjectDashboard() {
 
   // PANTALLA: Chat AI — pantalla principal para usuarios logueados
   if (currentScreen === 'mastering' && user)
-    return <MasteringPage />;
+    return <MasteringPage onExit={() => setCurrentScreen('dashboard')} />;
 
   // PANTALLA: Chat AI — pantalla principal para usuarios logueados
   if (currentScreen === 'chat' && user)

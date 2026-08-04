@@ -44,7 +44,7 @@ function getStoredUser() {
   catch { return {}; }
 }
 
-export default function MasteringPage() {
+export default function MasteringPage({ onExit }: { onExit?: () => void }) {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -280,6 +280,24 @@ export default function MasteringPage() {
     setError('');
   };
 
+  const saveAndExit = () => {
+    const user = getStoredUser();
+    const identity = user.id || user.email || 'guest';
+    localStorage.setItem(`mixingmusic_master_draft_${identity}`, JSON.stringify({
+      presetId: selectedPreset.id,
+      strength,
+      stereo,
+      loudness,
+      fileName: file?.name || '',
+      updatedAt: new Date().toISOString(),
+    }));
+    if (onExit) {
+      onExit();
+      return;
+    }
+    navigate('/');
+  };
+
   const processFile = async (candidate?: File) => {
     if (!candidate) return;
     setError('');
@@ -328,7 +346,7 @@ export default function MasteringPage() {
           <img src="/logo-brand.png" alt="MixingMusic.AI" />
           <span>MASTERING V3</span>
         </button>
-        <button className="master-exit" onClick={() => navigate('/')}>Guardar y salir</button>
+        <button className="master-exit" onClick={saveAndExit}>Guardar y salir</button>
       </header>
 
       <div className="master-shell">

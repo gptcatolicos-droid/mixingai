@@ -4,8 +4,8 @@
   --bg-0: #0A0710;
   --bg-1: #110B19;
   --bg-2: #161020;
-  --panel-1: #1A1426;
-  --panel-2: #211930;
+  --panel-1: rgba(20, 16, 27, 0.88);
+  --panel-2: rgba(32, 24, 43, 0.86);
   --hover:   #2A2040;
 
   /* Borders */
@@ -20,11 +20,11 @@
   --text-dim:       #4A4359;
 
   /* Brand — Magenta / Violet */
-  --accent:       #D946EF;   /* magenta */
-  --accent-2:     #A855F7;   /* violet */
+  --accent:       #EF4AA8;   /* V3 pink */
+  --accent-2:     #B557F3;   /* V3 violet */
   --accent-soft:  rgba(217,70,239,0.14);
   --accent-glow:  rgba(217,70,239,0.35);
-  --accent-grad:  linear-gradient(135deg, #D946EF 0%, #A855F7 100%);
+  --accent-grad:  linear-gradient(110deg, #EF4AA8 0%, #B557F3 72%, #8B4DE3 100%);
 
   /* Track / Stem colors (muted-professional) */
   --tc-pink:   #E36AB0;
