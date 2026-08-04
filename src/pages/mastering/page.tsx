@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PRESETS } from '../home/components/mixTypes';
 import type { MixPreset } from '../home/components/mixTypes';
+import { recommendPresetFromAnalysis } from '../home/components/presetRecommendation';
+import type { PresetRecommendation } from '../home/components/presetRecommendation';
 import { analyzeAudioFile, formatDuration, formatFileSize } from './audioAnalysis';
 import type { AudioFileAnalysis } from './audioAnalysis';
 import {
@@ -65,6 +67,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
   const [analysis, setAnalysis] = useState<AudioFileAnalysis | null>(null);
   const [error, setError] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<MixPreset>(PRESETS[0]);
+  const [presetRecommendation, setPresetRecommendation] = useState<PresetRecommendation | null>(null);
   const [strength, setStrength] = useState(50);
   const [loudness, setLoudness] = useState<LoudnessProfile>('balanced');
   const [stereo, setStereo] = useState(25);
@@ -170,7 +173,8 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     context.fillRect(43, height - 9 - Math.round(barHeight * .96), 24, Math.round(barHeight * .96));
     context.strokeStyle = 'rgba(255,255,255,.16)';
     context.setLineDash([3, 3]);
-    const targetY = height - 9 - Math.round((height - 18) * ((-14 + 48) / 43));
+    const targetLufs = masterResult?.integratedLufs ?? -16;
+    const targetY = height - 9 - Math.round((height - 18) * ((targetLufs + 48) / 43));
     context.beginPath(); context.moveTo(5, targetY); context.lineTo(width - 5, targetY); context.stroke();
     context.setLineDash([]);
   };
@@ -219,7 +223,11 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
       let sum = 0;
       for (let index = 0; index < samples.length; index += 1) sum += samples[index] * samples[index];
       const rms = Math.sqrt(sum / samples.length);
-      const momentary = rms > .00001 ? Math.max(-60, Math.min(0, 20 * Math.log10(rms) - .691)) : -60;
+      const playbackGainDb = element.volume > 0 ? 20 * Math.log10(element.volume) : 0;
+      const loudnessCalibrationDb = masterResult ? masterResult.integratedLufs - masterResult.averageDbfs : 0;
+      const momentary = rms > .00001
+        ? Math.max(-60, Math.min(0, 20 * Math.log10(rms) - playbackGainDb + loudnessCalibrationDb))
+        : -60;
       setLiveMomentary(momentary);
       if (momentary > -55) {
         meterEnergyRef.current.sum += 10 ** (momentary / 10);
@@ -258,6 +266,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     setFile(null);
     setAudioUrl('');
     setAnalysis(null);
+    setPresetRecommendation(null);
     setMasterResult(null);
     if (masterUrl) URL.revokeObjectURL(masterUrl);
     setMasterUrl('');
@@ -452,6 +461,10 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
         return;
       }
       setAnalysis(result);
+      const recommendation = recommendPresetFromAnalysis(candidate, result);
+      setPresetRecommendation(recommendation);
+      setSelectedPreset(recommendation.preset);
+      setStereo(Math.round(recommendation.preset.stereoWidth * 50));
       setStage('configure');
     } catch (analysisError) {
       setError(analysisError instanceof Error ? analysisError.message : 'No pudimos analizar el archivo.');
@@ -582,12 +595,25 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
               <Metric label="Pico máximo" value={`${analysis.peakDbfs.toFixed(1)} dBFS`} note={`${analysis.headroomDb.toFixed(1)} dB de margen`} />
               <Metric label="Loudness integrado" value={`${analysis.integratedLufs.toFixed(1)} LUFS`} note={`ITU-R BS.1770 · promedio ${analysis.averageDbfs.toFixed(1)} dBFS`} />
             </div>
+            <button className="master-concepts-link" onClick={() => navigate('/conceptos-audio')}>
+              ¿No conoces LUFS, dBFS o headroom? Ver conceptos de audio →
+            </button>
 
             <div className="master-config-grid">
               <div className="master-preset-panel">
                 <span className="master-kicker">1. ELIGE EL CARÁCTER</span>
                 <h2>Preset de mastering</h2>
                 <p>Usamos los perfiles actuales de MixingMusic como punto de partida.</p>
+                {presetRecommendation && (
+                  <div className="master-recommendation" style={{ '--preset': presetRecommendation.preset.color } as React.CSSProperties}>
+                    <div>
+                      <span>✦ IA RECOMIENDA · CONFIANZA {presetRecommendation.confidence.toUpperCase()}</span>
+                      <strong>{presetRecommendation.preset.name}</strong>
+                      <small>{presetRecommendation.reason} Puedes cambiarlo si buscas otro carácter.</small>
+                    </div>
+                    <button onClick={() => { setSelectedPreset(presetRecommendation.preset); setStereo(Math.round(presetRecommendation.preset.stereoWidth * 50)); }}>Usar recomendado</button>
+                  </div>
+                )}
                 <div className="master-preset-list">
                   {PRESETS.map((preset) => (
                     <button
@@ -706,19 +732,20 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
               </article>
             </div>
             <div className="master-live-meter">
-              <div className="master-live-title"><span><i className={masterCompareRef.current?.paused === false ? 'live' : ''} />MEDICIÓN DEL MASTER EN TIEMPO REAL</span><small>Reproduce MASTER V3 para activar la lectura</small></div>
+              <div className="master-live-title"><span><i className={masterCompareRef.current?.paused === false ? 'live' : ''} />MEDICIÓN DEL MASTER EN TIEMPO REAL</span><small>Reproduce MASTER V3 · <button onClick={() => navigate('/conceptos-audio')}>¿Qué significa?</button></small></div>
               <div className="master-live-grid">
                 <canvas ref={liveMeterCanvasRef} width="78" height="150" aria-label="Medidor VU en tiempo real" />
-                <div><strong>{liveMomentary.toFixed(1)}</strong><span>LUFS momentáneos</span><small>Nivel actual</small></div>
-                <div><strong>{liveIntegrated.toFixed(1)}</strong><span>LUFS integrados</span><small>Promedio durante reproducción</small></div>
+                <div><strong>{liveMomentary.toFixed(1)}</strong><span>LUFS momentáneos</span><small>Nivel actual · cambia con la música</small></div>
+                <div><strong>{liveIntegrated.toFixed(1)}</strong><span>Promedio parcial</span><small>Desde que diste play</small></div>
                 <div><strong>{masterResult.peakDbfs.toFixed(1)}</strong><span>dBFS pico</span><small>Techo {masterResult.samplePeakCeilingDbfs.toFixed(1)} dBFS</small></div>
               </div>
+              <p className="master-live-explanation">La lectura en vivo cambia segundo a segundo. <strong>{masterResult.integratedLufs.toFixed(1)} LUFS</strong> es el promedio certificado del archivo completo.</p>
             </div>
             <div className="master-result-metrics">
               <Metric label="Preset" value={selectedPreset.name} note={`${strength}% de intensidad`} />
               <Metric label="Ganancia aplicada" value={`${masterResult.appliedGainDb >= 0 ? '+' : ''}${masterResult.appliedGainDb.toFixed(1)} dB`} note="Antes del control final" />
               <Metric label="Pico de muestra" value={`${masterResult.peakDbfs.toFixed(1)} dBFS`} note={`Techo ${masterResult.samplePeakCeilingDbfs.toFixed(1)} dBFS`} />
-              <Metric label="Loudness integrado" value={`${masterResult.integratedLufs.toFixed(1)} LUFS`} note={`ITU-R BS.1770 · ${(analysis!.sampleRate / 1000).toFixed(1)} kHz`} />
+              <Metric label="LUFS final de la canción" value={`${masterResult.integratedLufs.toFixed(1)} LUFS`} note={`Archivo completo · ITU-R BS.1770 · ${(analysis!.sampleRate / 1000).toFixed(1)} kHz`} />
             </div>
             <div className="master-compare-actions">
               <button className="master-secondary" onClick={() => { releaseLiveMeter(); setError(''); setStage('configure'); }}>← Ajustar sonido</button>
@@ -750,10 +777,11 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
             )}
             <h2>¿Qué quieres hacer ahora?</h2>
             <div className="master-next-grid">
-              <button onClick={() => navigate('/')}><i>≋</i><strong>Hacer otra mezcla</strong><span>Subir stems separados</span></button>
-              <button onClick={() => isUnlimited ? reset() : navigate('/checkout-v3')}><i>◇</i><strong>Masterizar otra mezcla</strong><span>{isUnlimited ? 'Subir una premezcla' : 'Requiere Unlimited'}</span></button>
-              <button onClick={() => isUnlimited ? navigate('/mastering/album') : navigate('/checkout-v3')}><i>▦</i><strong>Masterizar un álbum</strong><span>{isUnlimited ? 'Hasta 12 canciones' : 'Requiere Unlimited'}</span></button>
+              <button onClick={() => navigate('/')}><i>≋</i><strong>Hacer otra mezcla</strong><span>Subir stems separados</span><b>Crear mezcla →</b></button>
+              <button onClick={() => isUnlimited ? reset() : navigate('/checkout-v3')}><i>◇</i><strong>Masterizar otra mezcla</strong><span>{isUnlimited ? 'Subir una premezcla' : 'Requiere Unlimited'}</span><b>{isUnlimited ? 'Subir mezcla →' : 'Activar Unlimited →'}</b></button>
+              <button onClick={() => isUnlimited ? navigate('/mastering/album') : navigate('/checkout-v3')}><i>▦</i><strong>Masterizar un álbum</strong><span>{isUnlimited ? 'Hasta 12 canciones' : 'Requiere Unlimited'}</span><b>{isUnlimited ? 'Crear álbum →' : 'Activar Unlimited →'}</b></button>
             </div>
+            <button className="master-home-button" onClick={() => navigate('/')}>← Volver al home</button>
           </section>
         )}
       </div>

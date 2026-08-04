@@ -22,9 +22,9 @@ const benefits = [
 ];
 
 const coreFunctions = [
-  { number: '01', title: 'Crear una mezcla', text: 'Sube los stems separados y construye una mezcla completa con IA.' },
-  { number: '02', title: 'Mejorar una mezcla', text: 'Corrige balance, claridad, amplitud y dinámica de tu premezcla.' },
-  { number: '03', title: 'Masterizar una mezcla', text: 'Lleva el resultado al nivel final de loudness y exportación profesional.' },
+  { number: '01', title: 'Crear una mezcla', text: 'Sube los stems separados y construye una mezcla completa con IA.', preset: PRESETS.find((preset) => preset.id === 'reggaeton')! },
+  { number: '02', title: 'Mejorar una mezcla', text: 'Corrige balance, claridad, amplitud y dinámica de tu premezcla.', preset: PRESETS.find((preset) => preset.id === 'dance')! },
+  { number: '03', title: 'Masterizar una mezcla', text: 'Lleva el resultado al nivel final de loudness y exportación profesional.', preset: PRESETS.find((preset) => preset.id === 'pop')! },
 ];
 
 const albumFeatures = [
@@ -77,6 +77,7 @@ export default function HomeHeroV3() {
         <div className="v3-nav-actions">
           <a href="#funciones">Funciones</a>
           <button className="v3-nav-link" onClick={() => navigate('/capacidades')}>Capacidades</button>
+          <button className="v3-nav-link" onClick={() => navigate('/conceptos-audio')}>Conceptos</button>
           <a href="#planes">Planes</a>
           <button className="v3-nav-login" onClick={() => navigate('/auth/login')}>Ingresar</button>
           <button className="v3-button v3-button-small" onClick={() => begin('master')}>Probar gratis</button>
@@ -98,7 +99,12 @@ export default function HomeHeroV3() {
 
         <div className="v3-function-strip" aria-label="Las tres funciones de MixingMusic">
           {coreFunctions.map((item) => (
-            <div key={item.number}><span>{item.number}</span><strong>{item.title}</strong><small>{item.text}</small></div>
+            <div key={item.number} style={{ '--function-color': item.preset.color } as React.CSSProperties}>
+              <div className="v3-function-wave" aria-hidden="true">
+                {item.preset.wavePattern.slice(0, 12).map((height, index) => <i key={index} style={{ height: `${Math.max(16, height * 100)}%` }} />)}
+              </div>
+              <span>{item.number}</span><strong>{item.title}</strong><small>{item.text}</small>
+            </div>
           ))}
         </div>
 
@@ -238,7 +244,7 @@ export default function HomeHeroV3() {
           <h2>Todo lo que necesitas, desde los stems hasta el álbum.</h2>
           <p>Consulta en una sola vista qué puedes hacer gratis y qué desbloqueas con Unlimited.</p>
         </div>
-        <button className="v3-button v3-button-outline" onClick={() => navigate('/capacidades')}>Ver todas las capacidades <span>→</span></button>
+        <button className="v3-button v3-button-outline" onClick={() => navigate('/capacidades')}>Ver Funciones MixingMusic <span>→</span></button>
       </section>
 
       <section className="v3-section v3-why">

@@ -10,6 +10,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import MasteringPage from '../../mastering/page';
 import { encodeWav24 } from '../../mastering/wav24';
 import './dashboard-v3.css';
+import { recommendPresetFromFiles } from './presetRecommendation';
 
 interface User {
   id: string; firstName: string; lastName: string; email: string;
@@ -34,6 +35,7 @@ export default function ProjectDashboard() {
   const [selectedProject, setSelectedProject] = useState<string|null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<MixPreset>(PRESETS[0]);
+  const [recommendedPresetId, setRecommendedPresetId] = useState('pop');
   const [reverbOn, setReverbOn] = useState(false);
   const [delayOn, setDelayOn] = useState(false);
   const [stereoOn, setStereoOn] = useState(false);
@@ -67,6 +69,7 @@ export default function ProjectDashboard() {
     setProjects(prev => [proj,...prev]);
     setSelectedProject(proj.id);
     setUploadedFiles(files);
+    setRecommendedPresetId(recommendPresetFromFiles(files).preset.id);
     setCurrentScreen('preset'); // ← va a presets primero
   };
 
@@ -112,7 +115,7 @@ export default function ProjectDashboard() {
 
   // PANTALLA: Presets — NUEVA
   if (currentScreen === 'preset' && user)
-    return <PresetScreen user={user} stemCount={uploadedFiles.length} onBack={() => setCurrentScreen('newProject')} onConfirm={handlePresetConfirm} />;
+    return <PresetScreen user={user} stemCount={uploadedFiles.length} recommendedPresetId={recommendedPresetId} onBack={() => setCurrentScreen('newProject')} onConfirm={handlePresetConfirm} />;
 
   // PANTALLA: Mezclador
   if (currentScreen === 'mixer' && selectedProject && user)
@@ -129,7 +132,7 @@ export default function ProjectDashboard() {
   };
 
   return (
-    <div style={S.page}>
+    <div className="studio-v3-page" style={S.page}>
       <Header user={user} onLogout={handleLogout} onCreditsUpdate={handleCreditsUpdate} />
       <div className="dash-v3-shell">
         {!user ? (

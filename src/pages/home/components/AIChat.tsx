@@ -175,7 +175,7 @@ export default function AIChat({ user, onStartMixer, onStartMastering }: AIChatP
   );
 
   return (
-    <div style={S.page}>
+    <div className="studio-v3-page" style={S.page}>
       {/* Ondas de audio sobre el fondo */}
       {[300,550,800].map((s,i)=>(
         <div key={i} style={{position:'fixed',width:`${s}px`,height:`${s}px`,top:'40%',left:'50%',borderRadius:'50%',border:'1px solid rgba(192,38,211,0.05)',animation:'expand 8s infinite',animationDelay:`${i*2.5}s`,transform:'translate(-50%,-50%)',pointerEvents:'none',zIndex:0}}></div>

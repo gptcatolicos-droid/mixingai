@@ -864,35 +864,23 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
   /* ════ LOADING SCREEN ════ */
   if(isLoading) return(
-    <div style={{minHeight:'100vh',background:'transparent',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'24px',fontFamily:'Inter,system-ui,sans-serif'}}>
-      <div style={{fontSize:'48px'}}>🎛️</div>
-      <div style={{textAlign:'center'}}>
-        <h2 style={{fontSize:'18px',fontWeight:600,color:'var(--text-primary)',marginBottom:'8px'}}>{loadingStep}</h2>
-        <p style={{fontSize:'13px',color:'var(--text-muted)',marginBottom:'24px'}}>{allFiles.length} stems cargando...</p>
-        <div style={{width:'280px',height:'4px',background:'var(--panel-2)',borderRadius:'2px',overflow:'hidden'}}>
-          <div style={{height:'100%',width:`${loadingProgress}%`,background:'var(--accent-grad)',borderRadius:'2px',transition:'width 0.3s'}}/>
-        </div>
-        <p style={{fontSize:'12px',color:'var(--text-dim)',marginTop:'8px'}}>{loadingProgress}%</p>
-      </div>
+    <div className="studio-v3-page v3-process-screen">
+      <div className="v3-process-orbit"><i /><b>{loadingProgress}%</b></div>
+      <span>PREPARANDO MEZCLA</span>
+      <h1>{loadingStep}</h1>
+      <p>Analizamos y alineamos {allFiles.length} stems antes de abrir tu sesión.</p>
+      <div className="v3-process-line"><i style={{width:`${Math.max(12,loadingProgress)}%`,animation:'none'}} /></div>
     </div>
   );
 
   /* ════ EXPORT OVERLAY ════ */
   if(isExporting) return(
-    <div style={{minHeight:'100vh',background:'transparent',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'24px',fontFamily:'Inter,system-ui,sans-serif'}}>
-      <div style={{fontSize:'48px'}}>🎚️</div>
-      <div style={{textAlign:'center',maxWidth:'360px'}}>
-        <h2 style={{fontSize:'18px',fontWeight:600,color:'var(--text-primary)',marginBottom:'8px'}}>{exportStep}</h2>
-        <div style={{width:'320px',height:'6px',background:'var(--panel-2)',borderRadius:'3px',overflow:'hidden',margin:'0 auto 8px'}}>
-          <div style={{height:'100%',width:`${exportProgress}%`,background:'var(--accent-grad)',borderRadius:'3px',transition:'width 0.4s'}}/>
-        </div>
-        <p style={{fontSize:'12px',color:'var(--text-muted)'}}>{exportProgress}% · WAV 24-bit · -16 LUFS</p>
-        <div style={{marginTop:'16px',display:'flex',justifyContent:'center',gap:'8px'}}>
-          {['IA EQ','Compresión','Limiter','-16 LUFS'].map((step,i)=>(
-            <span key={step} style={{padding:'4px 10px',borderRadius:'20px',fontSize:'11px',background:exportProgress>i*25?'rgba(217,70,239,0.2)':'var(--panel-1)',color:exportProgress>i*25?'var(--accent)':'var(--text-muted)',border:`1px solid ${exportProgress>i*25?'rgba(217,70,239,0.4)':'var(--border)'}`}}>{step}</span>
-          ))}
-        </div>
-      </div>
+    <div className="studio-v3-page v3-process-screen">
+      <div className="v3-process-orbit"><i /><b>{exportProgress}%</b></div>
+      <span>GENERANDO MEZCLA</span>
+      <h1>{exportStep}</h1>
+      <p>Aplicamos el preset elegido y preparamos el archivo que pasará directamente a mastering.</p>
+      <div className="v3-process-line"><i style={{width:`${Math.max(12,exportProgress)}%`,animation:'none'}} /></div>
     </div>
   );
 
@@ -900,7 +888,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
   /* ════ MAIN RENDER ════ */
   return (
-    <div style={{minHeight:'100vh',fontFamily:'Inter,-apple-system,system-ui,sans-serif',background:'transparent',color:'var(--text-primary)'}}>
+    <div className="studio-v3-page" style={{minHeight:'100vh',fontFamily:'Inter,-apple-system,system-ui,sans-serif',background:'transparent',color:'var(--text-primary)'}}>
       {showPaywall && <PaywallModal onClose={()=>setShowPaywall(false)} onSuccess={()=>setShowPaywall(false)}/>}
       {showUploadModal && <UploadModal onClose={()=>setShowUploadModal(false)} onUpload={handleUploadMoreStems}/>}
 

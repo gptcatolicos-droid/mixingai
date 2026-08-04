@@ -68,15 +68,17 @@ export default function NewProjectScreen({ user, onBack, onUploadComplete, hasUn
     const completed = files.filter(f => f.status==='complete').map(f => f.file);
     if (!completed.length) { setError('Espera a que terminen de cargar los archivos'); return; }
     setIsTransitioning(true);
-    setTimeout(() => onUploadComplete(completed), 400);
+    setTimeout(() => onUploadComplete(completed), 900);
   };
 
   const completed = files.filter(f => f.status==='complete').length;
   const uploading = files.filter(f => f.status==='uploading').length;
   const canProceed = completed > 0 && uploading === 0;
 
+  if (isTransitioning) return <div className="studio-v3-page v3-process-screen"><div className="v3-process-orbit"><i /><b>IA</b></div><span>ANALIZANDO STEMS</span><h1>Reconociendo tu sesión</h1><p>Revisamos instrumentos, voces y nombres de pista para recomendar el mejor preset.</p><div className="v3-process-line"><i /></div></div>;
+
   return (
-    <div style={S.page}>
+    <div className="studio-v3-page" style={S.page}>
       <Header user={user} onLogout={() => {}} onCreditsUpdate={() => {}} />
 
       <div className="np-v3-shell">
