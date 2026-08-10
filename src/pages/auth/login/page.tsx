@@ -43,7 +43,7 @@ const LoginPage: React.FC = () => {
       id, email,
       firstName: meta.first_name || email.split('@')[0],
       lastName: meta.last_name || '',
-      country: meta.country || 'Colombia',
+      country: meta.country || 'Colombia', preferred_locale: meta.preferred_locale || localStorage.getItem('mixingmusic_locale') || 'es',
       credits: isPro ? 999999 : 0,
       plan: isPro ? 'unlimited' : (meta.plan || 'free'),
       is_pro: isPro || meta.is_pro || false,
