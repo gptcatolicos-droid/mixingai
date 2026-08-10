@@ -5,13 +5,6 @@ import { blogArticles } from '../../mocks/blogArticles';
 import { pressMentions } from '../../content/pressMentions';
 import './press-blog.css';
 
-// Función para obtener últimos artículos del blog  
-const getLatestBlogArticles = () => {
-  return [...blogArticles]
-    .sort((a, b) => new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime())
-    .slice(0, 6); // Top 6 más recientes
-};
-
 const BlogPage: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'es'>('es');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -300,73 +293,6 @@ const BlogPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Footer con Últimos Artículos */}
-      <footer className="bg-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-          <div className="grid md:grid-cols-4 gap-6 sm:gap-8">
-            <div className="md:col-span-2">
-              <div className="flex items-center space-x-3 mb-4">
-                <img 
-                  src="https://static.readdy.ai/image/b1eac48ec385ead8debde409294ee615/609f268732409aa5f9e36b8cf47e9d62.png" 
-                  alt="MixingMusic.ai" 
-                  className="object-contain w-24 sm:w-32 h-5 sm:h-7"
-                />
-                <h3 className="text-lg font-medium text-white">
-                  mixingmusic.ai
-                </h3>
-              </div>
-              <p className="text-slate-400 mb-4 text-sm sm:text-base">
-                {selectedLanguage === 'en'
-                  ? 'The most advanced AI platform for professional music mixing and production.'
-                  : 'La plataforma de IA más avanzada para mezcla y producción musical profesional.'}
-              </p>
-            </div>
-            
-            {/* Últimos Artículos del Blog en Footer */}
-            <div>
-              <h4 className="font-semibold mb-4">
-                {selectedLanguage === 'en' ? 'Latest Articles' : 'Últimos Artículos'}
-              </h4>
-              <ul className="space-y-2 text-slate-400">
-                {getLatestBlogArticles().slice(0, 5).map((article) => (
-                  <li key={article.id}>
-                    <Link 
-                      to={`/blog/${article.slug}?lang=${selectedLanguage}`}
-                      className="hover:text-white transition-colors text-sm leading-relaxed line-clamp-2"
-                    >
-                      {selectedLanguage === 'es' ? article.titleEs : article.title}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold mb-4">
-                {selectedLanguage === 'en' ? 'Quick Links' : 'Enlaces Rápidos'}
-              </h4>
-              <ul className="space-y-2 text-slate-400">
-                <li><Link to="/" className="hover:text-white transition-colors text-sm">
-                  {selectedLanguage === 'en' ? 'Home' : 'Inicio'}
-                </Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors text-sm">
-                  {selectedLanguage === 'en' ? 'Pricing' : 'Precios'}
-                </Link></li>
-                <li><Link to="/auth/register" className="hover:text-white transition-colors text-sm">
-                  {selectedLanguage === 'en' ? 'Create Free Account' : 'Crear Cuenta Gratis'}
-                </Link></li>
-                <li><a href="https://readdy.ai/?origin=logo" className="hover:text-white transition-colors text-sm">
-                  Made with Readdy
-                </a></li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t border-slate-800 pt-6 sm:pt-8 mt-6 sm:mt-8 text-center text-slate-400">
-            <p className="text-sm">&copy; 2024 MixingMusic.ai. {selectedLanguage === 'en' ? 'All rights reserved.' : 'Todos los derechos reservados.'}</p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
