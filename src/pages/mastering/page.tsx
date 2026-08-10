@@ -69,7 +69,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
   const [selectedPreset, setSelectedPreset] = useState<MixPreset>(PRESETS[0]);
   const [presetRecommendation, setPresetRecommendation] = useState<PresetRecommendation | null>(null);
   const [strength, setStrength] = useState(50);
-  const [loudness, setLoudness] = useState<LoudnessProfile>('balanced');
+  const [loudness, setLoudness] = useState<LoudnessProfile>('streaming');
   const [stereo, setStereo] = useState(25);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processingLabel, setProcessingLabel] = useState('Preparando motor');
@@ -286,7 +286,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     if (!file || !analysis) return;
     setError('');
     setProcessingProgress(4);
-    setProcessingLabel('Preparando motor');
+    setProcessingLabel('Masterizando mezcla con IA');
     setStage('processing');
     try {
       const result = await createMaster(
@@ -295,7 +295,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
         { preset: selectedPreset, strength, stereo, loudness },
         (progress, label) => {
           setProcessingProgress(progress);
-          setProcessingLabel(label);
+          setProcessingLabel(`Masterizando mezcla con IA · ${label}`);
         },
       );
       if (masterUrl) URL.revokeObjectURL(masterUrl);
@@ -464,7 +464,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
       const recommendation = recommendPresetFromAnalysis(candidate, result);
       setPresetRecommendation(recommendation);
       setSelectedPreset(recommendation.preset);
-      setStereo(Math.round(recommendation.preset.stereoWidth * 50));
+      setStereo(result.isDualMono ? 0 : Math.round(recommendation.preset.stereoWidth * 50));
       setStage('configure');
     } catch (analysisError) {
       setError(analysisError instanceof Error ? analysisError.message : 'No pudimos analizar el archivo.');
@@ -486,7 +486,9 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     ? { tone: 'danger', title: 'La mezcla presenta clipping', text: 'Podemos trabajar con ella, pero el resultado será mejor si exportas el premaster sin limitador.' }
     : analysis && analysis.headroomDb < 1
       ? { tone: 'warning', title: 'La mezcla tiene poco headroom', text: 'El procesamiento será conservador para evitar distorsión adicional.' }
-      : { tone: 'good', title: 'Archivo listo para mastering', text: 'La mezcla es estéreo y conserva margen suficiente para continuar.' };
+      : analysis?.isDualMono
+        ? { tone: 'warning', title: 'Mezcla dual-mono detectada', text: 'Preservaremos su imagen mono y no aplicaremos amplitud artificial.' }
+        : { tone: 'good', title: 'Archivo listo para mastering', text: 'La mezcla es estéreo y conserva margen suficiente para continuar.' };
 
   return (
     <main className="master-page">
@@ -542,8 +544,9 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
               {stage === 'analyzing' ? (
                 <>
                   <div className="master-spinner" />
-                  <h2>Analizando {file?.name}</h2>
-                  <p>Estamos leyendo canales, resolución, nivel y margen dinámico.</p>
+                  <span className="master-kicker">IA DE ANÁLISIS</span>
+                  <h2>Analizando mezcla con IA</h2>
+                  <p>Leemos canales, resolución, loudness, dinámica, fase y margen de entrega.</p>
                   <div className="master-analysis-line"><span /></div>
                 </>
               ) : (
@@ -591,7 +594,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
 
             <div className="master-metrics">
               <Metric label="Resolución" value={analysis.bitDepth ? `${analysis.bitDepth}-bit` : 'No detectada'} note={`${(analysis.sampleRate / 1000).toFixed(1)} kHz`} />
-              <Metric label="Canales" value="Estéreo" note="2 canales" />
+              <Metric label="Imagen estéreo" value={analysis.isDualMono ? "Dual-mono" : "Estéreo"} note={analysis.stereoCorrelation === null ? "Sin lectura de fase" : `Correlación ${analysis.stereoCorrelation.toFixed(2)}`} />
               <Metric label="Pico máximo" value={`${analysis.peakDbfs.toFixed(1)} dBFS`} note={`${analysis.headroomDb.toFixed(1)} dB de margen`} />
               <Metric label="Loudness integrado" value={`${analysis.integratedLufs.toFixed(1)} LUFS`} note={`ITU-R BS.1770 · promedio ${analysis.averageDbfs.toFixed(1)} dBFS`} />
             </div>
@@ -654,7 +657,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                 </div>
                 <div className="master-control">
                   <div><strong>Amplitud estéreo</strong><span>{stereo}%</span></div>
-                  <input type="range" min="0" max="60" value={stereo} onChange={(event) => setStereo(Number(event.target.value))} />
+                  <input type="range" min="0" max="60" value={stereo} disabled={analysis.isDualMono} onChange={(event) => setStereo(Number(event.target.value))} />
                   <small>Original</small><small>Amplia</small>
                 </div>
                 <div className="master-loudness">
@@ -662,12 +665,12 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                   <div>
                     {(['streaming', 'balanced', 'competitive'] as const).map((option) => (
                       <button className={loudness === option ? 'selected' : ''} key={option} onClick={() => setLoudness(option)}>
-                        {option === 'streaming' ? 'Streaming' : option === 'balanced' ? 'Balanceado' : 'Competitivo'}
+                        {option === 'streaming' ? 'Streaming' : option === 'balanced' ? 'Dinámico' : 'Competitivo'}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className="master-safe"><i>✓</i><span><strong>Protección de pico digital</strong>El master inicial no superará −1.2 dBFS. La medición True Peak se validará por separado.</span></div>
+                <div className="master-safe"><i>✓</i><span><strong>Protección de pico digital</strong>Medimos LUFS integrados y True Peak. Streaming/Dinámico protegen a −1 dBTP; Competitivo a −2 dBTP.</span></div>
                 <button className="master-continue" onClick={processMaster}>MASTERIZAR CON IA <span>→</span></button>
               </div>
             </div>
@@ -678,12 +681,12 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
         {stage === 'processing' && (
           <section className="master-processing">
             <div className="master-processing-orbit"><i /><b>{Math.round(processingProgress)}%</b></div>
-            <span className="master-kicker">MOTOR V3</span>
+            <span className="master-kicker">MOTOR DE MASTERING CON IA</span>
             <h1>{processingLabel}</h1>
             <p>Procesamos una copia de tu mezcla. El archivo original permanece intacto.</p>
             <div className="master-processing-bar"><span style={{ width: `${processingProgress}%` }} /></div>
             <div className="master-chain">
-              {['Análisis', 'EQ tonal', 'Dinámica', 'Estéreo', 'Pico', 'Exportación'].map((item, index) => (
+              {['Análisis IA', 'EQ tonal', 'Dinámica', 'Estéreo', 'True Peak', 'Exportación'].map((item, index) => (
                 <div className={processingProgress >= (index + 1) * 15 ? 'done' : ''} key={item}><i>{processingProgress >= (index + 1) * 15 ? '✓' : index + 1}</i><span>{item}</span></div>
               ))}
             </div>
@@ -695,7 +698,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
             <div className="master-compare-heading">
               <span className="master-kicker">MASTER GENERADO</span>
               <h1>Escucha el resultado.</h1>
-              <p>Preset {selectedPreset.name} · Intensidad {strength}% · {loudness === 'streaming' ? 'Streaming' : loudness === 'balanced' ? 'Balanceado' : 'Competitivo'}</p>
+              <p>Preset {selectedPreset.name} · Intensidad {strength}% · {loudness === 'streaming' ? 'Streaming' : loudness === 'balanced' ? 'Dinámico' : 'Competitivo'}</p>
               <label className="master-volume-match">
                 <input type="checkbox" checked={volumeMatched} onChange={(event) => setVolumeMatched(event.target.checked)} />
                 <span><strong>Comparar con volumen igualado</strong><small>Evita confundir “más fuerte” con “mejor”.</small></span>
@@ -737,14 +740,14 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                 <canvas ref={liveMeterCanvasRef} width="78" height="150" aria-label="Medidor VU en tiempo real" />
                 <div><strong>{liveMomentary.toFixed(1)}</strong><span>LUFS momentáneos</span><small>Nivel actual · cambia con la música</small></div>
                 <div><strong>{liveIntegrated.toFixed(1)}</strong><span>Promedio parcial</span><small>Desde que diste play</small></div>
-                <div><strong>{masterResult.peakDbfs.toFixed(1)}</strong><span>dBFS pico</span><small>Techo {masterResult.samplePeakCeilingDbfs.toFixed(1)} dBFS</small></div>
+                <div><strong>{masterResult.truePeakDbtp.toFixed(1)}</strong><span>dBTP True Peak</span><small>{masterResult.deliveryStatus === "ready" ? "Validado para distribución" : "Revisar objetivo de loudness"}</small></div>
               </div>
               <p className="master-live-explanation">La lectura en vivo cambia segundo a segundo. <strong>{masterResult.integratedLufs.toFixed(1)} LUFS</strong> es el promedio certificado del archivo completo.</p>
             </div>
             <div className="master-result-metrics">
               <Metric label="Preset" value={selectedPreset.name} note={`${strength}% de intensidad`} />
               <Metric label="Ganancia aplicada" value={`${masterResult.appliedGainDb >= 0 ? '+' : ''}${masterResult.appliedGainDb.toFixed(1)} dB`} note="Antes del control final" />
-              <Metric label="Pico de muestra" value={`${masterResult.peakDbfs.toFixed(1)} dBFS`} note={`Techo ${masterResult.samplePeakCeilingDbfs.toFixed(1)} dBFS`} />
+              <Metric label="True Peak" value={`${masterResult.truePeakDbtp.toFixed(1)} dBTP`} note={masterResult.deliveryStatus === "ready" ? "Listo para distribución" : "Revisar antes de publicar"} />
               <Metric label="LUFS final de la canción" value={`${masterResult.integratedLufs.toFixed(1)} LUFS`} note={`Archivo completo · ITU-R BS.1770 · ${(analysis!.sampleRate / 1000).toFixed(1)} kHz`} />
             </div>
             <div className="master-compare-actions">

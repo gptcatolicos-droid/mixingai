@@ -11,6 +11,8 @@ export interface MasteringConfiguration {
   strength: number;
   stereo: number;
   loudness: LoudnessProfile;
+  /** Used by Album Mode to preserve intentional level differences between songs. */
+  targetLufsOverride?: number;
 }
 
 export interface MasteringResult {
@@ -18,11 +20,13 @@ export interface MasteringResult {
   wav24: Blob;
   mp3: Blob;
   peakDbfs: number;
+  truePeakDbtp: number;
   averageDbfs: number;
   integratedLufs: number;
   loudnessMatchGainDb: number;
   appliedGainDb: number;
   samplePeakCeilingDbfs: number;
+  deliveryStatus: 'ready' | 'review';
 }
 
 const compressionSettings: Record<MixPreset['compression'], { threshold: number; ratio: number }> = {
@@ -40,8 +44,9 @@ const targetAverageDbfs: Record<LoudnessProfile, number> = {
 };
 
 const targetIntegratedLufs: Record<LoudnessProfile, number> = {
-  streaming: -16,
-  balanced: -14,
+  // Streaming is aligned with Spotify normal playback; Dynamic preserves more space.
+  streaming: -14,
+  balanced: -16,
   competitive: -11,
 };
 
@@ -109,6 +114,35 @@ function enforceSamplePeakCeiling(buffer: AudioBuffer, ceilingDbfs: number) {
 
   const rms = sampleCount ? Math.sqrt(sumSquares / sampleCount) * correction : 0;
   return { peakDbfs: gainToDb(peak), averageDbfs: gainToDb(rms) };
+}
+
+async function measureTruePeakDbtp(buffer: AudioBuffer) {
+  const oversample = 4;
+  const context = new OfflineAudioContext(Math.min(buffer.numberOfChannels, 2), Math.ceil(buffer.length * oversample), buffer.sampleRate * oversample);
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  source.connect(context.destination);
+  source.start();
+  const rendered = await context.startRendering();
+  let peak = 0;
+  for (let channelIndex = 0; channelIndex < rendered.numberOfChannels; channelIndex += 1) {
+    const data = rendered.getChannelData(channelIndex);
+    for (let sampleIndex = 0; sampleIndex < data.length; sampleIndex += 1) peak = Math.max(peak, Math.abs(data[sampleIndex]));
+  }
+  return gainToDb(peak);
+}
+
+async function enforceTruePeakCeiling(buffer: AudioBuffer, ceilingDbtp: number) {
+  const measuredDbtp = await measureTruePeakDbtp(buffer);
+  const correctionDb = measuredDbtp > ceilingDbtp ? ceilingDbtp - measuredDbtp : 0;
+  if (correctionDb < 0) {
+    const gain = dbToGain(correctionDb);
+    for (let channelIndex = 0; channelIndex < buffer.numberOfChannels; channelIndex += 1) {
+      const data = buffer.getChannelData(channelIndex);
+      for (let sampleIndex = 0; sampleIndex < data.length; sampleIndex += 1) data[sampleIndex] *= gain;
+    }
+  }
+  return { truePeakDbtp: correctionDb < 0 ? ceilingDbtp : measuredDbtp };
 }
 
 async function renderLoudnessCorrection(buffer: AudioBuffer, gainDb: number) {
@@ -210,7 +244,7 @@ export async function createMaster(
   let integratedLufs = await measureIntegratedLufs(rendered, (progress) => {
     onProgress?.(86 + progress * 5, 'Midiendo loudness integrado');
   });
-  const targetLufs = targetIntegratedLufs[configuration.loudness];
+  const targetLufs = configuration.targetLufsOverride ?? targetIntegratedLufs[configuration.loudness];
   let loudnessCorrectionDb = 0;
   for (let pass = 0; pass < 3 && Math.abs(targetLufs - integratedLufs) > .25; pass += 1) {
     const correction = clamp(targetLufs - integratedLufs, -5, 5);
@@ -219,8 +253,12 @@ export async function createMaster(
     rendered = await renderLoudnessCorrection(rendered, correction);
     integratedLufs = await measureIntegratedLufs(rendered);
   }
+  onProgress?.(92, 'Validando True Peak y entrega');
+  const truePeakCeiling = configuration.loudness === 'competitive' ? -2 : -1;
+  const truePeak = await enforceTruePeakCeiling(rendered, truePeakCeiling);
+  integratedLufs = await measureIntegratedLufs(rendered);
   const outputLevels = enforceSamplePeakCeiling(rendered, -1.2);
-  onProgress?.(92, 'Generando WAV de 24 bits');
+  onProgress?.(93, 'Generando WAV de 24 bits');
   const wav24 = encodeWav24(rendered, true);
   onProgress?.(94, 'Generando MP3 de 320 kbps');
   const mp3 = await encodeMp3(wav24, (progress) => {
@@ -233,10 +271,12 @@ export async function createMaster(
     wav24,
     mp3,
     peakDbfs: outputLevels.peakDbfs,
+    truePeakDbtp: truePeak.truePeakDbtp,
     averageDbfs: outputLevels.averageDbfs,
     integratedLufs,
     loudnessMatchGainDb: clamp(analysis.integratedLufs - integratedLufs, -18, 18),
     appliedGainDb: appliedGainDb + loudnessCorrectionDb,
     samplePeakCeilingDbfs: -1.2,
+    deliveryStatus: integratedLufs <= targetLufs + .5 && integratedLufs >= targetLufs - .75 && truePeak.truePeakDbtp <= truePeakCeiling + .05 ? 'ready' : 'review',
   };
 }

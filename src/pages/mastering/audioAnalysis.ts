@@ -13,6 +13,8 @@ export interface AudioFileAnalysis {
   headroomDb: number;
   crestFactorDb: number;
   isClipping: boolean;
+  stereoCorrelation: number | null;
+  isDualMono: boolean;
 }
 
 const readAscii = (view: DataView, offset: number, length: number) => {
@@ -88,6 +90,20 @@ export async function analyzeAudioFile(file: File): Promise<AudioFileAnalysis> {
     const peakDbfs = toDb(peak);
     const averageDbfs = toDb(rms);
     const integratedLufs = await measureIntegratedLufs(decoded);
+    let stereoCorrelation: number | null = null;
+    if (decoded.numberOfChannels >= 2) {
+      const left = decoded.getChannelData(0);
+      const right = decoded.getChannelData(1);
+      let leftEnergy = 0;
+      let rightEnergy = 0;
+      let crossEnergy = 0;
+      for (let index = 0; index < decoded.length; index += stride) {
+        leftEnergy += left[index] * left[index];
+        rightEnergy += right[index] * right[index];
+        crossEnergy += left[index] * right[index];
+      }
+      stereoCorrelation = leftEnergy && rightEnergy ? crossEnergy / Math.sqrt(leftEnergy * rightEnergy) : 1;
+    }
 
     return {
       name: file.name,
@@ -102,6 +118,8 @@ export async function analyzeAudioFile(file: File): Promise<AudioFileAnalysis> {
       headroomDb: Math.max(0, -peakDbfs),
       crestFactorDb: Math.max(0, peakDbfs - averageDbfs),
       isClipping: peak >= 0.999,
+      stereoCorrelation,
+      isDualMono: stereoCorrelation !== null && stereoCorrelation > .995,
     };
   } catch {
     throw new Error('No pudimos leer este audio. Prueba con un WAV o AIFF estéreo sin protección.');
