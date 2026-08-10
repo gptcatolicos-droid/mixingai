@@ -27,6 +27,7 @@ export interface MasteringResult {
   appliedGainDb: number;
   samplePeakCeilingDbfs: number;
   deliveryStatus: 'ready' | 'review';
+  noiseProtectionApplied: boolean;
 }
 
 const compressionSettings: Record<MixPreset['compression'], { threshold: number; ratio: number }> = {
@@ -213,7 +214,10 @@ export async function createMaster(
   compressor.release.value = configuration.preset.id === 'clasica' ? 0.28 : 0.16;
 
   const makeup = offline.createGain();
-  const requestedGainDb = clamp(targetAverageDbfs[configuration.loudness] - analysis.averageDbfs, -4, 9);
+  // A loud premaster noise floor must never be raised aggressively just to hit a LUFS target.
+  const noiseProtectionApplied = analysis.noiseFloorDbfs > -55;
+  const maximumMakeupGainDb = noiseProtectionApplied ? 3 : 9;
+  const requestedGainDb = clamp(targetAverageDbfs[configuration.loudness] - analysis.averageDbfs, -4, maximumMakeupGainDb);
   const appliedGainDb = requestedGainDb * (0.35 + scale * 0.65);
   makeup.gain.value = dbToGain(appliedGainDb);
 
@@ -246,8 +250,11 @@ export async function createMaster(
   });
   const targetLufs = configuration.targetLufsOverride ?? targetIntegratedLufs[configuration.loudness];
   let loudnessCorrectionDb = 0;
+  const maximumLoudnessBoostDb = noiseProtectionApplied ? 3 : 8;
   for (let pass = 0; pass < 3 && Math.abs(targetLufs - integratedLufs) > .25; pass += 1) {
-    const correction = clamp(targetLufs - integratedLufs, -5, 5);
+    const availableBoostDb = Math.max(0, maximumLoudnessBoostDb - Math.max(0, loudnessCorrectionDb));
+    const correction = clamp(targetLufs - integratedLufs, -5, availableBoostDb);
+    if (Math.abs(correction) < .05) break;
     loudnessCorrectionDb += correction;
     onProgress?.(90 + pass, `Ajustando loudness a ${targetLufs} LUFS`);
     rendered = await renderLoudnessCorrection(rendered, correction);
@@ -278,5 +285,6 @@ export async function createMaster(
     appliedGainDb: appliedGainDb + loudnessCorrectionDb,
     samplePeakCeilingDbfs: -1.2,
     deliveryStatus: integratedLufs <= targetLufs + .5 && integratedLufs >= targetLufs - .75 && truePeak.truePeakDbtp <= truePeakCeiling + .05 ? 'ready' : 'review',
+    noiseProtectionApplied,
   };
 }
