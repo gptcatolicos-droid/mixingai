@@ -1,5 +1,6 @@
 
 import { seoArticles } from './seoArticles';
+import { masteringStandardsArticles } from './masteringStandardsArticles';
 
 export interface BlogArticle {
   id: string;
@@ -2278,6 +2279,7 @@ Las interfaces Focusrite siguen siendo la elección inteligente para home studio
       es: ['configuración interfaz Focusrite', 'grabación home studio', 'configuración Scarlett', 'guía interfaz audio', 'grabación profesional', 'optimización Focusrite']
     }
   },
-  ...seoArticles
+  ...seoArticles,
+  ...masteringStandardsArticles,
   // Se pueden agregar más artículos aquí...
 ];
