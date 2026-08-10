@@ -38,12 +38,6 @@ const compressionSettings: Record<MixPreset['compression'], { threshold: number;
   max: { threshold: -29, ratio: 3.5 },
 };
 
-const targetAverageDbfs: Record<LoudnessProfile, number> = {
-  streaming: -18,
-  balanced: -15,
-  competitive: -12.5,
-};
-
 const targetIntegratedLufs: Record<LoudnessProfile, number> = {
   // Streaming is aligned with Spotify normal playback; Dynamic preserves more space.
   streaming: -14,
@@ -192,6 +186,8 @@ export async function createMaster(
   lowShelf.type = 'lowshelf';
   lowShelf.frequency.value = 115;
   const scale = clamp(configuration.strength / 100, 0, 1);
+  // Every input is leveled from its gated programme loudness, not its file-wide RMS.
+  const targetLufs = configuration.targetLufsOverride ?? targetIntegratedLufs[configuration.loudness];
   lowShelf.gain.value = clamp(configuration.preset.bass * 0.28 * scale, -1.5, 1.8);
 
   const midBell = offline.createBiquadFilter();
@@ -214,10 +210,10 @@ export async function createMaster(
   compressor.release.value = configuration.preset.id === 'clasica' ? 0.28 : 0.16;
 
   const makeup = offline.createGain();
-  // A loud premaster noise floor must never be raised aggressively just to hit a LUFS target.
+  // Noise analysis remains advisory: it must not prevent a quiet, clean mix from
+  // reaching the delivery target. True Peak limiting protects the final output.
   const noiseProtectionApplied = analysis.noiseFloorDbfs > -55;
-  const maximumMakeupGainDb = noiseProtectionApplied ? 3 : 9;
-  const requestedGainDb = clamp(targetAverageDbfs[configuration.loudness] - analysis.averageDbfs, -4, maximumMakeupGainDb);
+  const requestedGainDb = targetLufs - analysis.integratedLufs;
   const appliedGainDb = requestedGainDb * (0.35 + scale * 0.65);
   makeup.gain.value = dbToGain(appliedGainDb);
 
@@ -248,13 +244,11 @@ export async function createMaster(
   let integratedLufs = await measureIntegratedLufs(rendered, (progress) => {
     onProgress?.(86 + progress * 5, 'Midiendo loudness integrado');
   });
-  const targetLufs = configuration.targetLufsOverride ?? targetIntegratedLufs[configuration.loudness];
   let loudnessCorrectionDb = 0;
-  const maximumLoudnessBoostDb = noiseProtectionApplied ? 3 : 8;
   for (let pass = 0; pass < 3 && Math.abs(targetLufs - integratedLufs) > .25; pass += 1) {
-    const availableBoostDb = Math.max(0, maximumLoudnessBoostDb - Math.max(0, loudnessCorrectionDb));
-    const correction = clamp(targetLufs - integratedLufs, -5, availableBoostDb);
-    if (Math.abs(correction) < .05) break;
+    // The correction is based on the rendered, gated programme loudness, so a
+    // low-level or long file reaches its selected delivery target automatically.
+    const correction = clamp(targetLufs - integratedLufs, -24, 24);
     loudnessCorrectionDb += correction;
     onProgress?.(90 + pass, `Ajustando loudness a ${targetLufs} LUFS`);
     rendered = await renderLoudnessCorrection(rendered, correction);
