@@ -563,7 +563,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
 
             <div className="master-preflight">
               <div><i>✓</i><span><strong>Recomendado</strong>WAV/AIFF de 24 bits</span></div>
-              <div><i>✓</i><span><strong>Mejor resultado</strong>Sin limitador en el mix bus</span></div>
+              <div><i>✓</i><span><strong>Mejor resultado</strong>Sin limitador · pico máximo entre −12 y −9 dBFS</span></div>
               <div><i>✓</i><span><strong>Privacidad</strong>El original se conserva intacto</span></div>
             </div>
           </section>
