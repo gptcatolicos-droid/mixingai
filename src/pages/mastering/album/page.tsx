@@ -7,7 +7,7 @@ import type { AudioFileAnalysis } from '../audioAnalysis';
 import { getMasteringEntitlements, secureMasteringAccessEnabled } from '../masteringAccess';
 import { createMaster } from '../masteringEngine';
 import type { LoudnessProfile } from '../masteringEngine';
-import { buildAlbumArchive } from './albumArchive';
+import { buildAlbumArchive, streamAlbumArchive } from './albumArchive';
 import { downloadBlob } from '../../../utils/downloadFile';
 import '../mastering.css';
 import './album.css';
@@ -32,6 +32,21 @@ interface AlbumTrack {
 
 const acceptedExtensions = /\.(wav|wave|aif|aiff|mp3|flac|m4a)$/i;
 const maxFileSize = 600 * 1024 * 1024;
+
+interface BrowserFileWriter {
+  write(data: Uint8Array): Promise<void>;
+  close(): Promise<void>;
+  abort?(): Promise<void>;
+}
+
+interface BrowserSaveHandle {
+  createWritable(): Promise<BrowserFileWriter>;
+}
+
+type SaveFilePicker = (options: {
+  suggestedName: string;
+  types: Array<{ description: string; accept: Record<string, string[]> }>;
+}) => Promise<BrowserSaveHandle>;
 
 function getUser() {
   try { return JSON.parse(localStorage.getItem('audioMixerUser') || '{}'); }
@@ -225,13 +240,38 @@ export default function AlbumMasteringPage() {
     });
     if (!files.length || archiveFormat) return;
 
+    const fileName = `mixingmusic-album-masters-${format === 'wav' ? 'wav24' : 'mp3'}.zip`;
+    const saveFilePicker = (window as typeof window & { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
+    let writer: BrowserFileWriter | null = null;
+
+    // Ask for the destination while the click still counts as a user gesture.
+    // This avoids Chrome silently rejecting a very large in-memory blob later.
+    if (saveFilePicker) {
+      try {
+        const handle = await saveFilePicker({
+          suggestedName: fileName,
+          types: [{ description: 'Archivo ZIP', accept: { 'application/zip': ['.zip'] } }],
+        });
+        writer = await handle.createWritable();
+      } catch (pickerError) {
+        if (pickerError instanceof DOMException && pickerError.name === 'AbortError') return;
+        // Safari/Firefox and restricted browsers continue with the Blob fallback.
+      }
+    }
+
     setArchiveFormat(format);
     setArchiveProgress(0);
     setError('');
     try {
-      const archive = await buildAlbumArchive(files, setArchiveProgress);
-      downloadBlob(archive, `mixingmusic-album-masters-${format === 'wav' ? 'wav24' : 'mp3'}.zip`);
+      if (writer) {
+        await streamAlbumArchive(files, (chunk) => writer!.write(chunk), setArchiveProgress);
+        await writer.close();
+      } else {
+        const archive = await buildAlbumArchive(files, setArchiveProgress);
+        downloadBlob(archive, fileName);
+      }
     } catch (archiveError) {
+      await writer?.abort?.().catch(() => {});
       setError(archiveError instanceof Error ? archiveError.message : 'No se pudo crear el archivo ZIP.');
     } finally {
       setArchiveFormat(null);
