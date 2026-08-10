@@ -15,6 +15,7 @@ import {
 } from './masteringAccess';
 import { createMaster } from './masteringEngine';
 import type { LoudnessProfile, MasteringResult } from './masteringEngine';
+import { downloadBlob, downloadObjectUrl } from '../../utils/downloadFile';
 import './mastering.css';
 
 type Stage = 'upload' | 'analyzing' | 'configure' | 'processing' | 'compare' | 'complete';
@@ -314,28 +315,22 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
 
   const downloadGeneratedMix = () => {
     if (!audioUrl || !file) return;
-    const link = document.createElement('a');
-    link.href = audioUrl;
-    link.download = 'mezcla-v3-mixingmusic-24bit.wav';
-    link.click();
+    downloadObjectUrl(audioUrl, 'mezcla-v3-mixingmusic-24bit.wav');
   };
 
   const downloadWav = () => {
-    if (!masterUrl || !file) return;
+    if (!masterResult || !file) return;
     if (!isUnlimited) {
       setError('La descarga WAV de 24 bits pertenece al plan Unlimited. El plan Gratis podrá descargar este master en MP3.');
       return;
     }
-    const link = document.createElement('a');
-    link.href = masterUrl;
-    link.download = `${file.name.replace(/\.[^.]+$/, '')}-master-mixingmusic-24bit.wav`;
-    link.click();
+    downloadBlob(masterResult.wav24, `${file.name.replace(/\.[^.]+$/, '')}-master-mixingmusic-24bit.wav`);
     setDownloadedFormat('WAV 24-bit');
     setStage('complete');
   };
 
   const downloadMp3 = async () => {
-    if (!masterMp3Url || !file) return;
+    if (!masterResult || !file) return;
     if (!isUnlimited && !downloadGrantedForCurrentResult) {
       if (secureMasteringAccessEnabled) {
         try {
@@ -363,10 +358,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
       }
       setDownloadGrantedForCurrentResult(true);
     }
-    const link = document.createElement('a');
-    link.href = masterMp3Url;
-    link.download = `${file.name.replace(/\.[^.]+$/, '')}-master-mixingmusic-320kbps.mp3`;
-    link.click();
+    downloadBlob(masterResult.mp3, `${file.name.replace(/\.[^.]+$/, '')}-master-mixingmusic-320kbps.mp3`);
     setDownloadedFormat('MP3');
     setStage('complete');
   };
