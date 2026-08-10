@@ -8,6 +8,7 @@ import { getMasteringEntitlements, secureMasteringAccessEnabled } from '../maste
 import { createMaster } from '../masteringEngine';
 import type { LoudnessProfile } from '../masteringEngine';
 import { buildAlbumArchive } from './albumArchive';
+import { downloadBlob } from '../../../utils/downloadFile';
 import '../mastering.css';
 import './album.css';
 
@@ -21,8 +22,6 @@ interface AlbumTrack {
   status: TrackStatus;
   progress: number;
   label: string;
-  wavUrl?: string;
-  mp3Url?: string;
   wavBlob?: Blob;
   mp3Blob?: Blob;
   peakDbfs?: number;
@@ -42,11 +41,11 @@ function getUser() {
 export default function AlbumMasteringPage() {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
-  const tracksRef = useRef<AlbumTrack[]>([]);
   const [stage, setStage] = useState<AlbumStage>('upload');
   const [tracks, setTracks] = useState<AlbumTrack[]>([]);
   const [error, setError] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<MixPreset>(PRESETS[0]);
   const [strength, setStrength] = useState(50);
   const [stereo, setStereo] = useState(25);
@@ -81,17 +80,9 @@ export default function AlbumMasteringPage() {
     return () => { active = false; };
   }, []);
 
-  useEffect(() => { tracksRef.current = tracks; }, [tracks]);
-  useEffect(() => () => {
-    tracksRef.current.forEach((track) => {
-      if (track.wavUrl) URL.revokeObjectURL(track.wavUrl);
-      if (track.mp3Url) URL.revokeObjectURL(track.mp3Url);
-    });
-  }, []);
-
   const albumStats = useMemo(() => {
     if (!tracks.length) return null;
-    const average = tracks.reduce((total, track) => total + track.analysis.integratedLufs, 0) / tracks.length;
+    const average = tracks.reduce((total, track) => total + (track.integratedLufs ?? track.analysis.integratedLufs), 0) / tracks.length;
     const crest = tracks.reduce((total, track) => total + track.analysis.crestFactorDb, 0) / tracks.length;
     const duration = tracks.reduce((total, track) => total + track.analysis.durationSeconds, 0);
     return { average, crest, duration };
@@ -149,17 +140,11 @@ export default function AlbumMasteringPage() {
       return;
     }
     setError('');
-    tracks.forEach((track) => {
-      if (track.wavUrl) URL.revokeObjectURL(track.wavUrl);
-      if (track.mp3Url) URL.revokeObjectURL(track.mp3Url);
-    });
     setTracks((current) => current.map((track) => ({
       ...track,
       status: 'ready',
       progress: 0,
       label: 'En cola',
-      wavUrl: undefined,
-      mp3Url: undefined,
       wavBlob: undefined,
       mp3Blob: undefined,
       peakDbfs: undefined,
@@ -194,16 +179,12 @@ export default function AlbumMasteringPage() {
             ? { ...item, progress, label }
             : item)),
         );
-        const wavUrl = URL.createObjectURL(result.wav24);
-        const mp3Url = URL.createObjectURL(result.mp3);
         setTracks((current) => current.map((item) => item.id === track.id
           ? {
               ...item,
               status: 'done',
               progress: 100,
               label: 'Master listo',
-              wavUrl,
-              mp3Url,
               wavBlob: result.wav24,
               mp3Blob: result.mp3,
               peakDbfs: result.peakDbfs,
@@ -226,12 +207,12 @@ export default function AlbumMasteringPage() {
   };
 
   const download = (track: AlbumTrack, format: 'wav' | 'mp3') => {
-    const url = format === 'wav' ? track.wavUrl : track.mp3Url;
-    if (!url) return;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${track.file.name.replace(/\.[^.]+$/, '')}-album-master-mixingmusic.${format}`;
-    link.click();
+    const blob = format === 'wav' ? track.wavBlob : track.mp3Blob;
+    if (!blob) {
+      setError('El archivo de esta canción no está disponible. Reprocésala e inténtalo nuevamente.');
+      return;
+    }
+    downloadBlob(blob, `${track.file.name.replace(/\.[^.]+$/, '')}-album-master-mixingmusic.${format}`);
   };
 
   const downloadAlbum = async (format: 'wav' | 'mp3') => {
@@ -249,12 +230,7 @@ export default function AlbumMasteringPage() {
     setError('');
     try {
       const archive = await buildAlbumArchive(files, setArchiveProgress);
-      const url = URL.createObjectURL(archive);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `mixingmusic-album-masters-${format === 'wav' ? 'wav24' : 'mp3'}.zip`;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      downloadBlob(archive, `mixingmusic-album-masters-${format === 'wav' ? 'wav24' : 'mp3'}.zip`);
     } catch (archiveError) {
       setError(archiveError instanceof Error ? archiveError.message : 'No se pudo crear el archivo ZIP.');
     } finally {
@@ -295,16 +271,36 @@ export default function AlbumMasteringPage() {
         )}
 
         {isUnlimited && stage === 'upload' && (
-          <section className="album-empty">
+          <section
+            className={`album-empty ${dragging ? 'is-dragging' : ''}`}
+            onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
+            onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setDragging(true); }}
+            onDragLeave={(event) => { event.preventDefault(); if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(false);
+              if (event.dataTransfer.files.length) void addFiles(event.dataTransfer.files);
+            }}
+          >
             <div>12</div><h2>Sube las mezclas de tu álbum</h2>
-            <p>WAV o AIFF recomendado · Archivos estéreo · Máximo 600 MB por canción</p>
+            <p>Arrastra aquí entre 2 y 12 canciones o selecciónalas · WAV o AIFF recomendado · Máximo 600 MB por canción</p>
             <button onClick={() => inputRef.current?.click()}>{analyzing ? 'Analizando…' : 'Seleccionar canciones'}</button>
           </section>
         )}
 
         {isUnlimited && stage !== 'upload' && (
           <>
-            <section className="album-toolbar">
+            <section
+              className={`album-toolbar ${dragging ? 'is-dragging' : ''}`}
+              onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
+              onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setDragging(true); }}
+              onDragLeave={(event) => { event.preventDefault(); if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragging(false);
+                if ((stage === 'configure' || stage === 'results') && event.dataTransfer.files.length) void addFiles(event.dataTransfer.files);
+              }}
+            >
               <div><strong>{tracks.length}/12 canciones</strong><span>{albumStats ? `${formatDuration(albumStats.duration)} · promedio ${albumStats.average.toFixed(1)} LUFS · dinámica ${albumStats.crest.toFixed(1)} dB` : ''}</span></div>
               {(stage === 'configure' || stage === 'results') && <button onClick={() => inputRef.current?.click()} disabled={tracks.length >= 12 || analyzing}>{analyzing ? 'Analizando…' : '+ Agregar canciones'}</button>}
             </section>
