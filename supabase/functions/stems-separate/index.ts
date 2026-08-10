@@ -13,7 +13,7 @@ serve(async (req) => {
   try {
     const FAL_KEY = Deno.env.get('FAL_API_KEY') ?? '';
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
-    const SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
+    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? '';
 
     if (!FAL_KEY) throw new Error('FAL_API_KEY no configurado');
 
@@ -34,9 +34,14 @@ serve(async (req) => {
     const body = await req.json();
     const { action, audioBase64, mimeType = 'audio/wav', fileName = 'audio.wav', model = 'htdemucs', request_id: existingRequestId } = body;
 
-    let { data: profile } = await supabase.from('profiles').select('credits, plan').eq('id', user.id).single();
+    let { data: profile } = await supabase.from('profiles').select('credits').eq('id', user.id).single();
+    const { data: entitlement } = await supabase
+      .from('mastering_entitlements')
+      .select('tier')
+      .eq('user_id', user.id)
+      .maybeSingle();
     const credits = profile?.credits ?? 0;
-    const isPro = profile?.plan === 'unlimited' || ['danipalacio@gmail.com'].includes(user.email ?? '');
+    const isPro = entitlement?.tier === 'unlimited' || user.app_metadata?.is_pro === true || user.app_metadata?.plan === 'unlimited';
 
     // POLL — verificar estado de request existente
     if (action === 'poll' && existingRequestId) {
