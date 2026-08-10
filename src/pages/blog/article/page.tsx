@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { blogArticles } from '../../../mocks/blogArticles';
+import ArticleComparison from './ArticleComparison';
 
 const BlogArticlePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -299,6 +300,8 @@ const BlogArticlePage: React.FC = () => {
           <div className="prose prose-lg max-w-none">
             {formatContent(content)}
           </div>
+
+          <ArticleComparison />
           
           {/* Author Bio */}
           <div className="border-t border-gray-200 pt-8 mt-12">
@@ -412,67 +415,6 @@ const BlogArticlePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="md:col-span-2">
-              <div className="flex items-center space-x-3 mb-4">
-                <img 
-                  src="https://static.readdy.ai/image/b1eac48ec385ead8debde409294ee615/609f268732409aa5f9e36b8cf47e9d62.png" 
-                  alt="MixingMusic.ai" 
-                  className="object-contain"
-                  style={{ width: '150px', height: '32px' }}
-                />
-              </div>
-              <p className="text-slate-400 mb-4">
-                {selectedLanguage === 'en'
-                  ? 'The most advanced AI platform for professional music mixing and production.'
-                  : 'La plataforma de IA más avanzada para mezcla y producción musical profesional.'}
-              </p>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold mb-4">
-                {selectedLanguage === 'en' ? 'Quick Links' : 'Enlaces Rápidos'}
-              </h4>
-              <ul className="space-y-2 text-slate-400">
-                <li><Link to="/" className="hover:text-white transition-colors">
-                  {selectedLanguage === 'en' ? 'Home' : 'Inicio'}
-                </Link></li>
-                <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">
-                  {selectedLanguage === 'en' ? 'Pricing' : 'Precios'}
-                </Link></li>
-                <li><Link to="/auth/register" className="hover:text-white transition-colors">
-                  {selectedLanguage === 'en' ? 'Sign Up' : 'Registrarse'}
-                </Link></li>
-                <li><a href="https://www.sellerplus.co/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
-                  Vender en Amazon - Agencia Amazon
-                </a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold mb-4">
-                {selectedLanguage === 'en' ? 'Legal' : 'Legal'}
-              </h4>
-              <ul className="space-y-2 text-slate-400">
-                <li><Link to="/terms" className="hover:text-white transition-colors">
-                  {selectedLanguage === 'en' ? 'Terms' : 'Términos'}
-                </Link></li>
-                <li><Link to="/privacy" className="hover:text-white transition-colors">
-                  {selectedLanguage === 'en' ? 'Privacy' : 'Privacidad'}
-                </Link></li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t border-slate-800 pt-8 mt-8 text-center text-slate-400">
-            <p>© 2024 MixingMusic.ai. {selectedLanguage === 'en' ? 'All rights reserved.' : 'Todos los derechos reservados.'}</p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
