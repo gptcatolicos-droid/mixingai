@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { getMasteringEntitlements } from '../mastering/masteringAccess';
 
 export default function PaymentConfirmation() {
   const [params] = useSearchParams();
@@ -7,16 +8,20 @@ export default function PaymentConfirmation() {
   const status = params.get('status') || 'success';
   const provider = params.get('provider') || 'paypal';
   const [countdown, setCountdown] = useState(5);
+  const [entitlementVerified, setEntitlementVerified] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (status === 'success') {
-      try {
-        const stored = localStorage.getItem('audioMixerUser');
-        const u = stored ? JSON.parse(stored) : {};
-        u.is_pro = true; u.plan = 'unlimited';
-        localStorage.setItem('audioMixerUser', JSON.stringify(u));
-        localStorage.removeItem('mixingai_used_free');
-      } catch {}
+      getMasteringEntitlements()
+        .then(({ unlimited }) => {
+          setEntitlementVerified(unlimited);
+          if (!unlimited) return;
+          const stored = localStorage.getItem('audioMixerUser');
+          const user = stored ? JSON.parse(stored) : {};
+          localStorage.setItem('audioMixerUser', JSON.stringify({ ...user, is_pro: true, plan: 'unlimited' }));
+          localStorage.removeItem('mixingai_used_free');
+        })
+        .catch(() => setEntitlementVerified(false));
     }
     const t = setInterval(() => {
       setCountdown(prev => {
@@ -27,8 +32,8 @@ export default function PaymentConfirmation() {
     return () => clearInterval(t);
   }, [status, navigate]);
 
-  const isOk = status === 'success';
-  const isPending = status === 'pending';
+  const isOk = status === 'success' && entitlementVerified === true;
+  const isPending = status === 'pending' || (status === 'success' && entitlementVerified !== true);
 
   return (
     <div style={{ minHeight:'100vh', background:'#0D0A14', backgroundImage:'url(/studio-bg.png)', backgroundSize:'cover', backgroundPosition:'center', backgroundAttachment:'fixed', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'Outfit',system-ui,sans-serif", padding:'20px' }}>
@@ -37,10 +42,10 @@ export default function PaymentConfirmation() {
           {isOk ? '✅' : isPending ? '⏳' : '❌'}
         </div>
         <h1 style={{ fontSize:'24px', fontWeight:800, color:isOk?'#4ade80':isPending?'#F59E0B':'#f87171', marginBottom:'10px', letterSpacing:'-0.5px' }}>
-          {isOk ? '¡Pago exitoso!' : isPending ? 'Pago pendiente' : 'Pago fallido'}
+          {isOk ? '¡Pago exitoso!' : isPending ? 'Confirmando tu pago' : 'Pago fallido'}
         </h1>
         <p style={{ fontSize:'14px', color:'rgba(155,126,200,0.8)', marginBottom:'20px', lineHeight:1.6 }}>
-          {isOk ? 'Tu suscripción de mezclas ilimitadas ha sido activada. ¡Ya puedes mezclar sin límites!' : isPending ? 'Tu pago está siendo procesado. Te notificaremos cuando se confirme.' : 'Hubo un problema con tu pago. No se realizó ningún cargo.'}
+          {isOk ? 'Tu acceso Unlimited ya está activo. ¡Ya puedes mezclar sin límites!' : isPending ? 'Estamos validando el pago y activando tu acceso de forma segura. No cierres esta ventana.' : 'Hubo un problema con tu pago. No se realizó ningún cargo.'}
         </p>
         {isOk && (
           <div style={{ background:'rgba(74,222,128,0.08)', border:'1px solid rgba(74,222,128,0.2)', borderRadius:'12px', padding:'12px 16px', marginBottom:'24px' }}>

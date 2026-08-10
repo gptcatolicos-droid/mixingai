@@ -5,10 +5,25 @@ import './login-v3.css';
 const SUPABASE_URL = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
-// Hardcoded unlimited users — always work
-const SUPER: Record<string, { firstName: string; lastName: string }> = {
-  'danipalacio@gmail.com': { firstName: 'Dani', lastName: 'Palacio' },
-};
+async function resolveUnlimitedAccess(accessToken: string, fallback: boolean) {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/mastering-access`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ action: 'entitlements' }),
+    });
+    const data = await response.json().catch(() => ({}));
+    return response.ok ? Boolean(data.unlimited) : fallback;
+  } catch {
+    // The server remains authoritative for protected operations. This only
+    // preserves the signed-in experience while a transient network error clears.
+    return fallback;
+  }
+}
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -49,14 +64,7 @@ const LoginPage: React.FC = () => {
 
     setLoading(true);
     try {
-      // ── 1. Super user bypass ──────────────────────────────────
-      const key = email.trim().toLowerCase();
-      if (SUPER[key]) {
-        saveAndGo(`super_${key}`, key, { first_name: SUPER[key].firstName, last_name: SUPER[key].lastName, country: 'Colombia' }, undefined, undefined, true);
-        return;
-      }
-
-      // ── 2. Normal Supabase login ──────────────────────────────
+      // ── 1. Supabase login ─────────────────────────────────────
       const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
@@ -65,13 +73,14 @@ const LoginPage: React.FC = () => {
       const data = await res.json();
 
       if (res.ok && data.access_token) {
-        const meta = data.user?.user_metadata || {};
-        const isPro = meta.is_pro || meta.plan === 'unlimited' || false;
+        const meta = { ...(data.user?.app_metadata || {}), ...(data.user?.user_metadata || {}) };
+        const metadataSaysUnlimited = Boolean(meta.is_pro || meta.plan === 'unlimited');
+        const isPro = await resolveUnlimitedAccess(data.access_token, metadataSaysUnlimited);
         saveAndGo(data.user.id, data.user.email, meta, data.access_token, data.refresh_token, isPro);
         return;
       }
 
-      // ── 3. Handle errors ─────────────────────────────────────
+      // ── 2. Handle errors ─────────────────────────────────────
       const msg = (data?.error_description || data?.msg || data?.message || '').toLowerCase();
 
       if (msg.includes('email not confirmed')) {
