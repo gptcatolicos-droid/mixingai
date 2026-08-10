@@ -169,6 +169,16 @@ export default function AlbumMasteringPage() {
     })));
     setStage('processing');
 
+    // Keep intentional loud/quiet relationships instead of forcing every song
+    // to the same LUFS number. Targets stay within ±1.5 LU of the album reference.
+    const orderedLufs = tracks.map((track) => track.analysis.integratedLufs).sort((a, b) => a - b);
+    const albumMedianLufs = orderedLufs[Math.floor(orderedLufs.length / 2)];
+    const albumBaseTarget = loudness === 'streaming' ? -14 : loudness === 'balanced' ? -16 : -11;
+    const albumTargets = new Map(tracks.map((track) => [
+      track.id,
+      albumBaseTarget + Math.max(-1.5, Math.min(1.5, track.analysis.integratedLufs - albumMedianLufs)),
+    ]));
+
     for (let index = 0; index < tracks.length; index += 1) {
       const track = tracks[index];
       setCurrentTrack(index + 1);
@@ -179,7 +189,7 @@ export default function AlbumMasteringPage() {
         const result = await createMaster(
           track.file,
           track.analysis,
-          { preset: selectedPreset, strength, stereo, loudness },
+          { preset: selectedPreset, strength, stereo, loudness, targetLufsOverride: albumTargets.get(track.id) },
           (progress, label) => setTracks((current) => current.map((item) => item.id === track.id
             ? { ...item, progress, label }
             : item)),
@@ -323,7 +333,7 @@ export default function AlbumMasteringPage() {
                 <label>Preset<select value={selectedPreset.id} onChange={(event) => setSelectedPreset(PRESETS.find((preset) => preset.id === event.target.value) || PRESETS[0])}>{PRESETS.map((preset) => <option value={preset.id} key={preset.id}>{preset.name}</option>)}</select></label>
                 <label>Intensidad <b>{strength}%</b><input type="range" min="0" max="100" value={strength} onChange={(event) => setStrength(Number(event.target.value))} /></label>
                 <label>Amplitud <b>{stereo}%</b><input type="range" min="0" max="60" value={stereo} onChange={(event) => setStereo(Number(event.target.value))} /></label>
-                <label>Loudness<select value={loudness} onChange={(event) => setLoudness(event.target.value as LoudnessProfile)}><option value="streaming">Streaming</option><option value="balanced">Balanceado</option><option value="competitive">Competitivo</option></select></label>
+                <label>Loudness<select value={loudness} onChange={(event) => setLoudness(event.target.value as LoudnessProfile)}><option value="streaming">Streaming</option><option value="balanced">Dinámico</option><option value="competitive">Competitivo</option></select></label>
                 {stage === 'configure' && <button className="album-process" onClick={processAlbum} disabled={tracks.length < 2}>Masterizar {tracks.length} canciones</button>}
                 {stage === 'processing' && <div className="album-processing-label"><strong>Canción {currentTrack} de {tracks.length}</strong><span>Procesamos una a la vez para proteger la memoria.</span></div>}
                 {stage === 'results' && (
