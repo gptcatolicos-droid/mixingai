@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import './auth-v3.css';
+import i18n from '../../../i18n';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -26,7 +27,7 @@ const RegisterPage: React.FC = () => {
   const saveAndGo = (id: string, email: string, token?: string, refreshToken?: string) => {
     const { firstName, lastName, country } = form;
     localStorage.setItem('audioMixerUser', JSON.stringify({
-      id, email, firstName, lastName, country,
+      id, email, firstName, lastName, country, preferred_locale: i18n.resolvedLanguage || 'es',
       credits: 0, plan: 'free', is_pro: false,
       provider: 'email',
       createdAt: new Date().toISOString(),
@@ -55,7 +56,7 @@ const RegisterPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({
           email, password,
-          data: { first_name: firstName, last_name: form.lastName, country: form.country, plan: 'free', is_pro: false },
+          data: { first_name: firstName, last_name: form.lastName, country: form.country, preferred_locale: i18n.resolvedLanguage || 'es', plan: 'free', is_pro: false },
         }),
       });
       const signupData = await signupRes.json();
@@ -89,6 +90,7 @@ const RegisterPage: React.FC = () => {
             last_name: lastName,
             email,
             country,
+            preferred_locale: i18n.resolvedLanguage || 'es',
             credits: 0,
             plan: 'free',
             is_pro: false,

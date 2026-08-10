@@ -1,8 +1,12 @@
 import { Link, Outlet } from 'react-router-dom';
+import LanguageSelector from './LanguageSelector';
+import RuntimeLocaleTranslator from './RuntimeLocaleTranslator';
 import './site-footer.css';
 
 export default function SiteLayout() {
   return <div className="site-v3-layout">
+    <div className="site-locale-float"><LanguageSelector /></div>
+    <RuntimeLocaleTranslator />
     <Outlet />
     <footer className="site-v3-footer">
       <div className="site-v3-footer-main">

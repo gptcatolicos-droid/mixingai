@@ -7,8 +7,15 @@ i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
-    lng: 'en',
-    fallbackLng: 'en',
+    supportedLngs: ['es', 'en', 'fr', 'zh'],
+    fallbackLng: 'es',
+    nonExplicitSupportedLngs: true,
+    detection: {
+      order: ['querystring', 'localStorage', 'navigator'],
+      lookupQuerystring: 'lang',
+      lookupLocalStorage: 'mixingmusic_locale',
+      caches: ['localStorage'],
+    },
     debug: false,
     resources: messages,
     interpolation: {

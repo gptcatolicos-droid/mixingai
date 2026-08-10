@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 import './i18n'
+import i18n from './i18n'
 import { initGA } from './utils/analytics'
 
 // SPA routing fix: handle 404.html redirect (for Render static hosting)
@@ -31,3 +32,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>,
 )
+
+document.documentElement.lang = i18n.resolvedLanguage === 'zh' ? 'zh-Hans' : (i18n.resolvedLanguage || 'es');
+i18n.on('languageChanged', (language) => { document.documentElement.lang = language === 'zh' ? 'zh-Hans' : language; });
