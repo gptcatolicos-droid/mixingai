@@ -113,6 +113,47 @@ function spanishContent(title: string, angle: string, standard: string) {
   return `# ${title}\n\n${angle} Esta guía explica el criterio técnico y la forma de escucharlo en una canción real. Los números ayudan a tomar decisiones, pero el resultado siempre debe conservar la intención del artista.\n\n## El estándar que conviene entender\n\n${standard} No es una regla para forzar cada género al mismo sonido: es un punto de control para evitar errores de entrega y para comparar con referencias de manera justa.\n\n## Un flujo de trabajo que sí funciona\n\n1. Empieza por una mezcla sin clipping, con balances resueltos y una exportación sin pérdida.\n2. Compara con dos referencias del mismo estilo, siempre con volumen igualado.\n3. Analiza loudness, picos y dinámica; después escucha en auriculares, mono y un sistema cotidiano.\n4. Ajusta solo aquello que mejora la traducción de la canción, no aquello que simplemente sube el medidor.\n\n## Qué resultados buscar en MixingMusic\n\nAl subir una mezcla, MixingMusic analiza el archivo antes de procesarlo y muestra el resultado junto al original para una comparación con volumen igualado. En un master pensado para streaming, busca claridad en voz y ritmo, graves controlados, dinámica apropiada y un margen de pico que proteja la codificación. El resultado no debe sonar “mejor” solo porque está más fuerte: debe traducir mejor sin añadir ruido, aspereza o fatiga.\n\n## Errores frecuentes\n\n- Confundir dBFS, dBTP y LUFS: cada medida responde a una pregunta distinta.\n- Intentar reparar una voz, un click o una resonancia local únicamente desde el master.\n- Decidir por una visualización sin realizar una escucha comparada.\n- Entregar un MP3 como única fuente cuando existe un WAV o AIFF disponible.\n\n## Checklist antes de publicar\n\n- La mezcla y el master no presentan clipping ni artefactos evidentes.\n- El original y el master fueron comparados a volumen igualado.\n- La canción se revisó en más de un sistema de escucha.\n- Se conserva un WAV de 24 bits como archivo final de respaldo.\n\nUn buen mastering es una decisión musical respaldada por medición. Si la canción conserva emoción, claridad y consistencia fuera del estudio, el estándar está cumpliendo su función.`;
 }
 
+function englishExcerpt(title: string) {
+  return `A practical guide to ${title.toLowerCase()}, with clear checks for a release-ready mix and master.`;
+}
+
+function englishContent(title: string) {
+  return `# ${title}
+
+This practical guide explains how to make decisions that protect the musical intent of a song while preparing it for modern listening platforms. Measurements are useful, but the final judgement should always come from level-matched listening.
+
+## The standard worth understanding
+
+There is no single number that makes every genre sound professional. A reliable delivery starts with a clean, unclipped mix, sensible dynamics and enough peak margin for encoding. Use technical targets as guardrails, then compare against references from the same style at the same perceived level.
+
+## A workflow that works
+
+1. Start with a lossless export and a mix with no clipping or unintended artifacts.
+2. Compare it with two relevant references using level matching.
+3. Check loudness, peaks and dynamics, then listen on headphones, in mono and on an everyday playback system.
+4. Change only what improves translation and musical clarity—not what merely makes a meter read higher.
+
+## What to look for in MixingMusic
+
+When you upload a mix, MixingMusic analyzes it before processing and lets you compare the master with the original at matched volume. For a streaming-ready master, look for clear vocals and rhythm, controlled low end, genre-appropriate dynamics and peak headroom that helps protect the file during encoding. A result is not better simply because it is louder: it should translate more reliably without added noise, harshness or listener fatigue.
+
+## Common mistakes
+
+- Treating dBFS, dBTP and LUFS as interchangeable measurements.
+- Trying to repair an isolated vocal issue, click or resonance only at the mastering stage.
+- Deciding from a graph without a fair listening comparison.
+- Sending an MP3 as the only source when a WAV or AIFF is available.
+
+## Checklist before release
+
+- The mix and master are free from clipping and obvious artifacts.
+- The original and master were compared at matched volume.
+- The song was checked on more than one playback system.
+- A 24-bit WAV is saved as the final archive master.
+
+Good mastering is a musical decision supported by measurement. When a song keeps its emotion, clarity and consistency outside the studio, the process has done its job.`;
+}
+
 export const masteringStandardsArticles: BlogArticle[] = seeds.map(([slug, titleEs, title, angle, standard], index) => {
   const category = categoryFor(index);
   return {
@@ -120,9 +161,9 @@ export const masteringStandardsArticles: BlogArticle[] = seeds.map(([slug, title
     slug,
     title,
     titleEs,
-    excerpt: angle,
+    excerpt: englishExcerpt(title),
     excerptEs: angle,
-    content: spanishContent(title, angle, standard),
+    content: englishContent(title),
     contentEs: spanishContent(title, angle, standard),
     category,
     categoryName: category === 'ai' ? 'AI Music Production' : category === 'tools' ? 'Music Tools' : 'Mixing Techniques',
@@ -134,7 +175,7 @@ export const masteringStandardsArticles: BlogArticle[] = seeds.map(([slug, title
     tags: ['music mastering', 'music mixing', 'streaming audio', 'MixingMusic'],
     tagsEs: ['mastering musical', 'mezcla musical', 'audio para streaming', 'MixingMusic'],
     seoKeywords: { en: [title.toLowerCase(), 'AI mastering', 'online mastering'], es: [titleEs.toLowerCase(), 'mastering con IA', 'mezcla y mastering'] },
-    metaDescription: `${angle} Aprende criterios de mezcla y mastering y cómo validar una entrega para streaming.`,
+    metaDescription: englishExcerpt(title),
     metaDescriptionEs: `${angle} Guía práctica de estándares de mezcla y mastering para streaming con MixingMusic.`,
   };
 });
