@@ -70,11 +70,21 @@ serve(async (req) => {
         updated_at: now,
       }, { onConflict: 'user_id' })
       if (entitlementError) throw entitlementError
-      await admin.from('users').update({ is_pro: true, plan: 'unlimited' }).eq('id', user.id)
+      const { error: usersError } = await admin
+        .from('users')
+        .update({ is_pro: true, plan: 'unlimited', subscription_status: 'active' })
+        .eq('id', user.id)
+      if (usersError) throw usersError
+      const { error: profilesError } = await admin
+        .from('profiles')
+        .update({ is_pro: true, plan: 'unlimited' })
+        .eq('id', user.id)
+      if (profilesError) throw profilesError
       const existingAppMetadata = user.app_metadata ?? {}
-      await admin.auth.admin.updateUserById(user.id, {
+      const { error: metadataError } = await admin.auth.admin.updateUserById(user.id, {
         app_metadata: { ...existingAppMetadata, is_pro: true, plan: 'unlimited' },
       })
+      if (metadataError) throw metadataError
     }
 
     const { data: entitlement } = await admin
