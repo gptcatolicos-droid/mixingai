@@ -15,6 +15,8 @@ export interface AudioFileAnalysis {
   isClipping: boolean;
   stereoCorrelation: number | null;
   isDualMono: boolean;
+  noiseFloorDbfs: number;
+  signalToNoiseDb: number;
 }
 
 const readAscii = (view: DataView, offset: number, length: number) => {
@@ -90,6 +92,27 @@ export async function analyzeAudioFile(file: File): Promise<AudioFileAnalysis> {
     const peakDbfs = toDb(peak);
     const averageDbfs = toDb(rms);
     const integratedLufs = await measureIntegratedLufs(decoded);
+    // Ignore digital silence and estimate the quiet musical floor from short blocks.
+    const noiseBlocks: number[] = [];
+    const blockSize = Math.max(1, Math.round(decoded.sampleRate * .4));
+    for (let start = 0; start < decoded.length; start += blockSize) {
+      let energy = 0;
+      let count = 0;
+      const end = Math.min(decoded.length, start + blockSize);
+      for (let channelIndex = 0; channelIndex < decoded.numberOfChannels; channelIndex += 1) {
+        const channel = decoded.getChannelData(channelIndex);
+        for (let index = start; index < end; index += stride) {
+          energy += channel[index] * channel[index];
+          count += 1;
+        }
+      }
+      const blockDb = toDb(count ? Math.sqrt(energy / count) : 0);
+      if (blockDb > -70) noiseBlocks.push(blockDb);
+    }
+    noiseBlocks.sort((a, b) => a - b);
+    const noiseFloorDbfs = noiseBlocks.length ? noiseBlocks[Math.floor((noiseBlocks.length - 1) * .1)] : -120;
+    const signalLevelDbfs = noiseBlocks.length ? noiseBlocks[Math.floor((noiseBlocks.length - 1) * .9)] : averageDbfs;
+    const signalToNoiseDb = Math.max(0, signalLevelDbfs - noiseFloorDbfs);
     let stereoCorrelation: number | null = null;
     if (decoded.numberOfChannels >= 2) {
       const left = decoded.getChannelData(0);
@@ -120,6 +143,8 @@ export async function analyzeAudioFile(file: File): Promise<AudioFileAnalysis> {
       isClipping: peak >= 0.999,
       stereoCorrelation,
       isDualMono: stereoCorrelation !== null && stereoCorrelation > .995,
+      noiseFloorDbfs,
+      signalToNoiseDb,
     };
   } catch {
     throw new Error('No pudimos leer este audio. Prueba con un WAV o AIFF estéreo sin protección.');
