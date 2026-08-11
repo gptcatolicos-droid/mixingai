@@ -15,7 +15,7 @@ import {
 } from './masteringAccess';
 import { createMaster } from './masteringEngine';
 import type { LoudnessProfile, MasteringResult } from './masteringEngine';
-import { downloadBlob, downloadObjectUrl } from '../../utils/downloadFile';
+import { downloadBlob, downloadObjectUrl, saveBlobToDisk } from '../../utils/downloadFile';
 import './mastering.css';
 
 type Stage = 'upload' | 'analyzing' | 'configure' | 'processing' | 'compare' | 'complete';
@@ -318,15 +318,28 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     downloadObjectUrl(audioUrl, 'mezcla-v3-mixingmusic-24bit.wav');
   };
 
-  const downloadWav = () => {
+  const downloadWav = async () => {
     if (!masterResult || !file) return;
     if (!isUnlimited) {
       setError('La descarga WAV de 24 bits pertenece al plan Unlimited. El plan Gratis podrá descargar este master en MP3.');
       return;
     }
-    downloadBlob(masterResult.wav24, `${file.name.replace(/\.[^.]+$/, '')}-master-mixingmusic-24bit.wav`);
-    setDownloadedFormat('WAV 24-bit');
-    setStage('complete');
+    setError('');
+    try {
+      const saved = await saveBlobToDisk(
+        masterResult.wav24,
+        `${file.name.replace(/\.[^.]+$/, '')}-master-mixingmusic-24bit.wav`,
+        'audio/wav',
+        '.wav',
+      );
+      if (!saved) return;
+      setDownloadedFormat('WAV 24-bit');
+      setStage('complete');
+    } catch (downloadError) {
+      setError(downloadError instanceof Error
+        ? `No se pudo guardar el WAV: ${downloadError.message}`
+        : 'No se pudo guardar el WAV. Inténtalo nuevamente.');
+    }
   };
 
   const downloadMp3 = async () => {
