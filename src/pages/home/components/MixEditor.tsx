@@ -752,19 +752,19 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       const lowShelf=offCtx.createBiquadFilter(); lowShelf.type='lowshelf'; lowShelf.frequency.value=100; lowShelf.gain.value=bassGain+1.2;
       const midPeak=offCtx.createBiquadFilter(); midPeak.type='peaking'; midPeak.frequency.value=2500; midPeak.Q.value=0.8; midPeak.gain.value=midGain-0.5;
       const highShelf=offCtx.createBiquadFilter(); highShelf.type='highshelf'; highShelf.frequency.value=8000; highShelf.gain.value=highGain+1.8;
-      const limiter=offCtx.createDynamicsCompressor();
-      limiter.threshold.value=-1.0; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=0.0003; limiter.release.value=0.05;
       mixBus.gain.value=Math.pow(10,(masterVolume-2)/20);
       const activePresetData=activePreset||initialPreset;
-      const dryGainOff=offCtx.createGain(); dryGainOff.gain.value=1-(activePresetData?.reverbWet??0)*0.4;
-      const reverbGainOff=offCtx.createGain(); reverbGainOff.gain.value=activePresetData?.reverbWet??0;
+      const dryGainOff=offCtx.createGain(); dryGainOff.gain.value=1;
+      const reverbGainOff=offCtx.createGain(); reverbGainOff.gain.value=reverbActive ? Math.min(.32, activePresetData?.reverbWet??0) : 0;
       const reverbNodeOff=offCtx.createConvolver();
-      const rl=offCtx.sampleRate*2.5; const rb=offCtx.createBuffer(2,rl,offCtx.sampleRate);
-      for(let c=0;c<2;c++){const d=rb.getChannelData(c);for(let i=0;i<rl;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/rl,3.5);}
-      reverbNodeOff.buffer=rb;
+      if (reverbActive && reverbGainOff.gain.value > 0) {
+        const rl=offCtx.sampleRate*2.5; const rb=offCtx.createBuffer(2,rl,offCtx.sampleRate);
+        for(let c=0;c<2;c++){const d=rb.getChannelData(c);for(let i=0;i<rl;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/rl,3.5);}
+        reverbNodeOff.buffer=rb;
+      }
       const delayNodeOff=offCtx.createDelay(1.0); delayNodeOff.delayTime.value=0.25;
-      const delayFeedOff=offCtx.createGain(); delayFeedOff.gain.value=0.3;
-      const delayGainOff=offCtx.createGain(); delayGainOff.gain.value=activePresetData?.delayWet??0;
+      const delayFeedOff=offCtx.createGain(); delayFeedOff.gain.value=delayActive ? 0.3 : 0;
+      const delayGainOff=offCtx.createGain(); delayGainOff.gain.value=delayActive ? Math.min(.25, activePresetData?.delayWet??0) : 0;
       setExportProgress(30); setExportStep('Aplicando IA EQ '+ iaEqPreset.name +'...');
       const iaPreGain=offCtx.createGain(); iaPreGain.gain.value=Math.pow(10,iaEqBands[0]/20);
       let iaPrev: AudioNode = iaPreGain;
@@ -777,8 +777,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       highShelf.connect(compressor); compressor.connect(iaPreGain);
       iaPrev.connect(dryGainOff); iaPrev.connect(reverbNodeOff); reverbNodeOff.connect(reverbGainOff);
       iaPrev.connect(delayNodeOff); delayNodeOff.connect(delayFeedOff); delayFeedOff.connect(delayNodeOff); delayNodeOff.connect(delayGainOff);
-      dryGainOff.connect(limiter); reverbGainOff.connect(limiter); delayGainOff.connect(limiter);
-      limiter.connect(offCtx.destination);
+      dryGainOff.connect(offCtx.destination); reverbGainOff.connect(offCtx.destination); delayGainOff.connect(offCtx.destination);
       setExportProgress(45); setExportStep('Renderizando stems...'); await new Promise(r=>setTimeout(r,600));
       for(const stem of stems){
         if(stem.buffer&&!stem.muted){
@@ -802,14 +801,25 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   };
 
   const normalizeTo16LUFS=(buffer:AudioBuffer):AudioBuffer=>{
-    const target=-10; let rmsSum=0; const ch0=buffer.getChannelData(0);
-    for(let i=0;i<ch0.length;i++) rmsSum+=ch0[i]*ch0[i];
-    const rms=Math.sqrt(rmsSum/ch0.length);
+    const target=-16; let rmsSum=0; let count=0;
+    for(let c=0;c<buffer.numberOfChannels;c++){const d=buffer.getChannelData(c);for(let i=0;i<d.length;i++){rmsSum+=d[i]*d[i];count++;}}
+    const rms=count?Math.sqrt(rmsSum/count):0;
     const currLufs=rms>0?20*Math.log10(rms)-0.691:-60;
-    const gain=Math.pow(10,(target-currLufs)/20); let peak=0;
-    for(let c=0;c<buffer.numberOfChannels;c++){const d=buffer.getChannelData(c);for(let i=0;i<d.length;i++){const a=Math.abs(d[i]*gain);if(a>peak)peak=a;}}
-    const ceiling=0.891; const sg=peak>ceiling?gain*(ceiling/peak):gain;
-    for(let c=0;c<buffer.numberOfChannels;c++){const d=buffer.getChannelData(c);for(let i=0;i<d.length;i++){d[i]*=sg;if(d[i]>ceiling)d[i]=ceiling;else if(d[i]<-ceiling)d[i]=-ceiling;}}
+    const requestedGain=Math.pow(10,(target-currLufs)/20);
+    const ceiling=0.891; let peak=0;
+    for(let c=0;c<buffer.numberOfChannels;c++){const d=buffer.getChannelData(c);for(let i=0;i<d.length;i++)peak=Math.max(peak,Math.abs(d[i]));}
+    const gain=Math.min(requestedGain, peak>0?ceiling/peak:1);
+    const repairThreshold=.97;
+    for(let c=0;c<buffer.numberOfChannels;c++){
+      const d=buffer.getChannelData(c);
+      for(let i=1;i<d.length-1;i++){
+        const value=d[i]*gain;
+        const neighbour=(d[i-1]*gain+d[i+1]*gain)*.5;
+        const isIsolated=Math.abs(value)>repairThreshold&&Math.abs(value-neighbour)>.55&&Math.abs(d[i-1]*gain)<.82&&Math.abs(d[i+1]*gain)<.82;
+        d[i]=isIsolated?neighbour:Math.max(-ceiling,Math.min(ceiling,value));
+      }
+      if(d.length){d[0]=Math.max(-ceiling,Math.min(ceiling,d[0]*gain));d[d.length-1]=Math.max(-ceiling,Math.min(ceiling,d[d.length-1]*gain));}
+    }
     return buffer;
   };
 

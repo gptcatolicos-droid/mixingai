@@ -105,6 +105,55 @@ function WaveformStrip({
   );
 }
 
+export function GeneratedMixWaveform({
+  peaks,
+  source,
+}: {
+  peaks: Float32Array;
+  source: string;
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playback, setPlayback] = useState<Playback>({ isPlaying: false, progress: 0 });
+
+  const seek = (progress: number) => {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(audio.duration)) return;
+    audio.currentTime = Math.max(0, Math.min(1, progress)) * audio.duration;
+    setPlayback({ isPlaying: !audio.paused, progress: audio.currentTime / audio.duration });
+  };
+
+  return (
+    <section className="generated-mix-waveform">
+      <audio
+        className="master-waveform-audio"
+        ref={audioRef}
+        src={source}
+        preload="metadata"
+        onPlay={() => setPlayback((current) => ({ ...current, isPlaying: true }))}
+        onPause={() => setPlayback((current) => ({ ...current, isPlaying: false }))}
+        onEnded={() => setPlayback({ isPlaying: false, progress: 1 })}
+        onTimeUpdate={(event) => {
+          const audio = event.currentTarget;
+          setPlayback((current) => ({ ...current, progress: audio.duration ? audio.currentTime / audio.duration : current.progress }));
+        }}
+      />
+      <WaveformStrip
+        label="MEZCLA GENERADA"
+        peaks={peaks}
+        accent="rgba(128, 167, 255, .92)"
+        playback={playback}
+        onToggle={() => {
+          const audio = audioRef.current;
+          if (!audio) return;
+          if (audio.paused) audio.play().catch(() => {});
+          else audio.pause();
+        }}
+        onSeek={seek}
+      />
+    </section>
+  );
+}
+
 export function MasteringWaveformComparison({
   originalPeaks,
   masterPeaks,
