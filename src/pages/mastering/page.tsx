@@ -84,6 +84,8 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
   const [masterUrl, setMasterUrl] = useState('');
   const [masterMp3Url, setMasterMp3Url] = useState('');
   const [volumeMatched, setVolumeMatched] = useState(true);
+  const [waveformPlaying, setWaveformPlaying] = useState<'original' | 'master' | null>(null);
+  const [waveformProgress, setWaveformProgress] = useState({ original: 0, master: 0 });
   const [downloadGrantedForCurrentResult, setDownloadGrantedForCurrentResult] = useState(false);
   const [sourceWasGeneratedMix, setSourceWasGeneratedMix] = useState(false);
   const [downloadedFormat, setDownloadedFormat] = useState<'MP3' | 'WAV 24-bit' | null>(null);
@@ -271,6 +273,27 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     }
   }, [masterResult, volumeMatched, stage]);
 
+  const toggleWaveformPlayback = (kind: 'original' | 'master') => {
+    const target = kind === 'original' ? originalCompareRef.current : masterCompareRef.current;
+    const other = kind === 'original' ? masterCompareRef.current : originalCompareRef.current;
+    if (!target) return;
+    other?.pause();
+    if (target.paused) target.play().catch(() => {});
+    else target.pause();
+  };
+
+  const seekWaveformPlayback = (kind: 'original' | 'master', progress: number) => {
+    const target = kind === 'original' ? originalCompareRef.current : masterCompareRef.current;
+    const other = kind === 'original' ? masterCompareRef.current : originalCompareRef.current;
+    if (!target || !Number.isFinite(target.duration)) return;
+    const currentTime = Math.max(0, Math.min(1, progress)) * target.duration;
+    target.currentTime = currentTime;
+    if (other && Number.isFinite(other.duration)) other.currentTime = Math.min(currentTime, other.duration);
+    const originalProgress = kind === 'original' ? currentTime / target.duration : (other?.duration ? other.currentTime / other.duration : waveformProgress.original);
+    const masterProgress = kind === 'master' ? currentTime / target.duration : (other?.duration ? other.currentTime / other.duration : waveformProgress.master);
+    setWaveformProgress({ original: originalProgress, master: masterProgress });
+  };
+
   const reset = () => {
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setStage('upload');
@@ -290,6 +313,8 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     setLiveMomentary(-60);
     setLiveIntegrated(-60);
     setVolumeMatched(true);
+    setWaveformPlaying(null);
+    setWaveformProgress({ original: 0, master: 0 });
     setError('');
   };
 
@@ -316,6 +341,8 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
       setMasterMp3Url(URL.createObjectURL(result.mp3));
       setDownloadGrantedForCurrentResult(false);
       setVolumeMatched(true);
+      setWaveformPlaying(null);
+      setWaveformProgress({ original: 0, master: 0 });
       setStage('compare');
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'No pudimos procesar este master.');
@@ -726,10 +753,17 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                   ref={originalCompareRef}
                   controls
                   src={audioUrl}
-                  onPlay={() => { masterCompareRef.current?.pause(); stopLiveMeter(); }}
+                  onPlay={() => { masterCompareRef.current?.pause(); stopLiveMeter(); setWaveformPlaying('original'); }}
+                  onPause={() => setWaveformPlaying((current) => current === 'original' ? null : current)}
+                  onEnded={() => setWaveformPlaying(null)}
                   onTimeUpdate={(event) => {
                     const other = masterCompareRef.current;
-                    if (other && !event.currentTarget.paused && Math.abs(other.currentTime - event.currentTarget.currentTime) > 0.35) other.currentTime = event.currentTarget.currentTime;
+                    const progress = event.currentTarget.duration ? event.currentTarget.currentTime / event.currentTarget.duration : 0;
+                    setWaveformProgress((current) => ({ ...current, original: progress }));
+                    if (other && !event.currentTarget.paused && Math.abs(other.currentTime - event.currentTarget.currentTime) > 0.35) {
+                      other.currentTime = event.currentTarget.currentTime;
+                      setWaveformProgress((current) => ({ ...current, master: other.duration ? other.currentTime / other.duration : current.master }));
+                    }
                   }}
                 />
               </article>
@@ -739,12 +773,17 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                   ref={masterCompareRef}
                   controls
                   src={masterUrl}
-                  onPlay={() => { originalCompareRef.current?.pause(); startLiveMeter(); }}
-                  onPause={stopLiveMeter}
-                  onEnded={() => { stopLiveMeter(); setLiveMomentary(-60); setLiveIntegrated(-60); drawLiveMeter(-60); }}
+                  onPlay={() => { originalCompareRef.current?.pause(); startLiveMeter(); setWaveformPlaying('master'); }}
+                  onPause={() => { stopLiveMeter(); setWaveformPlaying((current) => current === 'master' ? null : current); }}
+                  onEnded={() => { stopLiveMeter(); setWaveformPlaying(null); setLiveMomentary(-60); setLiveIntegrated(-60); drawLiveMeter(-60); }}
                   onTimeUpdate={(event) => {
                     const other = originalCompareRef.current;
-                    if (other && !event.currentTarget.paused && Math.abs(other.currentTime - event.currentTarget.currentTime) > 0.35) other.currentTime = event.currentTarget.currentTime;
+                    const progress = event.currentTarget.duration ? event.currentTarget.currentTime / event.currentTarget.duration : 0;
+                    setWaveformProgress((current) => ({ ...current, master: progress }));
+                    if (other && !event.currentTarget.paused && Math.abs(other.currentTime - event.currentTarget.currentTime) > 0.35) {
+                      other.currentTime = event.currentTarget.currentTime;
+                      setWaveformProgress((current) => ({ ...current, original: other.duration ? other.currentTime / other.duration : current.original }));
+                    }
                   }}
                 />
               </article>
@@ -752,6 +791,12 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
             <MasteringWaveformComparison
               originalPeaks={masterResult.originalWaveformPeaks}
               masterPeaks={masterResult.masterWaveformPeaks}
+              originalPlayback={{ isPlaying: waveformPlaying === 'original', progress: waveformProgress.original }}
+              masterPlayback={{ isPlaying: waveformPlaying === 'master', progress: waveformProgress.master }}
+              onToggleOriginal={() => toggleWaveformPlayback('original')}
+              onToggleMaster={() => toggleWaveformPlayback('master')}
+              onSeekOriginal={(progress) => seekWaveformPlayback('original', progress)}
+              onSeekMaster={(progress) => seekWaveformPlayback('master', progress)}
             />
             <div className="master-live-meter">
               <div className="master-live-title"><span><i className={masterCompareRef.current?.paused === false ? 'live' : ''} />MEDICIÓN DEL MASTER EN TIEMPO REAL</span><small>Reproduce MASTER V3 · <button onClick={() => navigate('/conceptos-audio')}>¿Qué significa?</button></small></div>
