@@ -761,8 +761,8 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
             <div className="master-result-metrics">
               <Metric label="Preset" value={selectedPreset.name} note={`${strength}% de intensidad`} />
               <Metric label="Ganancia aplicada" value={`${masterResult.appliedGainDb >= 0 ? '+' : ''}${formatNumber(masterResult.appliedGainDb)} dB`} note="Antes del control final" />
-              <Metric label="True Peak" value={`${masterResult.truePeakDbtp.toFixed(1)} dBTP`} note={masterResult.deliveryStatus === "ready" ? "Listo para distribución" : "Revisar antes de publicar"} />
-              <Metric label="LUFS final de la canción" value={`${masterResult.integratedLufs.toFixed(1)} LUFS`} note={`Archivo completo · ITU-R BS.1770 · ${(analysis!.sampleRate / 1000).toFixed(1)} kHz`} />
+              <Metric label="True Peak" value={`${formatNumber(masterResult.truePeakDbtp)} dBTP`} note={masterResult.deliveryStatus === "ready" ? "Listo para distribución" : "Revisar antes de publicar"} />
+              <Metric label="LUFS final de la canción" value={`${formatNumber(masterResult.integratedLufs)} LUFS`} note={`Archivo completo · ITU-R BS.1770 · ${(analysis!.sampleRate / 1000).toFixed(1)} kHz`} />
             </div>
             <div className="master-compare-actions">
               <button className="master-secondary" onClick={() => { releaseLiveMeter(); setError(''); setStage('configure'); }}>← Ajustar sonido</button>
@@ -783,7 +783,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
             <p>Descargaste {downloadedFormat}. El archivo original permanece intacto y tu master está listo para publicar.</p>
             <div className="master-complete-summary">
               <div><span>PRESET</span><strong>{selectedPreset.name}</strong></div>
-              <div><span>LOUDNESS</span><strong>{masterResult.integratedLufs.toFixed(1)} LUFS</strong></div>
+              <div><span>LOUDNESS</span><strong>{formatNumber(masterResult.integratedLufs)} LUFS</strong></div>
               <div><span>PICO</span><strong>{formatNumber(masterResult.peakDbfs)} dBFS</strong></div>
             </div>
             {!isUnlimited && (
