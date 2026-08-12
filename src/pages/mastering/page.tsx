@@ -15,6 +15,7 @@ import {
 } from './masteringAccess';
 import { createMaster } from './masteringEngine';
 import type { LoudnessProfile, MasteringResult } from './masteringEngine';
+import { MasteringWaveformComparison } from './MasteringWaveforms';
 import { downloadBlob, downloadObjectUrl, saveBlobToDisk } from '../../utils/downloadFile';
 import './mastering.css';
 
@@ -748,6 +749,10 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                 />
               </article>
             </div>
+            <MasteringWaveformComparison
+              originalPeaks={masterResult.originalWaveformPeaks}
+              masterPeaks={masterResult.masterWaveformPeaks}
+            />
             <div className="master-live-meter">
               <div className="master-live-title"><span><i className={masterCompareRef.current?.paused === false ? 'live' : ''} />MEDICIÓN DEL MASTER EN TIEMPO REAL</span><small>Reproduce MASTER V3 · <button onClick={() => navigate('/conceptos-audio')}>¿Qué significa?</button></small></div>
               <div className="master-live-grid">
