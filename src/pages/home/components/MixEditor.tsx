@@ -1316,6 +1316,9 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         .preset-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; }
         .stems-toolbar { align-items:center; }
         .stem { position:relative; }
+        .stem-wave { cursor:pointer; }
+        .interactive-stem-wave { cursor:pointer; touch-action:none; outline:none; border-radius:7px; }
+        .interactive-stem-wave:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
         .knob { cursor:ns-resize; transition:box-shadow 150ms; }
         .knob:hover { box-shadow:0 0 12px var(--accent-glow) !important; }
         .eq-band-slider { touch-action:none; }
