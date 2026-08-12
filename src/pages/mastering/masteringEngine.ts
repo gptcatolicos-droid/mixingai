@@ -134,26 +134,76 @@ function repairIsolatedSampleSpikes(buffer: AudioBuffer) {
   }
 }
 
+
+/**
+ * Deterministic linked compressor. Browser DynamicsCompressor nodes can render
+ * short discontinuities in long OfflineAudioContext jobs; working directly on
+ * PCM samples prevents those TV-static-like impulses.
+ */
+function applyLinkedCompression(
+  buffer: AudioBuffer,
+  thresholdDb: number,
+  ratio: number,
+  attackSeconds: number,
+  releaseSeconds: number,
+) {
+  const threshold = dbToGain(thresholdDb);
+  const attack = Math.exp(-1 / Math.max(1, attackSeconds * buffer.sampleRate));
+  const release = Math.exp(-1 / Math.max(1, releaseSeconds * buffer.sampleRate));
+  const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
+  let gain = 1;
+
+  for (let sampleIndex = 0; sampleIndex < buffer.length; sampleIndex += 1) {
+    let linkedPeak = 0;
+    for (const channel of channels) linkedPeak = Math.max(linkedPeak, Math.abs(channel[sampleIndex]));
+    let desiredGain = 1;
+    if (linkedPeak > threshold) {
+      const inputDb = gainToDb(linkedPeak);
+      const outputDb = thresholdDb + (inputDb - thresholdDb) / Math.max(1, ratio);
+      desiredGain = dbToGain(outputDb - inputDb);
+    }
+    const coefficient = desiredGain < gain ? attack : release;
+    gain = desiredGain + coefficient * (gain - desiredGain);
+    for (const channel of channels) channel[sampleIndex] *= gain;
+  }
+}
+
+function applyTransparentLimiter(buffer: AudioBuffer, ceilingDbfs: number) {
+  const ceiling = dbToGain(ceilingDbfs);
+  const kneeStart = ceiling * .92;
+  const kneeRange = Math.max(ceiling - kneeStart, 0.000001);
+
+  for (let channelIndex = 0; channelIndex < buffer.numberOfChannels; channelIndex += 1) {
+    const data = buffer.getChannelData(channelIndex);
+    for (let sampleIndex = 0; sampleIndex < data.length; sampleIndex += 1) {
+      const sample = data[sampleIndex];
+      const magnitude = Math.abs(sample);
+      if (!Number.isFinite(sample)) {
+        data[sampleIndex] = 0;
+      } else if (magnitude > kneeStart) {
+        const limited = kneeStart + kneeRange * (1 - Math.exp(-(magnitude - kneeStart) / kneeRange));
+        data[sampleIndex] = Math.sign(sample) * Math.min(ceiling, limited);
+      }
+    }
+  }
+}
+
+function applyGain(buffer: AudioBuffer, gainDb: number) {
+  const gain = dbToGain(gainDb);
+  for (let channelIndex = 0; channelIndex < buffer.numberOfChannels; channelIndex += 1) {
+    const data = buffer.getChannelData(channelIndex);
+    for (let sampleIndex = 0; sampleIndex < data.length; sampleIndex += 1) data[sampleIndex] *= gain;
+  }
+}
+
+
 async function renderLoudnessCorrection(buffer: AudioBuffer, gainDb: number) {
-  const context = new OfflineAudioContext(2, buffer.length, buffer.sampleRate);
-  const source = context.createBufferSource();
-  source.buffer = buffer;
-  const gain = context.createGain();
-  gain.gain.value = dbToGain(gainDb);
-  const limiter = context.createDynamicsCompressor();
-  limiter.threshold.value = -2.2;
-  limiter.knee.value = 0;
-  limiter.ratio.value = 20;
-  limiter.attack.value = .001;
-  limiter.release.value = .075;
-  source.connect(gain);
-  gain.connect(limiter);
-  limiter.connect(context.destination);
-  source.start();
-  const corrected = await context.startRendering();
-  repairIsolatedSampleSpikes(corrected);
-  enforceSamplePeakCeiling(corrected, -1.2);
-  return corrected;
+  applyGain(buffer, gainDb);
+  applyLinkedCompression(buffer, -2.2, 20, .001, .075);
+  applyTransparentLimiter(buffer, -1.2);
+  repairIsolatedSampleSpikes(buffer);
+  enforceSamplePeakCeiling(buffer, -1.2);
+  return buffer;
 }
 
 export async function createMaster(
@@ -194,34 +244,19 @@ export async function createMaster(
   highShelf.frequency.value = 7200;
   highShelf.gain.value = clamp(configuration.preset.high * 0.22 * scale, -1.2, 1.5);
 
-  const compressor = offline.createDynamicsCompressor();
   const compression = compressionSettings[configuration.preset.compression];
-  compressor.threshold.value = -3 + (compression.threshold + 3) * scale;
-  compressor.ratio.value = 1 + (compression.ratio - 1) * scale;
-  compressor.knee.value = 12;
-  compressor.attack.value = configuration.preset.id === 'rock' ? 0.012 : 0.025;
-  compressor.release.value = configuration.preset.id === 'clasica' ? 0.28 : 0.16;
-
-  const makeup = offline.createGain();
+  const compressionThreshold = -3 + (compression.threshold + 3) * scale;
+  const compressionRatio = 1 + (compression.ratio - 1) * scale;
+  const compressionAttack = configuration.preset.id === 'rock' ? 0.012 : 0.025;
+  const compressionRelease = configuration.preset.id === 'clasica' ? 0.28 : 0.16;
   const requestedGainDb = clamp(targetAverageDbfs[configuration.loudness] - analysis.averageDbfs, -4, 9);
   const appliedGainDb = requestedGainDb * (0.35 + scale * 0.65);
-  makeup.gain.value = dbToGain(appliedGainDb);
-
-  const limiter = offline.createDynamicsCompressor();
-  limiter.threshold.value = -1.4;
-  limiter.knee.value = 0;
-  limiter.ratio.value = 20;
-  limiter.attack.value = 0.003;
-  limiter.release.value = 0.09;
 
   source.connect(highPass);
   highPass.connect(lowShelf);
   lowShelf.connect(midBell);
   midBell.connect(highShelf);
-  highShelf.connect(compressor);
-  connectStereoWidth(offline, compressor, makeup, 1 + clamp(configuration.stereo, 0, 60) / 100);
-  makeup.connect(limiter);
-  limiter.connect(offline.destination);
+  connectStereoWidth(offline, highShelf, offline.destination, 1 + clamp(configuration.stereo, 0, 60) / 100);
 
   onProgress?.(28, 'Aplicando balance tonal');
   source.start();
@@ -229,6 +264,9 @@ export async function createMaster(
   let rendered = await offline.startRendering();
   window.clearInterval(progressTimer);
   repairIsolatedSampleSpikes(rendered);
+  applyLinkedCompression(rendered, compressionThreshold, compressionRatio, compressionAttack, compressionRelease);
+  applyGain(rendered, appliedGainDb);
+  applyTransparentLimiter(rendered, -1.2);
   onProgress?.(82, 'Protegiendo el pico de salida');
   enforceSamplePeakCeiling(rendered, -1.2);
   onProgress?.(86, 'Midiendo loudness integrado');
