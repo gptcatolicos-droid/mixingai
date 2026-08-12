@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
 
 export function createWaveformPeaks(buffer: AudioBuffer, points = 720) {
   const peaks = new Float32Array(points);
@@ -190,7 +190,7 @@ export function CompactWaveformComparison({
       if (kind === 'original') setOriginalPlayback((current) => ({ ...current, isPlaying: false }));
       else setMasterPlayback((current) => ({ ...current, isPlaying: false }));
     },
-    onTimeUpdate: (event: React.SyntheticEvent<HTMLAudioElement>) => {
+    onTimeUpdate: (event: SyntheticEvent<HTMLAudioElement>) => {
       const audio = event.currentTarget;
       const progress = audio.duration ? audio.currentTime / audio.duration : 0;
       if (kind === 'original') setOriginalPlayback((current) => ({ ...current, progress }));
