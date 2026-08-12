@@ -125,28 +125,76 @@ function PaywallModal({ onClose }: { onClose:()=>void }) {
 }
 
 /* ─── Stem Waveform Canvas ─── */
-function StemWave({ peaks, color, currentTime, duration }: { peaks: Float32Array; color: string; currentTime: number; duration: number }) {
+function StemWave({
+  peaks,
+  color,
+  currentTime,
+  duration,
+  muted,
+  onSeek,
+}: {
+  peaks: Float32Array;
+  color: string;
+  currentTime: number;
+  duration: number;
+  muted: boolean;
+  onSeek: (progress: number) => void;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
+
   useEffect(() => {
-    const canvas = ref.current; if (!canvas) return;
+    const canvas = ref.current; if (!canvas || !peaks.length) return;
     const ctx = canvas.getContext('2d'); if (!ctx) return;
     const w = canvas.width, h = canvas.height, mid = h / 2;
+    const progress = duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
     ctx.clearRect(0, 0, w, h);
-    const playedPct = duration > 0 ? currentTime / duration : 0;
-    const playedW = Math.floor(playedPct * w);
+    ctx.fillStyle = 'rgba(255,255,255,.025)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,.10)';
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+    const step = w / peaks.length;
+    ctx.fillStyle = muted ? 'rgba(166,157,175,.32)' : color;
     for (let i = 0; i < peaks.length; i++) {
-      const x = Math.floor((i / peaks.length) * w);
-      const amp = peaks[i] * (mid - 2);
-      const isPlayed = x < playedW;
-      ctx.fillStyle = isPlayed ? color : 'rgba(180,180,220,0.22)';
-      ctx.fillRect(x, mid - amp, 1, amp * 2 || 1);
+      const amp = Math.max(1, Math.min(mid - 3, peaks[i] * (mid - 3)));
+      ctx.fillRect(i * step, mid - amp, Math.max(1, step), amp * 2);
     }
-    if (playedW > 0 && playedW < w) {
-      ctx.fillStyle = color;
-      ctx.fillRect(playedW, 0, 1, h);
+    if (progress > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,.14)';
+      ctx.fillRect(0, 0, w * progress, h);
     }
-  }, [peaks, currentTime, duration, color]);
-  return <canvas ref={ref} width={800} height={64} style={{ width:'100%', height:'64px', display:'block' }} />;
+    const cursor = Math.max(1, Math.min(w - 1, progress * w));
+    ctx.strokeStyle = muted ? 'rgba(255,255,255,.45)' : '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(cursor, 0); ctx.lineTo(cursor, h); ctx.stroke();
+  }, [peaks, color, currentTime, duration, muted]);
+
+  const seek = (clientX: number) => {
+    const canvas = ref.current; if (!canvas) return;
+    const bounds = canvas.getBoundingClientRect();
+    onSeek(Math.max(0, Math.min(1, (clientX - bounds.left) / bounds.width)));
+  };
+
+  return (
+    <canvas
+      ref={ref}
+      width={800}
+      height={64}
+      className="interactive-stem-wave"
+      style={{ width:'100%', height:'64px', display:'block' }}
+      aria-label="Forma de onda interactiva del stem"
+      role="slider"
+      tabIndex={0}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round((duration > 0 ? currentTime / duration : 0) * 100)}
+      onPointerDown={event => seek(event.clientX)}
+      onKeyDown={event => {
+        const progress = duration > 0 ? currentTime / duration : 0;
+        if (event.key === 'ArrowLeft') { event.preventDefault(); onSeek(progress - .05); }
+        if (event.key === 'ArrowRight') { event.preventDefault(); onSeek(progress + .05); }
+      }}
+    />
+  );
 }
 
 /* ─── Track color palette — hex reales (canvas no entiende CSS vars) ─── */
@@ -584,9 +632,8 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     setIsPlaying(false); setCurrentTime(0); pausedTimeRef.current=0;
     if(timeUpdateIntervalRef.current) clearInterval(timeUpdateIntervalRef.current);
   };
-  const handleTimelineSeek=(e: React.MouseEvent<HTMLDivElement>)=>{
-    const r=e.currentTarget.getBoundingClientRect();
-    const t=Math.max(0,Math.min(duration,((e.clientX-r.left)/r.width)*duration));
+  const seekToProgress=(progress:number)=>{
+    const t=Math.max(0,Math.min(duration,progress*duration));
     pausedTimeRef.current=t; setCurrentTime(t);
     if(isPlaying){
       // Parar sin resetear pausedTime, luego reanudar desde nueva posición
@@ -597,6 +644,10 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       // Reanudar en el siguiente tick con la nueva posición ya guardada
       setTimeout(()=>handlePlayPause(), 80);
     }
+  };
+  const handleTimelineSeek=(e: React.MouseEvent<HTMLDivElement>)=>{
+    const r=e.currentTarget.getBoundingClientRect();
+    seekToProgress((e.clientX-r.left)/r.width);
   };
 
   /* ─── Volume / Pan ─── */
@@ -1192,7 +1243,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
                     {/* Waveform */}
                     <div className="stem-wave" style={{background:'rgba(8,4,16,0.3)',padding:'8px 0'}}>
-                      <StemWave peaks={stem.waveformPeaks} color={color} currentTime={currentTime} duration={duration}/>
+                      <StemWave peaks={stem.waveformPeaks} color={color} currentTime={currentTime} duration={duration} muted={stem.muted} onSeek={seekToProgress}/>
                     </div>
 
                     {/* Controls */}
