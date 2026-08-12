@@ -11,8 +11,6 @@ export interface MasteringConfiguration {
   strength: number;
   stereo: number;
   loudness: LoudnessProfile;
-  /** Used by Album Mode to preserve intentional level differences between songs. */
-  targetLufsOverride?: number;
 }
 
 export interface MasteringResult {
@@ -20,14 +18,11 @@ export interface MasteringResult {
   wav24: Blob;
   mp3: Blob;
   peakDbfs: number;
-  truePeakDbtp: number;
   averageDbfs: number;
   integratedLufs: number;
   loudnessMatchGainDb: number;
   appliedGainDb: number;
   samplePeakCeilingDbfs: number;
-  deliveryStatus: 'ready' | 'review';
-  noiseProtectionApplied: boolean;
 }
 
 const compressionSettings: Record<MixPreset['compression'], { threshold: number; ratio: number }> = {
@@ -38,10 +33,15 @@ const compressionSettings: Record<MixPreset['compression'], { threshold: number;
   max: { threshold: -29, ratio: 3.5 },
 };
 
+const targetAverageDbfs: Record<LoudnessProfile, number> = {
+  streaming: -18,
+  balanced: -15,
+  competitive: -12.5,
+};
+
 const targetIntegratedLufs: Record<LoudnessProfile, number> = {
-  // Streaming is aligned with Spotify normal playback; Dynamic preserves more space.
-  streaming: -14,
-  balanced: -16,
+  streaming: -16,
+  balanced: -14,
   competitive: -11,
 };
 
@@ -111,33 +111,25 @@ function enforceSamplePeakCeiling(buffer: AudioBuffer, ceilingDbfs: number) {
   return { peakDbfs: gainToDb(peak), averageDbfs: gainToDb(rms) };
 }
 
-async function measureTruePeakDbtp(buffer: AudioBuffer) {
-  const oversample = 4;
-  const context = new OfflineAudioContext(Math.min(buffer.numberOfChannels, 2), Math.ceil(buffer.length * oversample), buffer.sampleRate * oversample);
-  const source = context.createBufferSource();
-  source.buffer = buffer;
-  source.connect(context.destination);
-  source.start();
-  const rendered = await context.startRendering();
-  let peak = 0;
-  for (let channelIndex = 0; channelIndex < rendered.numberOfChannels; channelIndex += 1) {
-    const data = rendered.getChannelData(channelIndex);
-    for (let sampleIndex = 0; sampleIndex < data.length; sampleIndex += 1) peak = Math.max(peak, Math.abs(data[sampleIndex]));
-  }
-  return gainToDb(peak);
-}
-
-async function enforceTruePeakCeiling(buffer: AudioBuffer, ceilingDbtp: number) {
-  const measuredDbtp = await measureTruePeakDbtp(buffer);
-  const correctionDb = measuredDbtp > ceilingDbtp ? ceilingDbtp - measuredDbtp : 0;
-  if (correctionDb < 0) {
-    const gain = dbToGain(correctionDb);
-    for (let channelIndex = 0; channelIndex < buffer.numberOfChannels; channelIndex += 1) {
-      const data = buffer.getChannelData(channelIndex);
-      for (let sampleIndex = 0; sampleIndex < data.length; sampleIndex += 1) data[sampleIndex] *= gain;
+/**
+ * Remove isolated full-scale discontinuities left by browser DSP renders.
+ * It only replaces a one-sample spike when both neighbours agree, preserving
+ * musical transients and avoiding the clicks users can hear as static.
+ */
+function repairIsolatedSampleSpikes(buffer: AudioBuffer) {
+  for (let channelIndex = 0; channelIndex < buffer.numberOfChannels; channelIndex += 1) {
+    const data = buffer.getChannelData(channelIndex);
+    for (let sampleIndex = 1; sampleIndex < data.length - 1; sampleIndex += 1) {
+      const previous = data[sampleIndex - 1];
+      const current = data[sampleIndex];
+      const next = data[sampleIndex + 1];
+      const neighbourDelta = Math.abs(next - previous);
+      const deviation = Math.abs(current - (previous + next) / 2);
+      if (!Number.isFinite(current) || (neighbourDelta < .08 && deviation > .32)) {
+        data[sampleIndex] = Number.isFinite(previous) && Number.isFinite(next) ? (previous + next) / 2 : 0;
+      }
     }
   }
-  return { truePeakDbtp: correctionDb < 0 ? ceilingDbtp : measuredDbtp };
 }
 
 async function renderLoudnessCorrection(buffer: AudioBuffer, gainDb: number) {
@@ -157,6 +149,7 @@ async function renderLoudnessCorrection(buffer: AudioBuffer, gainDb: number) {
   limiter.connect(context.destination);
   source.start();
   const corrected = await context.startRendering();
+  repairIsolatedSampleSpikes(corrected);
   enforceSamplePeakCeiling(corrected, -1.2);
   return corrected;
 }
@@ -186,8 +179,6 @@ export async function createMaster(
   lowShelf.type = 'lowshelf';
   lowShelf.frequency.value = 115;
   const scale = clamp(configuration.strength / 100, 0, 1);
-  // Every input is leveled from its gated programme loudness, not its file-wide RMS.
-  const targetLufs = configuration.targetLufsOverride ?? targetIntegratedLufs[configuration.loudness];
   lowShelf.gain.value = clamp(configuration.preset.bass * 0.28 * scale, -1.5, 1.8);
 
   const midBell = offline.createBiquadFilter();
@@ -210,10 +201,7 @@ export async function createMaster(
   compressor.release.value = configuration.preset.id === 'clasica' ? 0.28 : 0.16;
 
   const makeup = offline.createGain();
-  // Noise analysis remains advisory: it must not prevent a quiet, clean mix from
-  // reaching the delivery target. True Peak limiting protects the final output.
-  const noiseProtectionApplied = analysis.noiseFloorDbfs > -55;
-  const requestedGainDb = targetLufs - analysis.integratedLufs;
+  const requestedGainDb = clamp(targetAverageDbfs[configuration.loudness] - analysis.averageDbfs, -4, 9);
   const appliedGainDb = requestedGainDb * (0.35 + scale * 0.65);
   makeup.gain.value = dbToGain(appliedGainDb);
 
@@ -238,29 +226,27 @@ export async function createMaster(
   const progressTimer = window.setInterval(() => onProgress?.(58, 'Controlando dinámica y amplitud'), 500);
   let rendered = await offline.startRendering();
   window.clearInterval(progressTimer);
+  repairIsolatedSampleSpikes(rendered);
   onProgress?.(82, 'Protegiendo el pico de salida');
   enforceSamplePeakCeiling(rendered, -1.2);
   onProgress?.(86, 'Midiendo loudness integrado');
   let integratedLufs = await measureIntegratedLufs(rendered, (progress) => {
     onProgress?.(86 + progress * 5, 'Midiendo loudness integrado');
   });
+  const targetLufs = targetIntegratedLufs[configuration.loudness];
   let loudnessCorrectionDb = 0;
   for (let pass = 0; pass < 3 && Math.abs(targetLufs - integratedLufs) > .25; pass += 1) {
-    // The correction is based on the rendered, gated programme loudness, so a
-    // low-level or long file reaches its selected delivery target automatically.
-    const correction = clamp(targetLufs - integratedLufs, -24, 24);
+    const correction = clamp(targetLufs - integratedLufs, -5, 5);
     loudnessCorrectionDb += correction;
     onProgress?.(90 + pass, `Ajustando loudness a ${targetLufs} LUFS`);
     rendered = await renderLoudnessCorrection(rendered, correction);
     integratedLufs = await measureIntegratedLufs(rendered);
   }
-  onProgress?.(92, 'Validando True Peak y entrega');
-  const truePeakCeiling = configuration.loudness === 'competitive' ? -2 : -1;
-  const truePeak = await enforceTruePeakCeiling(rendered, truePeakCeiling);
-  integratedLufs = await measureIntegratedLufs(rendered);
   const outputLevels = enforceSamplePeakCeiling(rendered, -1.2);
-  onProgress?.(93, 'Generando WAV de 24 bits');
-  const wav24 = encodeWav24(rendered, true);
+  onProgress?.(92, 'Generando WAV de 24 bits');
+  // The source is already 24-bit PCM. Adding optional dither here can be
+  // perceived as noise in quiet acoustic passages, so export transparently.
+  const wav24 = encodeWav24(rendered, false);
   onProgress?.(94, 'Generando MP3 de 320 kbps');
   const mp3 = await encodeMp3(wav24, (progress) => {
     onProgress?.(94 + progress * 5, 'Generando MP3 de 320 kbps');
@@ -272,13 +258,10 @@ export async function createMaster(
     wav24,
     mp3,
     peakDbfs: outputLevels.peakDbfs,
-    truePeakDbtp: truePeak.truePeakDbtp,
     averageDbfs: outputLevels.averageDbfs,
     integratedLufs,
     loudnessMatchGainDb: clamp(analysis.integratedLufs - integratedLufs, -18, 18),
     appliedGainDb: appliedGainDb + loudnessCorrectionDb,
     samplePeakCeilingDbfs: -1.2,
-    deliveryStatus: integratedLufs <= targetLufs + .5 && integratedLufs >= targetLufs - .75 && truePeak.truePeakDbtp <= truePeakCeiling + .05 ? 'ready' : 'review',
-    noiseProtectionApplied,
   };
 }

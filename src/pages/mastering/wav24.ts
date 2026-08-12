@@ -7,7 +7,7 @@ const writeText = (view: DataView, offset: number, value: string) => {
 const clamp = (value: number) => Math.max(-1, Math.min(1, value));
 
 /** Encode an AudioBuffer as genuine interleaved 24-bit PCM WAV. */
-export function encodeWav24(audio: AudioBuffer, applyDither = true): Blob {
+export function encodeWav24(audio: AudioBuffer, applyDither = false): Blob {
   const channels = audio.numberOfChannels;
   const bytesPerSample = 3;
   const blockAlign = channels * bytesPerSample;

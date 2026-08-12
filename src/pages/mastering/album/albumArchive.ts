@@ -5,8 +5,6 @@ export interface AlbumArchiveFile {
   fileName: string;
 }
 
-export type AlbumArchiveChunkWriter = (chunk: Uint8Array) => Promise<void> | void;
-
 function archiveFileName(fileName: string, index: number) {
   const safeName = fileName
     .normalize('NFKC')
@@ -17,21 +15,20 @@ function archiveFileName(fileName: string, index: number) {
   return `${String(index + 1).padStart(2, '0')} - ${safeName}`;
 }
 
-export function streamAlbumArchive(
+export function buildAlbumArchive(
   files: AlbumArchiveFile[],
-  writeChunk: AlbumArchiveChunkWriter,
   onProgress?: (progress: number) => void,
 ) {
-  return new Promise<void>((resolve, reject) => {
+  return new Promise<Blob>((resolve, reject) => {
     if (!files.length) {
       reject(new Error('No hay masters listos para empaquetar.'));
       return;
     }
 
+    const chunks: Uint8Array[] = [];
     const totalBytes = files.reduce((total, file) => total + file.blob.size, 0);
     let processedBytes = 0;
     let settled = false;
-    let writeQueue = Promise.resolve();
 
     const fail = (error: unknown) => {
       if (settled) return;
@@ -44,17 +41,13 @@ export function streamAlbumArchive(
         fail(error);
         return;
       }
-      if (chunk.byteLength) {
-        const stableChunk = chunk.slice();
-        writeQueue = writeQueue.then(() => writeChunk(stableChunk));
-      }
+      // fflate may reuse its output buffers. Copy before retaining a chunk,
+      // otherwise a long archive can contain overwritten bytes and fail to unzip.
+      chunks.push(chunk.slice());
       if (final && !settled) {
-        void writeQueue.then(() => {
-          if (settled) return;
-          settled = true;
-          onProgress?.(100);
-          resolve();
-        }, fail);
+        settled = true;
+        onProgress?.(100);
+        resolve(new Blob(chunks, { type: 'application/zip' }));
       }
     });
 
@@ -84,13 +77,4 @@ export function streamAlbumArchive(
       }
     })();
   });
-}
-
-export async function buildAlbumArchive(
-  files: AlbumArchiveFile[],
-  onProgress?: (progress: number) => void,
-) {
-  const chunks: Uint8Array[] = [];
-  await streamAlbumArchive(files, (chunk) => { chunks.push(chunk); }, onProgress);
-  return new Blob(chunks, { type: 'application/zip' });
 }
