@@ -42,6 +42,11 @@ function Metric({ label, value, note }: { label: string; value: string; note?: s
   );
 }
 
+/** Keep the result screen available even if a browser reports a missing meter value. */
+function formatNumber(value: unknown, digits = 1) {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—';
+}
+
 function getStoredUser() {
   try { return JSON.parse(localStorage.getItem('audioMixerUser') || '{}'); }
   catch { return {}; }
@@ -225,7 +230,11 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
       for (let index = 0; index < samples.length; index += 1) sum += samples[index] * samples[index];
       const rms = Math.sqrt(sum / samples.length);
       const playbackGainDb = element.volume > 0 ? 20 * Math.log10(element.volume) : 0;
-      const loudnessCalibrationDb = masterResult ? masterResult.integratedLufs - masterResult.averageDbfs : 0;
+      const loudnessCalibrationDb = masterResult
+        && Number.isFinite(masterResult.integratedLufs)
+        && Number.isFinite(masterResult.averageDbfs)
+        ? masterResult.integratedLufs - masterResult.averageDbfs
+        : 0;
       const momentary = rms > .00001
         ? Math.max(-60, Math.min(0, 20 * Math.log10(rms) - playbackGainDb + loudnessCalibrationDb))
         : -60;
@@ -724,7 +733,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                 />
               </article>
               <article className="master-version">
-                <div><span>MASTER V3</span><small>{volumeMatched ? `${masterResult.loudnessMatchGainDb.toFixed(1)} dB para comparar` : 'WAV PCM 24 bits'}</small></div>
+                <div><span>MASTER V3</span><small>{volumeMatched ? `${formatNumber(masterResult.loudnessMatchGainDb)} dB para comparar` : 'WAV PCM 24 bits'}</small></div>
                 <audio
                   ref={masterCompareRef}
                   controls
@@ -743,17 +752,17 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
               <div className="master-live-title"><span><i className={masterCompareRef.current?.paused === false ? 'live' : ''} />MEDICIÓN DEL MASTER EN TIEMPO REAL</span><small>Reproduce MASTER V3 · <button onClick={() => navigate('/conceptos-audio')}>¿Qué significa?</button></small></div>
               <div className="master-live-grid">
                 <canvas ref={liveMeterCanvasRef} width="78" height="150" aria-label="Medidor VU en tiempo real" />
-                <div><strong>{liveMomentary.toFixed(1)}</strong><span>LUFS momentáneos</span><small>Nivel actual · cambia con la música</small></div>
-                <div><strong>{liveIntegrated.toFixed(1)}</strong><span>Promedio parcial</span><small>Desde que diste play</small></div>
-                <div><strong>{masterResult.truePeakDbtp.toFixed(1)}</strong><span>dBTP True Peak</span><small>{masterResult.deliveryStatus === "ready" ? "Validado para distribución" : "Revisar objetivo de loudness"}</small></div>
+                <div><strong>{formatNumber(liveMomentary)}</strong><span>LUFS momentáneos</span><small>Nivel actual · cambia con la música</small></div>
+                <div><strong>{formatNumber(liveIntegrated)}</strong><span>Promedio parcial</span><small>Desde que diste play</small></div>
+                <div><strong>{formatNumber(masterResult.truePeakDbtp)}</strong><span>dBTP True Peak</span><small>{masterResult.deliveryStatus === "ready" ? "Validado para distribución" : "Revisar objetivo de loudness"}</small></div>
               </div>
-              <p className="master-live-explanation">La lectura en vivo cambia segundo a segundo. <strong>{masterResult.integratedLufs.toFixed(1)} LUFS</strong> es el promedio certificado del archivo completo.</p>
+              <p className="master-live-explanation">La lectura en vivo cambia segundo a segundo. <strong>{formatNumber(masterResult.integratedLufs)} LUFS</strong> es el promedio certificado del archivo completo.</p>
             </div>
             <div className="master-result-metrics">
               <Metric label="Preset" value={selectedPreset.name} note={`${strength}% de intensidad`} />
-              <Metric label="Ganancia aplicada" value={`${masterResult.appliedGainDb >= 0 ? '+' : ''}${masterResult.appliedGainDb.toFixed(1)} dB`} note="Antes del control final" />
-              <Metric label="True Peak" value={`${masterResult.truePeakDbtp.toFixed(1)} dBTP`} note={masterResult.deliveryStatus === "ready" ? "Listo para distribución" : "Revisar antes de publicar"} />
-              <Metric label="LUFS final de la canción" value={`${masterResult.integratedLufs.toFixed(1)} LUFS`} note={`Archivo completo · ITU-R BS.1770 · ${(analysis!.sampleRate / 1000).toFixed(1)} kHz`} />
+              <Metric label="Ganancia aplicada" value={`${masterResult.appliedGainDb >= 0 ? '+' : ''}${formatNumber(masterResult.appliedGainDb)} dB`} note="Antes del control final" />
+              <Metric label="True Peak" value={`${formatNumber(masterResult.truePeakDbtp)} dBTP`} note={masterResult.deliveryStatus === "ready" ? "Listo para distribución" : "Revisar antes de publicar"} />
+              <Metric label="LUFS final de la canción" value={`${formatNumber(masterResult.integratedLufs)} LUFS`} note={`Archivo completo · ITU-R BS.1770 · ${(analysis!.sampleRate / 1000).toFixed(1)} kHz`} />
             </div>
             <div className="master-compare-actions">
               <button className="master-secondary" onClick={() => { releaseLiveMeter(); setError(''); setStage('configure'); }}>← Ajustar sonido</button>
@@ -774,8 +783,8 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
             <p>Descargaste {downloadedFormat}. El archivo original permanece intacto y tu master está listo para publicar.</p>
             <div className="master-complete-summary">
               <div><span>PRESET</span><strong>{selectedPreset.name}</strong></div>
-              <div><span>LOUDNESS</span><strong>{masterResult.integratedLufs.toFixed(1)} LUFS</strong></div>
-              <div><span>PICO</span><strong>{masterResult.peakDbfs.toFixed(1)} dBFS</strong></div>
+              <div><span>LOUDNESS</span><strong>{formatNumber(masterResult.integratedLufs)} LUFS</strong></div>
+              <div><span>PICO</span><strong>{formatNumber(masterResult.peakDbfs)} dBFS</strong></div>
             </div>
             {!isUnlimited && (
               <div className="master-complete-upgrade">

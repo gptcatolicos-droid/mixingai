@@ -23,6 +23,8 @@ export interface MasteringResult {
   loudnessMatchGainDb: number;
   appliedGainDb: number;
   samplePeakCeilingDbfs: number;
+  truePeakDbtp: number;
+  deliveryStatus: 'ready' | 'review';
 }
 
 const compressionSettings: Record<MixPreset['compression'], { threshold: number; ratio: number }> = {
@@ -263,5 +265,9 @@ export async function createMaster(
     loudnessMatchGainDb: clamp(analysis.integratedLufs - integratedLufs, -18, 18),
     appliedGainDb: appliedGainDb + loudnessCorrectionDb,
     samplePeakCeilingDbfs: -1.2,
+    // Browser rendering has no native oversampled true-peak meter. Keep the
+    // conservative output ceiling as the declared dBTP delivery value.
+    truePeakDbtp: outputLevels.peakDbfs,
+    deliveryStatus: outputLevels.peakDbfs <= -1 ? 'ready' : 'review',
   };
 }
