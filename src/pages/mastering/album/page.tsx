@@ -8,6 +8,7 @@ import { getMasteringEntitlements, secureMasteringAccessEnabled } from '../maste
 import { createMaster } from '../masteringEngine';
 import type { LoudnessProfile } from '../masteringEngine';
 import { buildAlbumArchive } from './albumArchive';
+import { CompactWaveformComparison } from '../MasteringWaveforms';
 import '../mastering.css';
 import './album.css';
 
@@ -28,6 +29,8 @@ interface AlbumTrack {
   peakDbfs?: number;
   appliedGainDb?: number;
   integratedLufs?: number;
+  originalWaveformPeaks?: Float32Array;
+  masterWaveformPeaks?: Float32Array;
   error?: string;
 }
 
@@ -199,6 +202,8 @@ export default function AlbumMasteringPage() {
               peakDbfs: result.peakDbfs,
               appliedGainDb: result.appliedGainDb,
               integratedLufs: result.integratedLufs,
+              originalWaveformPeaks: result.originalWaveformPeaks,
+              masterWaveformPeaks: result.masterWaveformPeaks,
             }
           : item));
       } catch (processingError) {
@@ -315,7 +320,7 @@ export default function AlbumMasteringPage() {
                     </div>
                     <em>{track.label}</em>
                     {stage === 'configure' && <button onClick={() => removeTrack(track.id)}>×</button>}
-                    {stage === 'results' && track.status === 'done' && <div className="album-downloads"><button onClick={() => download(track, 'mp3')}>MP3</button><button onClick={() => download(track, 'wav')}>WAV 24</button></div>}
+{stage === 'results' && track.status === 'done' && <><div className="album-downloads"><button onClick={() => download(track, 'mp3')}>MP3</button><button onClick={() => download(track, 'wav')}>WAV 24</button></div>{track.originalWaveformPeaks && track.masterWaveformPeaks && <CompactWaveformComparison originalPeaks={track.originalWaveformPeaks} masterPeaks={track.masterWaveformPeaks} />}</>}
                   </article>
                 ))}
               </section>

@@ -3,6 +3,7 @@ import type { AudioFileAnalysis } from './audioAnalysis';
 import { encodeMp3 } from './mp3Encoder';
 import { measureIntegratedLufs } from './loudnessMeter';
 import { encodeWav24 } from './wav24';
+import { createWaveformPeaks } from './MasteringWaveforms';
 
 export type LoudnessProfile = 'streaming' | 'balanced' | 'competitive';
 
@@ -25,6 +26,8 @@ export interface MasteringResult {
   samplePeakCeilingDbfs: number;
   truePeakDbtp: number;
   deliveryStatus: 'ready' | 'review';
+  originalWaveformPeaks: Float32Array;
+  masterWaveformPeaks: Float32Array;
 }
 
 const compressionSettings: Record<MixPreset['compression'], { threshold: number; ratio: number }> = {
@@ -218,6 +221,7 @@ export async function createMaster(
   const sourceBuffer = await decodingContext.decodeAudioData(fileBuffer.slice(0));
   await decodingContext.close();
 
+  const originalWaveformPeaks = createWaveformPeaks(sourceBuffer);
   const offline = new OfflineAudioContext(2, sourceBuffer.length, sourceBuffer.sampleRate);
   const source = offline.createBufferSource();
   source.buffer = sourceBuffer;
@@ -307,5 +311,7 @@ export async function createMaster(
     // conservative output ceiling as the declared dBTP delivery value.
     truePeakDbtp: outputLevels.peakDbfs,
     deliveryStatus: outputLevels.peakDbfs <= -1 ? 'ready' : 'review',
+    originalWaveformPeaks,
+    masterWaveformPeaks: createWaveformPeaks(rendered),
   };
 }
