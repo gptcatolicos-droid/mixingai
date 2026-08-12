@@ -202,14 +202,19 @@
 .master-waveform-heading p { max-width:360px; margin:0; color:#847b8c; font-size:10px; line-height:1.55; }
 .master-waveform-strip { padding:11px 12px; border:1px solid rgba(255,255,255,.075); border-radius:10px; background:rgba(8,7,12,.52); }
 .master-waveform-strip + .master-waveform-strip { margin-top:8px; }
-.master-waveform-strip > div { display:flex; justify-content:space-between; gap:12px; margin-bottom:8px; }
+.master-waveform-strip-top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
 .master-waveform-strip span { color:#d9cfe0; font:800 9px 'DM Mono',monospace; letter-spacing:.1em; }
-.master-waveform-strip small { color:#756c7d; font-size:8px; }
-.master-waveform-strip canvas { width:100%; height:82px; display:block; border-radius:6px; }
+.master-waveform-strip small { margin-left:auto; color:#756c7d; font-size:8px; }
+.master-waveform-strip button { min-height:27px; padding:0 10px; flex:0 0 auto; border:1px solid rgba(255,255,255,.15); border-radius:7px; background:rgba(255,255,255,.04); color:#e8ddec; font:800 8px 'DM Mono',monospace; cursor:pointer; }
+.master-waveform-strip button:hover { border-color:rgba(235,113,210,.7); background:rgba(235,113,210,.12); }
+.master-waveform-strip canvas { width:100%; height:82px; display:block; border-radius:6px; cursor:pointer; touch-action:none; outline:none; }
+.master-waveform-strip canvas:focus-visible { outline:2px solid #df6dcc; outline-offset:3px; }
+.master-waveform-audio { display:none; }
 .album-waveform-pair { grid-column:2/-1; display:grid; grid-template-columns:1fr 1fr; gap:5px; }
 .album-waveform-pair .master-waveform-strip { padding:7px; }
-.album-waveform-pair .master-waveform-strip > div { margin-bottom:4px; }
+.album-waveform-pair .master-waveform-strip-top { margin-bottom:4px; }
 .album-waveform-pair .master-waveform-strip small { display:none; }
+.album-waveform-pair .master-waveform-strip button { min-height:23px; padding:0 7px; font-size:7px; }
 .album-waveform-pair .master-waveform-strip canvas { height:36px; }
 @media(max-width:800px) { .master-waveform-heading { align-items:flex-start; flex-direction:column; gap:8px; } .album-waveform-pair { grid-column:1/-1; } }
 @media(max-width:520px) { .master-waveform-comparison { padding:14px; } .master-waveform-strip canvas { height:64px; } .album-waveform-pair { grid-template-columns:1fr; } }

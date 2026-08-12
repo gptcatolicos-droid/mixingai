@@ -22,6 +22,7 @@ interface AlbumTrack {
   status: TrackStatus;
   progress: number;
   label: string;
+  originalUrl?: string;
   wavUrl?: string;
   mp3Url?: string;
   wavBlob?: Blob;
@@ -87,6 +88,7 @@ export default function AlbumMasteringPage() {
   useEffect(() => { tracksRef.current = tracks; }, [tracks]);
   useEffect(() => () => {
     tracksRef.current.forEach((track) => {
+      if (track.originalUrl) URL.revokeObjectURL(track.originalUrl);
       if (track.wavUrl) URL.revokeObjectURL(track.wavUrl);
       if (track.mp3Url) URL.revokeObjectURL(track.mp3Url);
     });
@@ -127,6 +129,7 @@ export default function AlbumMasteringPage() {
           id: crypto.randomUUID(),
           file,
           analysis,
+          originalUrl: URL.createObjectURL(file),
           status: 'ready',
           progress: 0,
           label: 'Lista para procesar',
@@ -320,7 +323,7 @@ export default function AlbumMasteringPage() {
                     </div>
                     <em>{track.label}</em>
                     {stage === 'configure' && <button onClick={() => removeTrack(track.id)}>×</button>}
-{stage === 'results' && track.status === 'done' && <><div className="album-downloads"><button onClick={() => download(track, 'mp3')}>MP3</button><button onClick={() => download(track, 'wav')}>WAV 24</button></div>{track.originalWaveformPeaks && track.masterWaveformPeaks && <CompactWaveformComparison originalPeaks={track.originalWaveformPeaks} masterPeaks={track.masterWaveformPeaks} />}</>}
+{stage === 'results' && track.status === 'done' && <><div className="album-downloads"><button onClick={() => download(track, 'mp3')}>MP3</button><button onClick={() => download(track, 'wav')}>WAV 24</button></div>{track.originalWaveformPeaks && track.masterWaveformPeaks && track.originalUrl && track.wavUrl && <CompactWaveformComparison originalPeaks={track.originalWaveformPeaks} masterPeaks={track.masterWaveformPeaks} originalSource={track.originalUrl} masterSource={track.wavUrl} />}</>}
                   </article>
                 ))}
               </section>
