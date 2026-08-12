@@ -63,8 +63,8 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
   const masterCompareRef = useRef<HTMLAudioElement>(null);
   const liveMeterCanvasRef = useRef<HTMLCanvasElement>(null);
   const meterContextRef = useRef<AudioContext | null>(null);
-  const meterSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const meterAnalyserRef = useRef<AnalyserNode | null>(null);
+  const meterSourceRefs = useRef<Partial<Record<'original' | 'master', MediaElementAudioSourceNode>>>({});
+  const meterAnalyserRefs = useRef<Partial<Record<'original' | 'master', AnalyserNode>>>({});
   const meterAnimationRef = useRef<number | null>(null);
   const meterEnergyRef = useRef({ sum: 0, count: 0 });
   const [stage, setStage] = useState<Stage>('upload');
@@ -91,6 +91,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
   const [downloadedFormat, setDownloadedFormat] = useState<'MP3' | 'WAV 24-bit' | null>(null);
   const [liveMomentary, setLiveMomentary] = useState(-60);
   const [liveIntegrated, setLiveIntegrated] = useState(-60);
+  const [liveMeterSource, setLiveMeterSource] = useState<'original' | 'master'>('master');
   const [savedConfigurations, setSavedConfigurations] = useState<SavedMasteringConfiguration[]>(() => {
     const user = getStoredUser();
     const key = user.id || user.email || 'guest';
@@ -160,7 +161,13 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     meterContextRef.current?.close().catch(() => {});
   }, []);
 
-  const drawLiveMeter = (lufs: number) => {
+  const activeMeterAnalysis = () => liveMeterSource === 'original'
+    ? analysis
+    : masterResult
+      ? { integratedLufs: masterResult.integratedLufs, averageDbfs: masterResult.averageDbfs, truePeakDbtp: masterResult.truePeakDbtp, deliveryStatus: masterResult.deliveryStatus }
+      : null;
+
+  const drawLiveMeter = (lufs: number, targetLufs?: number) => {
     const canvas = liveMeterCanvasRef.current;
     if (!canvas) return;
     const context = canvas.getContext('2d');
@@ -182,8 +189,8 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     context.fillRect(43, height - 9 - Math.round(barHeight * .96), 24, Math.round(barHeight * .96));
     context.strokeStyle = 'rgba(255,255,255,.16)';
     context.setLineDash([3, 3]);
-    const targetLufs = masterResult?.integratedLufs ?? -16;
-    const targetY = height - 9 - Math.round((height - 18) * ((targetLufs + 48) / 43));
+    const reference = targetLufs ?? activeMeterAnalysis()?.integratedLufs ?? -16;
+    const targetY = height - 9 - Math.round((height - 18) * ((reference + 48) / 43));
     context.beginPath(); context.moveTo(5, targetY); context.lineTo(width - 5, targetY); context.stroke();
     context.setLineDash([]);
   };
@@ -197,12 +204,12 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
     stopLiveMeter();
     meterContextRef.current?.close().catch(() => {});
     meterContextRef.current = null;
-    meterSourceRef.current = null;
-    meterAnalyserRef.current = null;
+    meterSourceRefs.current = {};
+    meterAnalyserRefs.current = {};
   };
 
-  const startLiveMeter = async () => {
-    const element = masterCompareRef.current;
+  const startLiveMeter = async (sourceKind: 'original' | 'master') => {
+    const element = sourceKind === 'original' ? originalCompareRef.current : masterCompareRef.current;
     if (!element) return;
     let context = meterContextRef.current;
     if (!context) {
@@ -210,21 +217,28 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
       meterContextRef.current = context;
     }
     if (context.state === 'suspended') await context.resume();
-    if (!meterSourceRef.current) {
+    if (!meterSourceRefs.current[sourceKind]) {
       const source = context.createMediaElementSource(element);
       const analyser = context.createAnalyser();
       analyser.fftSize = 2048;
       analyser.smoothingTimeConstant = .62;
       source.connect(analyser);
       analyser.connect(context.destination);
-      meterSourceRef.current = source;
-      meterAnalyserRef.current = analyser;
+      meterSourceRefs.current[sourceKind] = source;
+      meterAnalyserRefs.current[sourceKind] = analyser;
     }
+    const reference = sourceKind === 'original'
+      ? analysis
+      : masterResult
+        ? { integratedLufs: masterResult.integratedLufs, averageDbfs: masterResult.averageDbfs }
+        : null;
+    if (!reference) return;
+    setLiveMeterSource(sourceKind);
     meterEnergyRef.current = { sum: 0, count: 0 };
     setLiveMomentary(-60);
     setLiveIntegrated(-60);
     stopLiveMeter();
-    const analyser = meterAnalyserRef.current;
+    const analyser = meterAnalyserRefs.current[sourceKind];
     if (!analyser) return;
     const samples = new Float32Array(analyser.fftSize);
     const loop = () => {
@@ -233,11 +247,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
       for (let index = 0; index < samples.length; index += 1) sum += samples[index] * samples[index];
       const rms = Math.sqrt(sum / samples.length);
       const playbackGainDb = element.volume > 0 ? 20 * Math.log10(element.volume) : 0;
-      const loudnessCalibrationDb = masterResult
-        && Number.isFinite(masterResult.integratedLufs)
-        && Number.isFinite(masterResult.averageDbfs)
-        ? masterResult.integratedLufs - masterResult.averageDbfs
-        : 0;
+      const loudnessCalibrationDb = reference.integratedLufs - reference.averageDbfs;
       const momentary = rms > .00001
         ? Math.max(-60, Math.min(0, 20 * Math.log10(rms) - playbackGainDb + loudnessCalibrationDb))
         : -60;
@@ -247,7 +257,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
         meterEnergyRef.current.count += 1;
         setLiveIntegrated(10 * Math.log10(meterEnergyRef.current.sum / meterEnergyRef.current.count));
       }
-      drawLiveMeter(momentary);
+      drawLiveMeter(momentary, reference.integratedLufs);
       meterAnimationRef.current = requestAnimationFrame(loop);
     };
     loop();
@@ -753,9 +763,9 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                   ref={originalCompareRef}
                   controls
                   src={audioUrl}
-                  onPlay={() => { masterCompareRef.current?.pause(); stopLiveMeter(); setWaveformPlaying('original'); }}
-                  onPause={() => setWaveformPlaying((current) => current === 'original' ? null : current)}
-                  onEnded={() => setWaveformPlaying(null)}
+                  onPlay={() => { masterCompareRef.current?.pause(); startLiveMeter('original'); setWaveformPlaying('original'); }}
+                  onPause={() => { stopLiveMeter(); setWaveformPlaying((current) => current === 'original' ? null : current); }}
+                  onEnded={() => { stopLiveMeter(); setWaveformPlaying(null); setLiveMomentary(-60); setLiveIntegrated(-60); drawLiveMeter(-60); }}
                   onTimeUpdate={(event) => {
                     const other = masterCompareRef.current;
                     const progress = event.currentTarget.duration ? event.currentTarget.currentTime / event.currentTarget.duration : 0;
@@ -773,7 +783,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                   ref={masterCompareRef}
                   controls
                   src={masterUrl}
-                  onPlay={() => { originalCompareRef.current?.pause(); startLiveMeter(); setWaveformPlaying('master'); }}
+                  onPlay={() => { originalCompareRef.current?.pause(); startLiveMeter('master'); setWaveformPlaying('master'); }}
                   onPause={() => { stopLiveMeter(); setWaveformPlaying((current) => current === 'master' ? null : current); }}
                   onEnded={() => { stopLiveMeter(); setWaveformPlaying(null); setLiveMomentary(-60); setLiveIntegrated(-60); drawLiveMeter(-60); }}
                   onTimeUpdate={(event) => {
@@ -799,14 +809,14 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
               onSeekMaster={(progress) => seekWaveformPlayback('master', progress)}
             />
             <div className="master-live-meter">
-              <div className="master-live-title"><span><i className={masterCompareRef.current?.paused === false ? 'live' : ''} />MEDICIÓN DEL MASTER EN TIEMPO REAL</span><small>Reproduce MASTER V3 · <button onClick={() => navigate('/conceptos-audio')}>¿Qué significa?</button></small></div>
+              <div className="master-live-title"><span><i className={waveformPlaying ? 'live' : ''} />MEDICIÓN DE {liveMeterSource === 'original' ? 'LA MEZCLA' : 'EL MASTER'} EN TIEMPO REAL</span><small>Reproduce {liveMeterSource === 'original' ? 'ORIGINAL' : 'MASTER V3'} · <button onClick={() => navigate('/conceptos-audio')}>¿Qué significa?</button></small></div>
               <div className="master-live-grid">
-                <canvas ref={liveMeterCanvasRef} width="78" height="150" aria-label="Medidor VU en tiempo real" />
+                <canvas ref={liveMeterCanvasRef} width="78" height="150" aria-label="Medidor de loudness en tiempo real" />
                 <div><strong>{formatNumber(liveMomentary)}</strong><span>LUFS momentáneos</span><small>Nivel actual · cambia con la música</small></div>
                 <div><strong>{formatNumber(liveIntegrated)}</strong><span>Promedio parcial</span><small>Desde que diste play</small></div>
-                <div><strong>{formatNumber(masterResult.truePeakDbtp)}</strong><span>dBTP True Peak</span><small>{masterResult.deliveryStatus === "ready" ? "Validado para distribución" : "Revisar objetivo de loudness"}</small></div>
+                <div><strong>{liveMeterSource === 'original' ? `${formatNumber(analysis!.peakDbfs)} dBFS` : `${formatNumber(masterResult.truePeakDbtp)} dBTP`}</strong><span>{liveMeterSource === 'original' ? 'Pico máximo' : 'True Peak'}</span><small>{liveMeterSource === 'original' ? 'Medición de la mezcla original' : masterResult.deliveryStatus === "ready" ? "Validado para distribución" : "Revisar objetivo de loudness"}</small></div>
               </div>
-              <p className="master-live-explanation">La lectura en vivo cambia segundo a segundo. <strong>{formatNumber(masterResult.integratedLufs)} LUFS</strong> es el promedio certificado del archivo completo.</p>
+              <p className="master-live-explanation">La lectura en vivo cambia segundo a segundo. <strong>{formatNumber(liveMeterSource === 'original' ? analysis!.integratedLufs : masterResult.integratedLufs)} LUFS</strong> es el promedio certificado de {liveMeterSource === 'original' ? 'la mezcla original' : 'el master completo'}.</p>
             </div>
             <div className="master-result-metrics">
               <Metric label="Preset" value={selectedPreset.name} note={`${strength}% de intensidad`} />
