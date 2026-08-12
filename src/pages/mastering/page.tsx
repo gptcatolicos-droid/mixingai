@@ -809,7 +809,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
               onSeekMaster={(progress) => seekWaveformPlayback('master', progress)}
             />
             <div className="master-live-meter">
-              <div className="master-live-title"><span><i className={waveformPlaying ? 'live' : ''} />MEDICIÓN DE {liveMeterSource === 'original' ? 'LA MEZCLA' : 'L MASTER'} EN TIEMPO REAL</span><small>Reproduce {liveMeterSource === 'original' ? 'ORIGINAL' : 'MASTER V3'} · <button onClick={() => navigate('/conceptos-audio')}>¿Qué significa?</button></small></div>
+              <div className="master-live-title"><span><i className={waveformPlaying ? 'live' : ''} />MEDICIÓN DE {liveMeterSource === 'original' ? 'LA MEZCLA' : 'EL MASTER'} EN TIEMPO REAL</span><small>Reproduce {liveMeterSource === 'original' ? 'ORIGINAL' : 'MASTER V3'} · <button onClick={() => navigate('/conceptos-audio')}>¿Qué significa?</button></small></div>
               <div className="master-live-grid">
                 <canvas ref={liveMeterCanvasRef} width="78" height="150" aria-label="Medidor de loudness en tiempo real" />
                 <div><strong>{formatNumber(liveMomentary)}</strong><span>LUFS momentáneos</span><small>Nivel actual · cambia con la música</small></div>
