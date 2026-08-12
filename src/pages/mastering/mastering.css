@@ -196,7 +196,7 @@
 }
 
 
-.master-waveform-comparison { margin-top:14px; padding:20px; border:1px solid rgba(103,138,255,.22); border-radius:16px; background:linear-gradient(145deg,rgba(60,76,148,.10),rgba(22,15,29,.96)); text-align:left; }
+.generated-mix-waveform { margin:14px 0; padding:10px; border:1px solid rgba(103,138,255,.22); border-radius:13px; background:rgba(35,49,103,.10); }\n.master-waveform-comparison { margin-top:14px; padding:20px; border:1px solid rgba(103,138,255,.22); border-radius:16px; background:linear-gradient(145deg,rgba(60,76,148,.10),rgba(22,15,29,.96)); text-align:left; }
 .master-waveform-heading { display:flex; justify-content:space-between; gap:24px; align-items:flex-end; margin-bottom:16px; }
 .master-waveform-heading h2 { margin:8px 0 0; font-size:21px; letter-spacing:-.035em; }
 .master-waveform-heading p { max-width:360px; margin:0; color:#847b8c; font-size:10px; line-height:1.55; }
