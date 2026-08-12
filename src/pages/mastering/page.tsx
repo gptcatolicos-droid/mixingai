@@ -15,7 +15,7 @@ import {
 } from './masteringAccess';
 import { createMaster } from './masteringEngine';
 import type { LoudnessProfile, MasteringResult } from './masteringEngine';
-import { MasteringWaveformComparison } from './MasteringWaveforms';
+import { GeneratedMixWaveform, MasteringWaveformComparison } from './MasteringWaveforms';
 import { downloadBlob, downloadObjectUrl, saveBlobToDisk } from '../../utils/downloadFile';
 import './mastering.css';
 
@@ -638,6 +638,11 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
               <audio ref={audioRef} controls src={audioUrl} />
               <button onClick={reset}>Cambiar archivo</button>
             </div>
+
+            {sourceWasGeneratedMix && analysis && (
+              <GeneratedMixWaveform peaks={analysis.waveformPeaks} source={audioUrl} />
+            )}
+
 
             <div className={`master-status ${status.tone}`}>
               <i>{status.tone === 'good' ? '✓' : '!'}</i>
