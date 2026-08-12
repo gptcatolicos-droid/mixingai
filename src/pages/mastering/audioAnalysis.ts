@@ -17,6 +17,7 @@ export interface AudioFileAnalysis {
   isDualMono: boolean;
   noiseFloorDbfs: number;
   signalToNoiseDb: number;
+  waveformPeaks: Float32Array;
 }
 
 const readAscii = (view: DataView, offset: number, length: number) => {
@@ -61,6 +62,22 @@ function detectBitDepth(buffer: ArrayBuffer): number | null {
 }
 
 const toDb = (value: number) => value > 0 ? 20 * Math.log10(value) : -120;
+
+const createWaveformPeaks = (buffer: AudioBuffer, points = 720) => {
+  const peaks = new Float32Array(points);
+  const samplesPerPoint = Math.max(1, Math.floor(buffer.length / points));
+  for (let point = 0; point < points; point += 1) {
+    const start = point * samplesPerPoint;
+    const end = Math.min(buffer.length, start + samplesPerPoint);
+    let peak = 0;
+    for (let channelIndex = 0; channelIndex < buffer.numberOfChannels; channelIndex += 1) {
+      const channel = buffer.getChannelData(channelIndex);
+      for (let sample = start; sample < end; sample += 1) peak = Math.max(peak, Math.abs(channel[sample]));
+    }
+    peaks[point] = peak;
+  }
+  return peaks;
+};
 
 export async function analyzeAudioFile(file: File): Promise<AudioFileAnalysis> {
   const fileBuffer = await file.arrayBuffer();
@@ -145,6 +162,7 @@ export async function analyzeAudioFile(file: File): Promise<AudioFileAnalysis> {
       isDualMono: stereoCorrelation !== null && stereoCorrelation > .995,
       noiseFloorDbfs,
       signalToNoiseDb,
+      waveformPeaks: createWaveformPeaks(decoded),
     };
   } catch {
     throw new Error('No pudimos leer este audio. Prueba con un WAV o AIFF estéreo sin protección.');
