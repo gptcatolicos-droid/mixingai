@@ -43,4 +43,7 @@ export const PRESETS: MixPreset[] = [
   { id:'gospel', name:'Gospel', desc:'Coro potente, voces llenas, reverb de iglesia', color:'#FBBF24',
     bass:2, mid:3, high:3, compression:'medium', reverbWet:0.45, delayWet:0.05, stereoWidth:0.7,
     tags:['Coro','Iglesia'], wavePattern:[.5,.6,.7,.8,.9,.8,.7,.8,.9,.8,.7,.6,.7,.8,.7,.6] },
+  { id:'neutro', name:'Neutro', desc:'Conserva el sonido original; solo normaliza nivel y protege picos', color:'#22D3EE',
+    bass:0, mid:0, high:0, compression:'none', reverbWet:0, delayWet:0, stereoWidth:0,
+    tags:['Transparente','Sin efectos'], wavePattern:[.45,.45,.45,.45,.45,.45,.45,.45,.45,.45,.45,.45,.45,.45,.45,.45] },
 ];
