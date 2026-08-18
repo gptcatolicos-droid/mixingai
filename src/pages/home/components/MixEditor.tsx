@@ -513,6 +513,12 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     if (dryGainRef.current) dryGainRef.current.gain.setTargetAtTime(1-rvWet*0.4,t,s);
     const dlWet = preset.delayWet * (delayOnRef.current?1:0);
     if (delayGainRef.current) delayGainRef.current.gain.setTargetAtTime(dlWet,t,s);
+    if (preset.id === 'neutro') {
+      reverbOnRef.current=false; delayOnRef.current=false;
+      setReverbActive(false); setDelayActive(false); setWidenerActive(false);
+      setIaEqPreset(IAEQ_PRESETS[0]); setIaEqBands([...IAEQ_PRESETS[0].bands]);
+      updateLiveIAEQ(IAEQ_PRESETS[0].bands);
+    }
     setBassGain(preset.bass); setMidGain(preset.mid); setHighGain(preset.high);
     setActivePreset(preset);
   };
@@ -537,7 +543,15 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     stem.eqLow.gain.setTargetAtTime(preset.bass,ctx.currentTime,0.05);
     stem.eqMid.gain.setTargetAtTime(preset.mid,ctx.currentTime,0.05);
     stem.eqHigh.gain.setTargetAtTime(preset.high,ctx.currentTime,0.05);
-    setStems(prev=>prev.map(s=>s.id===stem.id?{...s,stemPresetId:preset.id}:s));
+    if (preset.id === 'neutro') {
+      stem.compressorNode.threshold.setTargetAtTime(-60,ctx.currentTime,0.02);
+      stem.reverbWet.gain.setTargetAtTime(0,ctx.currentTime,0.05);
+      stem.reverbDry.gain.setTargetAtTime(1,ctx.currentTime,0.05);
+      stem.delayWet.gain.setTargetAtTime(0,ctx.currentTime,0.05);
+      stem.tapeShaper.curve=makeIdentityCurve();
+      stem.noiseGate.frequency.setTargetAtTime(20,ctx.currentTime,0.02);
+    }
+    setStems(prev=>prev.map(s=>s.id===stem.id?{...s,stemPresetId:preset.id,plugins:preset.id==='neutro'?{compressor:false,reverb:false,delay:false,tape:false,noiseReduction:false}:s.plugins}:s));
     setOpenStemPresetId(null);
   };
   const clearStemPreset=(stem:Stem)=>{
@@ -736,7 +750,9 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     if(isPlaying){handleStop();await new Promise(r=>setTimeout(r,100));}
     setIsExporting(true); setExportProgress(0); setExportStep('Inicializando procesamiento IA...');
     try {
-      setExportProgress(15); setExportStep('Aplicando IA EQ + Reducción de ruido...'); await new Promise(r=>setTimeout(r,1000));
+      const activePresetData=activePreset||initialPreset;
+      const isNeutral=activePresetData?.id==='neutro';
+      setExportProgress(15); setExportStep(isNeutral?'Preparando normalización transparente...':'Aplicando IA EQ + Reducción de ruido...'); await new Promise(r=>setTimeout(r,1000));
       const offCtx=new OfflineAudioContext(2,Math.floor(44100*duration),44100);
       const mixBus=offCtx.createGain();
       const compMap: Record<string,(c:DynamicsCompressorNode)=>void>={
@@ -747,13 +763,12 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         max: c=>{c.threshold.value=-10;c.ratio.value=10;c.knee.value=4;c.attack.value=0.001;c.release.value=0.05;},
       };
       const compressor=offCtx.createDynamicsCompressor();
-      (compMap[initialPreset?.compression??'medium']||compMap.medium)(compressor);
+      (compMap[activePresetData?.compression??'medium']||compMap.medium)(compressor);
       const noiseRed=offCtx.createBiquadFilter(); noiseRed.type='highpass'; noiseRed.frequency.value=40;
       const lowShelf=offCtx.createBiquadFilter(); lowShelf.type='lowshelf'; lowShelf.frequency.value=100; lowShelf.gain.value=bassGain+1.2;
       const midPeak=offCtx.createBiquadFilter(); midPeak.type='peaking'; midPeak.frequency.value=2500; midPeak.Q.value=0.8; midPeak.gain.value=midGain-0.5;
       const highShelf=offCtx.createBiquadFilter(); highShelf.type='highshelf'; highShelf.frequency.value=8000; highShelf.gain.value=highGain+1.8;
       mixBus.gain.value=Math.pow(10,(masterVolume-2)/20);
-      const activePresetData=activePreset||initialPreset;
       const dryGainOff=offCtx.createGain(); dryGainOff.gain.value=1;
       const reverbGainOff=offCtx.createGain(); reverbGainOff.gain.value=reverbActive ? Math.min(.32, activePresetData?.reverbWet??0) : 0;
       const reverbNodeOff=offCtx.createConvolver();
@@ -765,7 +780,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       const delayNodeOff=offCtx.createDelay(1.0); delayNodeOff.delayTime.value=0.25;
       const delayFeedOff=offCtx.createGain(); delayFeedOff.gain.value=delayActive ? 0.3 : 0;
       const delayGainOff=offCtx.createGain(); delayGainOff.gain.value=delayActive ? Math.min(.25, activePresetData?.delayWet??0) : 0;
-      setExportProgress(30); setExportStep('Aplicando IA EQ '+ iaEqPreset.name +'...');
+      setExportProgress(30); setExportStep(isNeutral?'Conservando EQ, dinámica y estéreo originales...':'Aplicando IA EQ '+ iaEqPreset.name +'...');
       const iaPreGain=offCtx.createGain(); iaPreGain.gain.value=Math.pow(10,iaEqBands[0]/20);
       let iaPrev: AudioNode = iaPreGain;
       for(let i=1;i<IAEQ_BANDS.length;i++){
@@ -773,11 +788,14 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         f.type=bd.type as any; f.frequency.value=bd.freq!; f.Q.value=1.0; f.gain.value=iaEqBands[i]??0;
         iaPrev.connect(f); iaPrev=f;
       }
-      mixBus.connect(noiseRed); noiseRed.connect(lowShelf); lowShelf.connect(midPeak); midPeak.connect(highShelf);
-      highShelf.connect(compressor); compressor.connect(iaPreGain);
-      iaPrev.connect(dryGainOff); iaPrev.connect(reverbNodeOff); reverbNodeOff.connect(reverbGainOff);
-      iaPrev.connect(delayNodeOff); delayNodeOff.connect(delayFeedOff); delayFeedOff.connect(delayNodeOff); delayNodeOff.connect(delayGainOff);
-      dryGainOff.connect(offCtx.destination); reverbGainOff.connect(offCtx.destination); delayGainOff.connect(offCtx.destination);
+      if (isNeutral) mixBus.connect(offCtx.destination);
+      else {
+        mixBus.connect(noiseRed); noiseRed.connect(lowShelf); lowShelf.connect(midPeak); midPeak.connect(highShelf);
+        highShelf.connect(compressor); compressor.connect(iaPreGain);
+        iaPrev.connect(dryGainOff); iaPrev.connect(reverbNodeOff); reverbNodeOff.connect(reverbGainOff);
+        iaPrev.connect(delayNodeOff); delayNodeOff.connect(delayFeedOff); delayFeedOff.connect(delayNodeOff); delayNodeOff.connect(delayGainOff);
+        dryGainOff.connect(offCtx.destination); reverbGainOff.connect(offCtx.destination); delayGainOff.connect(offCtx.destination);
+      }
       setExportProgress(45); setExportStep('Renderizando stems...'); await new Promise(r=>setTimeout(r,600));
       for(const stem of stems){
         if(stem.buffer&&!stem.muted){
@@ -788,7 +806,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       }
       setExportProgress(70); setExportStep('Normalizando a -16 LUFS...'); await new Promise(r=>setTimeout(r,700));
       const rendered=await offCtx.startRendering();
-      const normalized=normalizeTo16LUFS(rendered);
+      const normalized=normalizeTo16LUFS(rendered,isNeutral);
       setExportProgress(92); setExportStep('Generando WAV 24-bit...'); await new Promise(r=>setTimeout(r,500));
       const peaks=generateWaveformPeaks(normalized,800);
       const wavBlob=bufferToWav(normalized,24);
@@ -800,7 +818,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     } catch(e){console.error('Export error:',e);setIsExporting(false);}
   };
 
-  const normalizeTo16LUFS=(buffer:AudioBuffer):AudioBuffer=>{
+  const normalizeTo16LUFS=(buffer:AudioBuffer,transparent=false):AudioBuffer=>{
     const target=-16; let rmsSum=0; let count=0;
     for(let c=0;c<buffer.numberOfChannels;c++){const d=buffer.getChannelData(c);for(let i=0;i<d.length;i++){rmsSum+=d[i]*d[i];count++;}}
     const rms=count?Math.sqrt(rmsSum/count):0;
@@ -816,7 +834,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         const value=d[i]*gain;
         const neighbour=(d[i-1]*gain+d[i+1]*gain)*.5;
         const isIsolated=Math.abs(value)>repairThreshold&&Math.abs(value-neighbour)>.55&&Math.abs(d[i-1]*gain)<.82&&Math.abs(d[i+1]*gain)<.82;
-        d[i]=isIsolated?neighbour:Math.max(-ceiling,Math.min(ceiling,value));
+        d[i]=!transparent&&isIsolated?neighbour:Math.max(-ceiling,Math.min(ceiling,value));
       }
       if(d.length){d[0]=Math.max(-ceiling,Math.min(ceiling,d[0]*gain));d[d.length-1]=Math.max(-ceiling,Math.min(ceiling,d[d.length-1]*gain));}
     }
