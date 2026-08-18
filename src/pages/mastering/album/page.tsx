@@ -331,9 +331,10 @@ export default function AlbumMasteringPage() {
               <aside className="album-controls">
                 <span className="master-kicker">SONIDO COMPARTIDO</span>
                 <h2>Configuración del álbum</h2>
-                <label>Preset<select value={selectedPreset.id} onChange={(event) => setSelectedPreset(PRESETS.find((preset) => preset.id === event.target.value) || PRESETS[0])}>{PRESETS.map((preset) => <option value={preset.id} key={preset.id}>{preset.name}</option>)}</select></label>
-                <label>Intensidad <b>{strength}%</b><input type="range" min="0" max="100" value={strength} onChange={(event) => setStrength(Number(event.target.value))} /></label>
-                <label>Amplitud <b>{stereo}%</b><input type="range" min="0" max="60" value={stereo} onChange={(event) => setStereo(Number(event.target.value))} /></label>
+                <label>Preset<select value={selectedPreset.id} onChange={(event) => { const preset=PRESETS.find((item) => item.id === event.target.value) || PRESETS[0]; setSelectedPreset(preset); if(preset.id==='neutro') setStereo(0); }}>{PRESETS.map((preset) => <option value={preset.id} key={preset.id}>{preset.name}</option>)}</select></label>
+                <label>Intensidad <b>{selectedPreset.id==='neutro'?'No aplica':`${strength}%`}</b><input type="range" min="0" max="100" value={strength} disabled={selectedPreset.id==='neutro'} onChange={(event) => setStrength(Number(event.target.value))} /></label>
+                <label>Amplitud <b>{selectedPreset.id==='neutro'?'Original':`${stereo}%`}</b><input type="range" min="0" max="60" value={stereo} disabled={selectedPreset.id==='neutro'} onChange={(event) => setStereo(Number(event.target.value))} /></label>
+                {selectedPreset.id==='neutro' && <p className="album-processing-label">Solo normalización transparente y protección de picos; sin EQ, compresión, efectos ni cambio estéreo.</p>}
                 <label>Loudness<select value={loudness} onChange={(event) => setLoudness(event.target.value as LoudnessProfile)}><option value="streaming">Streaming</option><option value="balanced">Balanceado</option><option value="competitive">Competitivo</option></select></label>
                 {stage === 'configure' && <button className="album-process" onClick={processAlbum} disabled={tracks.length < 2}>Masterizar {tracks.length} canciones</button>}
                 {stage === 'processing' && <div className="album-processing-label"><strong>Canción {currentTrack} de {tracks.length}</strong><span>Procesamos una a la vez para proteger la memoria.</span></div>}
