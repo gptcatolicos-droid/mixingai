@@ -200,11 +200,13 @@ function applyGain(buffer: AudioBuffer, gainDb: number) {
 }
 
 
-async function renderLoudnessCorrection(buffer: AudioBuffer, gainDb: number) {
+async function renderLoudnessCorrection(buffer: AudioBuffer, gainDb: number, transparent = false) {
   applyGain(buffer, gainDb);
-  applyLinkedCompression(buffer, -2.2, 20, .001, .075);
-  applyTransparentLimiter(buffer, -1.2);
-  repairIsolatedSampleSpikes(buffer);
+  if (!transparent) {
+    applyLinkedCompression(buffer, -2.2, 20, .001, .075);
+    applyTransparentLimiter(buffer, -1.2);
+    repairIsolatedSampleSpikes(buffer);
+  }
   enforceSamplePeakCeiling(buffer, -1.2);
   return buffer;
 }
@@ -225,6 +227,7 @@ export async function createMaster(
   const offline = new OfflineAudioContext(2, sourceBuffer.length, sourceBuffer.sampleRate);
   const source = offline.createBufferSource();
   source.buffer = sourceBuffer;
+  const isNeutral = configuration.preset.id === 'neutro';
 
   const highPass = offline.createBiquadFilter();
   highPass.type = 'highpass';
@@ -254,23 +257,28 @@ export async function createMaster(
   const compressionAttack = configuration.preset.id === 'rock' ? 0.012 : 0.025;
   const compressionRelease = configuration.preset.id === 'clasica' ? 0.28 : 0.16;
   const requestedGainDb = clamp(targetAverageDbfs[configuration.loudness] - analysis.averageDbfs, -4, 9);
-  const appliedGainDb = requestedGainDb * (0.35 + scale * 0.65);
+  const appliedGainDb = isNeutral ? requestedGainDb : requestedGainDb * (0.35 + scale * 0.65);
 
-  source.connect(highPass);
-  highPass.connect(lowShelf);
-  lowShelf.connect(midBell);
-  midBell.connect(highShelf);
-  connectStereoWidth(offline, highShelf, offline.destination, 1 + clamp(configuration.stereo, 0, 60) / 100);
+  if (isNeutral) source.connect(offline.destination);
+  else {
+    source.connect(highPass);
+    highPass.connect(lowShelf);
+    lowShelf.connect(midBell);
+    midBell.connect(highShelf);
+    connectStereoWidth(offline, highShelf, offline.destination, 1 + clamp(configuration.stereo, 0, 60) / 100);
+  }
 
-  onProgress?.(28, 'Aplicando balance tonal');
+  onProgress?.(28, isNeutral ? 'Conservando balance tonal y dinámica' : 'Aplicando balance tonal');
   source.start();
-  const progressTimer = window.setInterval(() => onProgress?.(58, 'Controlando dinámica y amplitud'), 500);
+  const progressTimer = window.setInterval(() => onProgress?.(58, isNeutral ? 'Normalizando nivel de forma transparente' : 'Controlando dinámica y amplitud'), 500);
   let rendered = await offline.startRendering();
   window.clearInterval(progressTimer);
-  repairIsolatedSampleSpikes(rendered);
-  applyLinkedCompression(rendered, compressionThreshold, compressionRatio, compressionAttack, compressionRelease);
+  if (!isNeutral) {
+    repairIsolatedSampleSpikes(rendered);
+    applyLinkedCompression(rendered, compressionThreshold, compressionRatio, compressionAttack, compressionRelease);
+  }
   applyGain(rendered, appliedGainDb);
-  applyTransparentLimiter(rendered, -1.2);
+  if (!isNeutral) applyTransparentLimiter(rendered, -1.2);
   onProgress?.(82, 'Protegiendo el pico de salida');
   enforceSamplePeakCeiling(rendered, -1.2);
   onProgress?.(86, 'Midiendo loudness integrado');
@@ -279,11 +287,11 @@ export async function createMaster(
   });
   const targetLufs = targetIntegratedLufs[configuration.loudness];
   let loudnessCorrectionDb = 0;
-  for (let pass = 0; pass < 3 && Math.abs(targetLufs - integratedLufs) > .25; pass += 1) {
+  for (let pass = 0; pass < (isNeutral ? 1 : 3) && Math.abs(targetLufs - integratedLufs) > .25; pass += 1) {
     const correction = clamp(targetLufs - integratedLufs, -5, 5);
     loudnessCorrectionDb += correction;
     onProgress?.(90 + pass, `Ajustando loudness a ${targetLufs} LUFS`);
-    rendered = await renderLoudnessCorrection(rendered, correction);
+    rendered = await renderLoudnessCorrection(rendered, correction, isNeutral);
     integratedLufs = await measureIntegratedLufs(rendered);
   }
   const outputLevels = enforceSamplePeakCeiling(rendered, -1.2);

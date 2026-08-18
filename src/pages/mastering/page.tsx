@@ -679,7 +679,7 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                     <button
                       key={preset.id}
                       className={selectedPreset.id === preset.id ? 'selected' : ''}
-                      onClick={() => { setSelectedPreset(preset); setStereo(Math.round(preset.stereoWidth * 50)); }}
+                      onClick={() => { setSelectedPreset(preset); setStereo(preset.id === 'neutro' ? 0 : Math.round(preset.stereoWidth * 50)); }}
                       style={{ '--preset': preset.color } as React.CSSProperties}
                     >
                       <div>
@@ -709,14 +709,15 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                 </div>
                 <div className="master-control">
                   <div><strong>Intensidad</strong><span>{strength}%</span></div>
-                  <input type="range" min="0" max="100" value={strength} onChange={(event) => setStrength(Number(event.target.value))} />
+                  <input type="range" min="0" max="100" value={strength} disabled={selectedPreset.id === 'neutro'} onChange={(event) => setStrength(Number(event.target.value))} />
                   <small>Sutil</small><small>Fuerte</small>
                 </div>
                 <div className="master-control">
                   <div><strong>Amplitud estéreo</strong><span>{stereo}%</span></div>
-                  <input type="range" min="0" max="60" value={stereo} disabled={analysis.isDualMono} onChange={(event) => setStereo(Number(event.target.value))} />
+                  <input type="range" min="0" max="60" value={stereo} disabled={analysis.isDualMono || selectedPreset.id === 'neutro'} onChange={(event) => setStereo(Number(event.target.value))} />
                   <small>Original</small><small>Amplia</small>
                 </div>
+                {selectedPreset.id === 'neutro' && <div className="master-safe"><i>✓</i><span><strong>Procesamiento neutro</strong>Solo ajustaremos ganancia y protegeremos picos. No se aplican EQ, compresión, amplitud, reverb, delay, saturación ni ruido.</span></div>}
                 <div className="master-loudness">
                   <strong>Loudness</strong>
                   <div>

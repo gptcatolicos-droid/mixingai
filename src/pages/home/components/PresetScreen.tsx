@@ -59,14 +59,15 @@ export default function PresetScreen({ user, stemCount, recommendedPresetId = 'p
   const [stereoOn, setStereoOn] = useState(false);
 
   const preset = PRESETS.find(p => p.id === selected)!;
+  const isNeutral = preset.id === 'neutro';
 
   const recommended = PRESETS.find((item) => item.id === recommendedPresetId) ?? PRESETS[0];
   const handleConfirm = () => {
     setIsOpening(true);
-    setTimeout(() => onConfirm(preset, reverbOn, delayOn, stereoOn), 850);
+    setTimeout(() => onConfirm(preset, isNeutral ? false : reverbOn, isNeutral ? false : delayOn, isNeutral ? false : stereoOn), 850);
   };
 
-  if (isOpening) return <div className="studio-v3-page v3-process-screen"><div className="v3-process-orbit"><i /><b>IA</b></div><span>PREPARANDO EL ESTUDIO</span><h1>Aplicando el carácter {preset.name}</h1><p>Configuramos balance, efectos y controles antes de abrir el mezclador.</p><div className="v3-process-line"><i /></div></div>;
+  if (isOpening) return <div className="studio-v3-page v3-process-screen"><div className="v3-process-orbit"><i /><b>IA</b></div><span>PREPARANDO EL ESTUDIO</span><h1>{isNeutral ? 'Conservando el sonido original' : `Aplicando el carácter ${preset.name}`}</h1><p>{isNeutral ? 'Sin EQ, compresión, reverb, delay, amplitud artificial ni ruido.' : 'Configuramos balance, efectos y controles antes de abrir el mezclador.'}</p><div className="v3-process-line"><i /></div></div>;
 
   return (
     <div className="studio-v3-page" style={S.page}>
@@ -83,7 +84,7 @@ export default function PresetScreen({ user, stemCount, recommendedPresetId = 'p
           <h1 style={{fontSize:'clamp(22px,5vw,32px)',fontWeight:700,letterSpacing:'-0.5px',background:'linear-gradient(90deg,#EC4899,#C026D3,#7C3AED)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:'8px'}}>
             Elige tu estilo de mezcla
           </h1>
-          <p style={{fontSize:'14px',color:'#9B7EC8'}}>La IA ajusta EQ, compresión y efectos según el género. Los cambios son reales.</p>
+          <p style={{fontSize:'14px',color:'#9B7EC8'}}>Elige un carácter de género o usa Neutro si tus pistas ya traen efectos y ambiente.</p>
         </div>
 
         <div className="preset-ai-recommendation" style={{'--recommend-color':recommended.color} as React.CSSProperties}>
@@ -148,26 +149,26 @@ export default function PresetScreen({ user, stemCount, recommendedPresetId = 'p
         </div>
 
         {/* Efectos adicionales */}
-        <div style={{...S.card,marginBottom:'24px'}}>
-          <span style={S.label}>Efectos adicionales — estos SÍ cambian el sonido</span>
+        <div style={{...S.card,marginBottom:'24px',opacity:isNeutral?0.72:1}}>
+          <span style={S.label}>{isNeutral ? 'Neutro conserva el audio: efectos desactivados' : 'Efectos adicionales — estos SÍ cambian el sonido'}</span>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'10px'}}>
             {[
               {id:'reverb',label:'Reverb',desc:`Ambiente espacial · ${Math.round(preset.reverbWet*100)}% wet`,icon:'ri-radio-line',on:reverbOn,toggle:()=>setReverbOn(!reverbOn)},
               {id:'delay',label:'Delay',desc:'Echo rítmico · 1/4 beat',icon:'ri-repeat-line',on:delayOn,toggle:()=>setDelayOn(!delayOn)},
               {id:'stereo',label:'Widener',desc:'Amplitud estéreo · 60%',icon:'ri-sound-module-line',on:stereoOn,toggle:()=>setStereoOn(!stereoOn)},
             ].map(fx => (
-              <div key={fx.id} onClick={fx.toggle}
-                style={{background:fx.on?'rgba(192,38,211,0.08)':'#0F0A1A',border:`1px solid ${fx.on?'rgba(192,38,211,0.4)':'rgba(192,38,211,0.08)'}`,borderRadius:'12px',padding:'14px',cursor:'pointer',transition:'all 0.2s'}}>
+              <div key={fx.id} onClick={isNeutral ? undefined : fx.toggle}
+                style={{background:!isNeutral&&fx.on?'rgba(192,38,211,0.08)':'#0F0A1A',border:`1px solid ${!isNeutral&&fx.on?'rgba(192,38,211,0.4)':'rgba(192,38,211,0.08)'}`,borderRadius:'12px',padding:'14px',cursor:isNeutral?'not-allowed':'pointer',transition:'all 0.2s'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
-                  <div style={{width:'30px',height:'30px',borderRadius:'8px',background:fx.on?'rgba(192,38,211,0.15)':'rgba(155,126,200,0.08)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    <i className={fx.icon} style={{color:fx.on?'#C026D3':'#9B7EC8',fontSize:'14px'}}></i>
+                  <div style={{width:'30px',height:'30px',borderRadius:'8px',background:!isNeutral&&fx.on?'rgba(192,38,211,0.15)':'rgba(155,126,200,0.08)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    <i className={fx.icon} style={{color:!isNeutral&&fx.on?'#C026D3':'#9B7EC8',fontSize:'14px'}}></i>
                   </div>
                   {/* Toggle switch */}
-                  <div style={{width:'34px',height:'20px',borderRadius:'10px',background:fx.on?'#C026D3':'#241636',border:`1px solid ${fx.on?'#EC4899':'rgba(192,38,211,0.2)'}`,position:'relative',transition:'all 0.2s'}}>
-                    <div style={{width:'14px',height:'14px',borderRadius:'50%',background:'#fff',position:'absolute',top:'2px',left:fx.on?'17px':'3px',transition:'left 0.2s'}}></div>
+                  <div style={{width:'34px',height:'20px',borderRadius:'10px',background:!isNeutral&&fx.on?'#C026D3':'#241636',border:`1px solid ${!isNeutral&&fx.on?'#EC4899':'rgba(192,38,211,0.2)'}`,position:'relative',transition:'all 0.2s'}}>
+                    <div style={{width:'14px',height:'14px',borderRadius:'50%',background:'#fff',position:'absolute',top:'2px',left:!isNeutral&&fx.on?'17px':'3px',transition:'left 0.2s'}}></div>
                   </div>
                 </div>
-                <div style={{fontSize:'13px',fontWeight:600,color:fx.on?'#F8F0FF':'#9B7EC8',marginBottom:'2px'}}>{fx.label}</div>
+                <div style={{fontSize:'13px',fontWeight:600,color:!isNeutral&&fx.on?'#F8F0FF':'#9B7EC8',marginBottom:'2px'}}>{fx.label}</div>
                 <div style={{fontSize:'11px',color:'rgba(155,126,200,0.7)'}}>{fx.desc}</div>
               </div>
             ))}
