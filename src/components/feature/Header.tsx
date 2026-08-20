@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import UserProfile from './UserProfile';
-import CreditsPurchaseModal from './CreditsPurchaseModal';
+import { getMasteringEntitlements } from '@/pages/mastering/masteringAccess';
 
 interface User {
   id: string; firstName: string; lastName: string; email: string;
   country: string; credits: number; provider?: string; createdAt: string;
-  username?: string; avatar?: string;
+  username?: string; avatar?: string; plan?: string; is_pro?: boolean;
 }
 interface HeaderProps {
   user: User | null; onAuthSuccess?: (user: User) => void;
@@ -26,12 +26,31 @@ const S = {
   avatar: {width:'28px',height:'28px',background:'linear-gradient(135deg,#EC4899,#7C3AED)',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:'12px',flexShrink:0},
 };
 
-export default function Header({ user, onLogout, onCreditsUpdate }: HeaderProps) {
+export default function Header({ user, onLogout }: HeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isUnlimited, setIsUnlimited] = useState(Boolean(user?.is_pro || user?.plan === 'unlimited'));
+
+  useEffect(() => {
+    const fallback = Boolean(user?.is_pro || user?.plan === 'unlimited');
+    setIsUnlimited(fallback);
+    if (!user) return;
+    getMasteringEntitlements().then(({ unlimited }) => {
+      setIsUnlimited(unlimited);
+      try {
+        const stored = JSON.parse(localStorage.getItem('audioMixerUser') || '{}');
+        localStorage.setItem('audioMixerUser', JSON.stringify({
+          ...stored,
+          is_pro: unlimited,
+          plan: unlimited ? 'unlimited' : 'free',
+        }));
+      } catch {
+        // The live entitlement remains authoritative even if local storage is unavailable.
+      }
+    }).catch(() => setIsUnlimited(fallback));
+  }, [user?.id, user?.is_pro, user?.plan]);
 
   const handleLogout = () => {
     localStorage.removeItem('audioMixerUser');
@@ -66,7 +85,7 @@ export default function Header({ user, onLogout, onCreditsUpdate }: HeaderProps)
           <div style={{display:'flex',alignItems:'center',gap:'10px'}} className="hide-mobile">
             {user ? (
               <>
-                {(user.is_pro || user.plan === 'unlimited') ? (
+                {isUnlimited ? (
                   <div style={S.unlimitedBadge}>
                     <i className="ri-infinity-line"></i>
                     <span>ILIMITADO</span>
@@ -86,7 +105,7 @@ export default function Header({ user, onLogout, onCreditsUpdate }: HeaderProps)
                     </div>
                     <i className="ri-arrow-down-s-line" style={{color:'#9B7EC8',fontSize:'14px'}}></i>
                   </button>
-                  <UserProfile user={user} isOpen={showUserProfile} onClose={() => setShowUserProfile(false)} onLogout={handleLogout} />
+                  <UserProfile user={user} unlimited={isUnlimited} isOpen={showUserProfile} onClose={() => setShowUserProfile(false)} onLogout={handleLogout} />
                 </div>
               </>
             ) : (
@@ -114,7 +133,7 @@ export default function Header({ user, onLogout, onCreditsUpdate }: HeaderProps)
                   <div style={S.avatar}>{user.firstName.charAt(0).toUpperCase()}</div>
                   <div>
                     <div style={{fontSize:'14px',fontWeight:600,color:'#F8F0FF'}}>{user.firstName} {user.lastName}</div>
-                    <div style={{fontSize:'12px',color:'#9B7EC8'}}>{(user.is_pro || user.plan === 'unlimited') ? 'Mezclas y masters ilimitados ∞' : 'Plan Gratis · 3 mezclas + 1 master MP3'}</div>
+                    <div style={{fontSize:'12px',color:'#9B7EC8'}}>{isUnlimited ? 'Unlimited activo · acceso permanente' : 'Plan Gratis · 3 mezclas + 1 master MP3'}</div>
                   </div>
                 </div>
                 <button onClick={() => { navigate('/'); setMobileOpen(false); }} style={{...S.navBtn,textAlign:'left',width:'100%',padding:'10px 14px'}}>Inicio</button>
@@ -132,10 +151,6 @@ export default function Header({ user, onLogout, onCreditsUpdate }: HeaderProps)
           </div>
         )}
       </header>
-
-      <CreditsPurchaseModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)}
-        onPurchaseSuccess={(c) => { onCreditsUpdate?.(c); setShowCreditsModal(false); }}
-        currentCredits={user?.credits || 0} />
 
       <style>{`
         @media (max-width: 768px) { .hide-mobile { display: none !important; } }
