@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Button from '../base/Button';
-import Modal from '../base/Modal';
+import './user-profile.css';
 
 interface User {
   id: string;
@@ -14,265 +12,79 @@ interface User {
   createdAt: string;
   username?: string;
   avatar?: string;
+  plan?: string;
+  is_pro?: boolean;
 }
 
 interface UserProfileProps {
   user: User;
+  unlimited: boolean;
   isOpen: boolean;
   onClose: () => void;
   onLogout?: () => void;
 }
 
-export default function UserProfile({ user, isOpen, onClose, onLogout }: UserProfileProps) {
+export default function UserProfile({ user, unlimited, isOpen, onClose, onLogout }: UserProfileProps) {
   const navigate = useNavigate();
-  const [showProfileModal, setShowProfileModal] = useState(false);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const getCreditColor = (credits: number) => {
-    if (credits >= 500) return 'text-emerald-400';
-    if (credits >= 100) return 'text-cyan-400';
-    return 'text-orange-400';
-  };
-
-  const getNextRecharge = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    
-    const now = new Date().getTime();
-    const timeUntilRecharge = tomorrow.getTime() - now;
-    
-    const hours = Math.floor(timeUntilRecharge / (1000 * 60 * 60));
-    const minutes = Math.floor((timeUntilRecharge % (1000 * 60 * 60)) / (1000 * 60));
-    
-    return `${hours}h ${minutes}m`;
+  const goTo = (path: string) => {
+    navigate(path);
+    onClose();
   };
 
   const handleLogout = () => {
     localStorage.removeItem('audioMixerUser');
-    if (onLogout) onLogout();
+    localStorage.removeItem('rememberUser');
+    onLogout?.();
     onClose();
-    navigate('/'); // Redirect to home screen after logout
-  };
-
-  const handleNavigation = (path: string) => {
-    navigate(path);
-    onClose(); // Cerrar el menú después de navegar
+    navigate('/');
   };
 
   if (!isOpen) return null;
 
+  const initials = `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}` || 'MM';
+
   return (
-    <>
-      <div className="absolute right-0 top-full mt-2 w-80 bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-xl shadow-xl z-50">
-        <div className="p-4">
-          {/* User Info Header */}
-          <div className="flex items-center space-x-3 pb-4 border-b border-slate-700/50">
-            <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-slate-600">
-              {user.avatar ? (
-                <img 
-                  src={user.avatar} 
-                  alt={user.firstName}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-r from-magenta-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg">
-                  {user.firstName.charAt(0)}{user.lastName.charAt(0)}
-                </div>
-              )}
-            </div>
-            <div className="flex-1">
-              <p className="text-white font-semibold">
-                {user.firstName} {user.lastName}
-              </p>
-              <p className="text-slate-400 text-sm">{user.email}</p>
-              {user.username && (
-                <p className="text-cyan-400 text-sm">@{user.username}</p>
-              )}
-              {user.provider && (
-                <div className="flex items-center space-x-1 mt-1">
-                  <i className={`text-xs ${
-                    user.provider === 'google' 
-                      ? 'ri-google-fill text-red-400' 
-                      : 'ri-apple-fill text-gray-400'
-                  }`}></i>
-                  <span className="text-xs text-slate-400 capitalize">
-                    Connected via {user.provider}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Plan Section */}
-          <div className="py-4 border-b border-slate-700/50">
-            <div className="bg-slate-900/50 rounded-xl p-4">
-              {(user.is_pro || user.plan === 'unlimited') ? (
-                <>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-white flex items-center">
-                      <i className="ri-infinity-line text-purple-400 mr-2"></i>
-                      Plan Ilimitado
-                    </h4>
-                    <span className="text-sm font-bold text-purple-400 bg-purple-400/10 px-3 py-1 rounded-full">∞ Activo</span>
-                  </div>
-                  <p className="text-xs text-slate-400">Mezclas ilimitadas · IA EQ · WAV 24-bit · -16 LUFS</p>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-white flex items-center">
-                      <i className="ri-music-line text-emerald-400 mr-2"></i>
-                      Plan Gratis
-                    </h4>
-                    <span className="text-sm font-bold text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full">1 mezcla</span>
-                  </div>
-                  <p className="text-xs text-slate-400 mb-3">Incluye 1 mezcla completa gratis · WAV 24-bit</p>
-                  <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-lg p-3">
-                    <p className="text-xs text-purple-300 font-medium mb-1">✦ Mezclas Ilimitadas — $3.99</p>
-                    <p className="text-xs text-slate-400">Pago único de US$14.99 · PayPal</p>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Menu Options */}
-          <div className="py-2 border-t border-slate-600">
-            <button
-              onClick={() => handleNavigation('/profile')}
-              className="w-full flex items-center space-x-3 px-4 py-3 text-left text-white hover:bg-slate-700/50 transition-colors cursor-pointer"
-            >
-              <i className="ri-user-line w-5 h-5 flex items-center justify-center"></i>
-              <span>My Profile</span>
-            </button>
-            
-            <button
-              onClick={() => handleNavigation('/profile')}
-              className="w-full flex items-center space-x-3 px-4 py-3 text-left text-white hover:bg-slate-700/50 transition-colors cursor-pointer"
-            >
-              <i className="ri-history-line w-5 h-5 flex items-center justify-center"></i>
-              <span>Mix History</span>
-            </button>
-
-            <button
-              onClick={() => handleNavigation('/billing')}
-              className="w-full flex items-center space-x-3 px-4 py-3 text-left text-white hover:bg-slate-700/50 transition-colors cursor-pointer"
-            >
-              <i className="ri-bill-line w-5 h-5 flex items-center justify-center"></i>
-              <span>Billing</span>
-            </button>
-
-            <button
-              onClick={() => window.open('mailto:support@mixingmusic.co', '_blank')}
-              className="w-full flex items-center space-x-3 px-4 py-3 text-left text-white hover:bg-slate-700/50 transition-colors cursor-pointer"
-            >
-              <i className="ri-question-line w-5 h-5 flex items-center justify-center"></i>
-              <span>Help & Support</span>
-            </button>
-          </div>
-
-          <div className="py-2 border-t border-slate-600">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center space-x-3 px-4 py-3 text-left text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-            >
-              <i className="ri-logout-box-line w-5 h-5 flex items-center justify-center"></i>
-              <span>Sign Out</span>
-            </button>
-          </div>
+    <aside className="user-menu" aria-label="Cuenta de usuario">
+      <div className="user-menu__identity">
+        {user.avatar ? (
+          <img className="user-menu__avatar" src={user.avatar} alt="" />
+        ) : (
+          <div className="user-menu__avatar user-menu__avatar--initials">{initials.toUpperCase()}</div>
+        )}
+        <div>
+          <strong>{user.firstName} {user.lastName}</strong>
+          <span>{user.email}</span>
+          {user.username && <small>@{user.username}</small>}
         </div>
       </div>
 
-      {/* Profile Modal */}
-      <Modal
-        isOpen={showProfileModal}
-        onClose={() => setShowProfileModal(false)}
-        title="User Profile"
-        size="md"
-      >
-        <div className="bg-slate-900 text-white -m-6 p-6">
-          <div className="space-y-6">
-            {/* Profile Header */}
-            <div className="text-center">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden border-2 border-slate-600">
-                {user.avatar ? (
-                  <img 
-                    src={user.avatar} 
-                    alt={user.firstName}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-r from-magenta-500 to-cyan-500 flex items-center justify-center text-white font-bold text-2xl">
-                    {user.firstName.charAt(0)}{user.lastName.charAt(0)}
-                  </div>
-                )}
-              </div>
-              <h3 className="text-xl font-bold text-white">
-                {user.firstName} {user.lastName}
-              </h3>
-              <p className="text-slate-400">{user.email}</p>
-              {user.username && (
-                <p className="text-cyan-400">@{user.username}</p>
-              )}
-            </div>
-
-            {/* User Details */}
-            <div className="bg-slate-800/50 rounded-xl p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">
-                    First Name
-                  </label>
-                  <p className="text-white font-semibold">{user.firstName}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">
-                    Last Name
-                  </label>
-                  <p className="text-white font-semibold">{user.lastName}</p>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">
-                  Country
-                </label>
-                <p className="text-white font-semibold">{user.country}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">
-                  Member since
-                </label>
-                <p className="text-white font-semibold">{formatDate(user.createdAt)}</p>
-              </div>
-            </div>
-
-            {/* Credits Summary */}
-            <div className="bg-gradient-to-r from-magenta-500/10 to-cyan-500/10 border border-magenta-500/20 rounded-xl p-6">
-              <h4 className="font-bold text-white mb-4">Credits Summary</h4>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Current credits:</span>
-                  <span className={`text-xl font-bold ${getCreditColor(user.credits || 0)}`}>
-                    {(user.credits || 0).toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-400">Next recharge:</span>
-                  <span className="text-emerald-400 font-semibold">{getNextRecharge()}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+      <div className={`user-menu__access ${unlimited ? 'is-unlimited' : ''}`}>
+        <div className="user-menu__access-heading">
+          <span>{unlimited ? 'Unlimited' : 'Plan gratis'}</span>
+          <b>{unlimited ? '∞ ACTIVO' : 'ACTIVO'}</b>
         </div>
-      </Modal>
-    </>
+        <p>
+          {unlimited
+            ? 'Acceso permanente a mezclas, mastering, WAV 24 bits y Modo Álbum.'
+            : '3 mezclas desde stems y 1 master descargable en MP3.'}
+        </p>
+        {!unlimited && (
+          <button className="user-menu__upgrade" onClick={() => goTo('/checkout-v3')}>
+            Activar Unlimited · US$14.99
+          </button>
+        )}
+      </div>
+
+      <nav className="user-menu__links">
+        <button onClick={() => goTo('/profile')}><i className="ri-user-line" />Mi perfil</button>
+        <button onClick={() => goTo('/billing')}><i className="ri-infinity-line" />Mi acceso</button>
+        <a href="mailto:support@mixingmusic.ai"><i className="ri-question-line" />Soporte</a>
+      </nav>
+
+      <button className="user-menu__logout" onClick={handleLogout}>
+        <i className="ri-logout-box-line" />Cerrar sesión
+      </button>
+    </aside>
   );
 }

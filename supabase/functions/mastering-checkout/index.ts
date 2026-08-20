@@ -34,6 +34,37 @@ async function getPayPalToken() {
   return data.access_token as string
 }
 
+async function getPayPalOrder(orderId: string, paypalToken: string) {
+  const response = await fetch(`${getPayPalBaseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
+    headers: {
+      Authorization: `Bearer ${paypalToken}`,
+      'Content-Type': 'application/json',
+    },
+  })
+  const data = await response.json().catch(() => ({}))
+  return { response, data }
+}
+
+function inspectCompletedOrder(order: any, expectedUserId: string, expectedAmount: string, expectedCurrency: string) {
+  const purchaseUnit = order?.purchase_units?.[0]
+  const capture = purchaseUnit?.payments?.captures?.find((item: any) => item?.status === 'COMPLETED')
+    ?? purchaseUnit?.payments?.captures?.[0]
+  const amountMatches = Number(capture?.amount?.value) === Number(expectedAmount)
+  const currencyMatches = capture?.amount?.currency_code === expectedCurrency
+  const customIdMatches = !purchaseUnit?.custom_id || purchaseUnit.custom_id === expectedUserId
+  const referenceMatches = purchaseUnit?.reference_id === 'MIXINGMUSIC_V3_UNLIMITED'
+  const verified = Boolean(
+    order?.status === 'COMPLETED' &&
+    capture?.id &&
+    capture?.status === 'COMPLETED' &&
+    amountMatches &&
+    currencyMatches &&
+    customIdMatches &&
+    referenceMatches
+  )
+  return { verified, purchaseUnit, capture }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
@@ -146,7 +177,7 @@ serve(async (req) => {
         await grantUnlimited()
         return json({ success: true, unlimited: true })
       }
-      if (storedOrder.amount.toString() !== price || storedOrder.currency !== currency) {
+      if (Number(storedOrder.amount) !== Number(price) || storedOrder.currency !== currency) {
         return json({ error: 'ORDER_AMOUNT_MISMATCH' }, 409)
       }
 
@@ -159,27 +190,45 @@ serve(async (req) => {
           'PayPal-Request-Id': `mixingmusic-v3-capture-${orderId}`,
         },
       })
-      const captureData = await captureResponse.json()
-      const capture = captureData?.purchase_units?.[0]?.payments?.captures?.[0]
-      const capturedAmount = capture?.amount?.value
-      const capturedCurrency = capture?.amount?.currency_code
-      const customId = captureData?.purchase_units?.[0]?.custom_id
-      if (
-        !captureResponse.ok || captureData?.status !== 'COMPLETED' || !capture?.id ||
-        capturedAmount !== price || capturedCurrency !== currency || customId !== user.id
-      ) {
+      const captureData = await captureResponse.json().catch(() => ({}))
+      let canonicalData = captureData
+      let inspection = inspectCompletedOrder(canonicalData, user.id, price, currency)
+
+      // PayPal can return an already-captured response, or omit purchase-unit
+      // fields from the capture response. Re-read the canonical order before
+      // rejecting a payment that PayPal has already settled.
+      if (!captureResponse.ok || !inspection.verified) {
+        const lookup = await getPayPalOrder(orderId, paypalToken)
+        if (lookup.response.ok) {
+          canonicalData = lookup.data
+          inspection = inspectCompletedOrder(canonicalData, user.id, price, currency)
+        }
+      }
+
+      if (!inspection.verified) {
         await admin.from('mastering_orders').update({
           status: 'failed',
-          provider_payload: { status: captureData?.status ?? 'unknown' },
+          provider_payload: {
+            status: canonicalData?.status ?? captureData?.status ?? 'unknown',
+            paypal_http_status: captureResponse.status,
+            paypal_error: captureData?.name ?? null,
+            issues: Array.isArray(captureData?.details)
+              ? captureData.details.map((detail: any) => detail?.issue).filter(Boolean)
+              : [],
+          },
           updated_at: new Date().toISOString(),
-        }).eq('order_id', orderId)
+        }).eq('order_id', orderId).eq('user_id', user.id)
         return json({ error: 'PAYMENT_NOT_VERIFIED' }, 400)
       }
 
       const { error: updateOrderError } = await admin.from('mastering_orders').update({
         status: 'captured',
-        capture_id: capture.id,
-        provider_payload: { status: captureData.status, capture_status: capture.status },
+        capture_id: inspection.capture.id,
+        provider_payload: {
+          status: canonicalData.status,
+          capture_status: inspection.capture.status,
+          reference_id: inspection.purchaseUnit.reference_id,
+        },
         updated_at: new Date().toISOString(),
       }).eq('order_id', orderId).eq('user_id', user.id)
       if (updateOrderError) throw updateOrderError
