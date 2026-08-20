@@ -1,0 +1,22 @@
+.press-v3-grid article > .press-v3-video {
+  aspect-ratio: 16 / 9;
+  margin: -16px -16px 24px;
+  display: block;
+  overflow: hidden;
+  border-radius: 13px;
+  background: #050407;
+}
+
+.press-v3-video iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.press-v3-grid article > .press-v3-actions {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
