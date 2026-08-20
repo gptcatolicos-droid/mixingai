@@ -15,6 +15,9 @@ export default function SiteLayout() {
         <nav aria-label="Enlaces del pie de página">
           <Link to="/pricing">Precios</Link>
           <Link to="/capacidades">Funciones</Link>
+          <Link to="/presets">Presets</Link>
+          <Link to="/generos">Guías por género</Link>
+          <Link to="/plugins-audio">Plugins de audio</Link>
           <Link to="/conceptos-audio">Conceptos</Link>
           <Link to="/terms">Términos</Link>
           <Link to="/privacy">Privacidad</Link>
