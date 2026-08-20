@@ -1,5 +1,15 @@
 export const pressMentions = [
   {
+    outlet: 'Blu Radio',
+    date: '18 de agosto de 2026',
+    type: 'Entrevista en video',
+    title: 'Creador colombiano desarrolla una plataforma de IA para potenciar la música',
+    description: 'Entrevista con Daniel Palacio sobre el origen de MixingMusic.AI y la manera en que la plataforma acerca mezcla y mastering a músicos profesionales y aficionados.',
+    url: 'https://www.youtube.com/watch?v=ct59uI5Pwtw',
+    videoId: 'ct59uI5Pwtw',
+    color: '#3b82f6',
+  },
+  {
     outlet: 'Caracol Radio',
     date: '26 de julio de 2026',
     type: 'Artículo',
