@@ -1,6 +1,8 @@
 import type { RouteObject } from 'react-router-dom';
 import { lazy } from 'react';
 import SiteLayout from '../components/feature/SiteFooter';
+import { seoLandings } from '../pages/seo-landings/seoLandingData';
+import { pluginDirectoryRoutes } from '../pages/plugin-directory/pluginData';
 
 const HomePage = lazy(() => import('../pages/home/page'));
 const LoginPage = lazy(() => import('../pages/auth/login/page'));
@@ -27,19 +29,9 @@ const CapabilitiesPage = lazy(() => import('../pages/capabilities/page'));
 const AudioConceptsPage = lazy(() => import('../pages/concepts/page'));
 const PressPage = lazy(() => import('../pages/press/page'));
 const SeoLandingPage = lazy(() => import('../pages/seo-landings/page'));
+const PluginDirectoryPage = lazy(() => import('../pages/plugin-directory/page'));
 
-const seoLandingPaths = [
-  '/mezcla-con-ia',
-  '/mezclador-musica-online',
-  '/mastering-con-ia',
-  '/masterizar-cancion-online',
-  '/mastering-albumes',
-  '/ai-music-mixing',
-  '/online-music-mixer',
-  '/ai-mastering',
-  '/master-song-online',
-  '/album-mastering',
-];
+const seoLandingPaths = seoLandings.map((landing) => landing.path);
 
 const appRoutes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
@@ -62,6 +54,7 @@ const appRoutes: RouteObject[] = [
   { path: '/conceptos-audio', element: <AudioConceptsPage /> },
   { path: '/prensa', element: <PressPage /> },
   ...seoLandingPaths.map((path) => ({ path, element: <SeoLandingPage /> })),
+  ...pluginDirectoryRoutes.map((path) => ({ path, element: <PluginDirectoryPage /> })),
   { path: '/blog', element: <BlogPage /> },
   { path: '/blog/:slug', element: <BlogArticlePage /> },
   { path: '/terms', element: <TermsPage /> },

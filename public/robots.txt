@@ -21,6 +21,23 @@ User-agent: Bingbot
 Allow: /
 Disallow: /admin
 
+# AI search and answer engines
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /admin
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /admin
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /admin
+
 # Sitemap
 Sitemap: https://mixingmusic.ai/sitemap.xml
 

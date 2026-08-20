@@ -1,0 +1,27 @@
+# MixingMusic.AI
+
+> MixingMusic.AI is a bilingual AI mixing and mastering platform with practical, independent educational resources for music producers.
+
+## Audio plugin directory
+
+- [Audio Plugin Directory](https://mixingmusic.ai/en/audio-plugins): English index of 50 audio plugins organized by brand and production task.
+- [Directorio de plugins de audio](https://mixingmusic.ai/plugins-audio): Spanish index of 50 audio plugins organized by brand and production task.
+
+The directory covers Universal Audio, Waves, Slate Digital, iZotope, and Brainworx. Every product guide states its primary purpose, recommended uses, a practical starting tip, its manufacturer page, and the editorial verification date. Manufacturer pages are the primary source for current compatibility, licensing, formats, and pricing.
+
+## Primary product
+
+- [AI Mixing](https://mixingmusic.ai/en/ai-mixing)
+- [AI Mastering](https://mixingmusic.ai/en/ai-mastering)
+- [Pricing](https://mixingmusic.ai/pricing)
+
+## Spanish resources
+
+- [Mezcla con IA](https://mixingmusic.ai/mezcla-con-ia)
+- [Mastering con IA](https://mixingmusic.ai/mastering-con-ia)
+- [Presets](https://mixingmusic.ai/presets)
+- [Guías de grabación por género](https://mixingmusic.ai/generos)
+
+## Editorial policy
+
+Plugin pages are independent editorial summaries and do not imply endorsement or affiliation. Trademarks and official product images belong to their respective owners. Facts are checked against linked official manufacturer sources. Prices are intentionally omitted because they change frequently.

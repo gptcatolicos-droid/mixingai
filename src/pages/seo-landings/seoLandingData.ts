@@ -16,7 +16,20 @@ export type SeoLanding = {
   benefits: string[];
   faq: { q: string; a: string }[];
   keywords: string[];
+  kind?: 'core' | 'preset' | 'genre';
+  parentPath?: string;
+  relatedPaths?: string[];
+  guideSections?: {
+    eyebrow: string;
+    title: string;
+    intro: string;
+    tips: { title: string; text: string }[];
+  }[];
+  technicalNotes?: { label: string; value: string }[];
 };
+
+import { presetSeoLandings } from './presetLandingData';
+import { genreSeoLandings } from './genreLandingData';
 
 const sharedEs = {
   mixSteps: [
@@ -44,7 +57,7 @@ const sharedEn = {
   ],
 };
 
-export const seoLandings: SeoLanding[] = [
+const coreSeoLandings: SeoLanding[] = [
   {
     path: '/mezcla-con-ia', alternatePath: '/ai-music-mixing', lang: 'es', eyebrow: 'MEZCLA MUSICAL CON INTELIGENCIA ARTIFICIAL',
     title: 'Mezcla con IA', accent: 'sin perder tu intención musical.', metaTitle: 'Mezcla con IA: mezcla stems online | MixingMusic.AI',
@@ -205,6 +218,76 @@ export const seoLandings: SeoLanding[] = [
       { q: 'Is Album Mode free?', a: 'Album Mode is an Unlimited feature.' },
     ], keywords: ['album mastering', 'AI album mastering', 'master multiple songs', 'online album mastering', 'album loudness consistency'],
   },
+];
+
+const directorySeoLandings: SeoLanding[] = [
+  {
+    path: '/presets', alternatePath: '/en/presets', lang: 'es', eyebrow: 'BIBLIOTECA DE SONIDO',
+    title: 'Presets MixingMusic', accent: 'un punto de partida, no una receta.',
+    metaTitle: 'Presets para mezcla y mastering | MixingMusic.AI',
+    metaDescription: 'Explora los presets de MixingMusic.AI, conoce sus ajustes y elige el carácter adecuado para tus stems o mezcla estéreo.',
+    intro: 'Cada preset organiza EQ, dinámica, espacio y amplitud alrededor de una intención musical. Puedes aplicarlo, comparar y ajustar cada decisión.',
+    problem: 'Elegir un preset solo por el nombre del género puede sumar brillo, compresión o ambiente que la grabación no necesita.',
+    solution: 'Consulta el carácter, los parámetros y las advertencias de cada preset antes de usarlo. Si tu mezcla ya está procesada, comienza con Neutro.',
+    cta: 'Probar un preset', mode: 'mix', kind: 'core',
+    relatedPaths: presetSeoLandings.filter((item) => item.lang === 'es').map((item) => item.path),
+    steps: [{ title: 'Escucha tu material', text: 'Identifica si necesita balance, color o solamente normalización.' }, { title: 'Compara perfiles', text: 'Revisa qué cambia cada preset antes de aplicarlo.' }, { title: 'Ajusta y decide', text: 'Usa A/B al mismo volumen y conserva solo lo que mejora la canción.' }],
+    benefits: ['10 presets documentados', 'Parámetros visibles', 'Usos y advertencias', 'Acceso directo al mezclador'],
+    faq: [{ q: '¿Un preset reemplaza la mezcla?', a: 'No. Es un punto de partida que debes revisar según las pistas y la intención.' }, { q: '¿Cuál conserva el audio?', a: 'Neutro no añade EQ, compresión, reverb, delay ni amplitud artificial.' }, { q: '¿Puedo modificarlo?', a: 'Sí. Después de elegirlo puedes ajustar los controles disponibles.' }],
+    keywords: ['presets de mezcla', 'presets de mastering', 'presets de audio', 'preset neutro'],
+  },
+  {
+    path: '/en/presets', alternatePath: '/presets', lang: 'en', eyebrow: 'SOUND LIBRARY',
+    title: 'MixingMusic presets', accent: 'a starting point, not a recipe.',
+    metaTitle: 'Mixing and mastering presets | MixingMusic.AI',
+    metaDescription: 'Explore MixingMusic.AI presets, understand their settings and choose a useful character for stems or a stereo mix.',
+    intro: 'Each preset organizes EQ, dynamics, space and width around a musical intention. Apply it, compare it and adjust every decision.',
+    problem: 'Choosing a preset only by genre name can add brightness, compression or ambience that the recording does not need.',
+    solution: 'Review the character, parameters and cautions for each preset before using it. If the mix is already processed, start with Neutral.',
+    cta: 'Try a preset', mode: 'mix', kind: 'core',
+    relatedPaths: presetSeoLandings.filter((item) => item.lang === 'en').map((item) => item.path),
+    steps: [{ title: 'Listen to the material', text: 'Decide whether it needs balance, color or normalization only.' }, { title: 'Compare profiles', text: 'Review what every preset changes before applying it.' }, { title: 'Adjust and decide', text: 'A/B at matched level and keep only what improves the song.' }],
+    benefits: ['10 documented presets', 'Visible parameters', 'Uses and cautions', 'Direct mixer access'],
+    faq: [{ q: 'Does a preset replace mixing?', a: 'No. It is a starting point that must be reviewed for the tracks and artistic intent.' }, { q: 'Which preset preserves the audio?', a: 'Neutral adds no EQ, compression, reverb, delay or artificial width.' }, { q: 'Can I modify it?', a: 'Yes. After choosing it, you can adjust the available controls.' }],
+    keywords: ['mixing presets', 'mastering presets', 'audio presets', 'neutral preset'],
+  },
+  {
+    path: '/generos', alternatePath: '/en/genres', lang: 'es', eyebrow: 'GUÍAS DE PRODUCCIÓN',
+    title: 'Graba y mezcla por género', accent: 'con decisiones que empiezan antes del plugin.',
+    metaTitle: 'Guías de producción musical por género | MixingMusic.AI',
+    metaDescription: 'Guías prácticas de rock, pop, acústico, reggaeton, clásica, fusión, jazz, metal y folclor: micrófonos, compresión, mezcla y mastering.',
+    intro: 'Cada género organiza dinámica, espacio, interpretación e instrumentación de manera diferente. Estas guías conectan la captura con la mezcla final.',
+    problem: 'Aplicar la misma cadena a todos los géneros borra transitorios, profundidad y rasgos que hacen reconocible una producción.',
+    solution: 'Comienza por arreglo, sala, colocación y niveles; después elige micrófonos, compresión y procesamiento según una necesidad audible.',
+    cta: 'Empezar una mezcla', mode: 'mix', kind: 'core',
+    relatedPaths: genreSeoLandings.filter((item) => item.lang === 'es').map((item) => item.path),
+    steps: [{ title: 'Elige una guía', text: 'Parte del género y de la instrumentación real.' }, { title: 'Prepara la captura', text: 'Usa recomendaciones de sala, micrófonos y ganancia.' }, { title: 'Lleva las pistas al estudio', text: 'Aplica el criterio técnico dentro de MixingMusic.' }],
+    benefits: ['9 géneros', 'Grabación y microfonía', 'Compresores explicados', 'Mezcla y mastering'],
+    faq: [{ q: '¿Las recomendaciones son reglas?', a: 'No. Son puntos de partida que debes adaptar a la fuente, la sala y la intención.' }, { q: '¿Necesito los mismos modelos de micrófono?', a: 'No. Los modelos describen un tipo de respuesta; puedes usar alternativas con patrón y carácter similares.' }, { q: '¿Las guías incluyen presets?', a: 'Cada guía enlaza el preset más cercano o recomienda Neutro cuando no existe uno específico.' }],
+    keywords: ['cómo grabar música', 'guías de mezcla por género', 'micrófonos para grabar', 'compresores de audio'],
+  },
+  {
+    path: '/en/genres', alternatePath: '/generos', lang: 'en', eyebrow: 'PRODUCTION GUIDES',
+    title: 'Record and mix by genre', accent: 'with decisions that begin before the plugin.',
+    metaTitle: 'Recording, mixing and mastering guides by genre | MixingMusic.AI',
+    metaDescription: 'Practical rock, pop, acoustic, reggaeton, classical, fusion, jazz, metal and folk guides covering microphones, compression, mixing and mastering.',
+    intro: 'Every genre organizes dynamics, space, performance and instrumentation differently. These guides connect capture decisions to the final mix.',
+    problem: 'Applying the same chain to every genre erases transients, depth and the traits that make a production recognizable.',
+    solution: 'Begin with arrangement, room, placement and levels; then choose microphones, compression and processing for an audible need.',
+    cta: 'Start a mix', mode: 'mix', kind: 'core',
+    relatedPaths: genreSeoLandings.filter((item) => item.lang === 'en').map((item) => item.path),
+    steps: [{ title: 'Choose a guide', text: 'Start with the genre and actual instrumentation.' }, { title: 'Prepare the capture', text: 'Use the room, microphone and gain recommendations.' }, { title: 'Bring tracks into the studio', text: 'Apply the technical criteria inside MixingMusic.' }],
+    benefits: ['9 genres', 'Recording and microphones', 'Compressors explained', 'Mixing and mastering'],
+    faq: [{ q: 'Are these recommendations rules?', a: 'No. They are starting points to adapt to the source, room and artistic intent.' }, { q: 'Do I need the same microphone models?', a: 'No. Models describe a response type; alternatives with similar pattern and character can work.' }, { q: 'Do guides include presets?', a: 'Each guide links to the nearest preset or recommends Neutral when no dedicated preset exists.' }],
+    keywords: ['how to record music', 'mixing guides by genre', 'recording microphones', 'audio compressors'],
+  },
+];
+
+export const seoLandings: SeoLanding[] = [
+  ...coreSeoLandings,
+  ...directorySeoLandings,
+  ...presetSeoLandings,
+  ...genreSeoLandings,
 ];
 
 export const seoLandingByPath = Object.fromEntries(seoLandings.map((landing) => [landing.path, landing]));
