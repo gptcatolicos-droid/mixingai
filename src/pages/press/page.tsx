@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { awardFacts, pressMentions } from '../../content/pressMentions';
 import { usePageSeo } from '../../utils/usePageSeo';
 import './press.css';
+import './press-video.css';
 
 export default function PressPage() {
   usePageSeo({
@@ -12,7 +13,9 @@ export default function PressPage() {
     schema: {
       '@context': 'https://schema.org', '@type': 'Organization', name: 'MixingMusic.AI', url: 'https://mixingmusic.ai',
       founder: { '@type': 'Person', name: 'Daniel Palacio' }, award: awardFacts.name,
-      subjectOf: pressMentions.map((mention) => ({ '@type': 'CreativeWork', name: mention.title, publisher: mention.outlet, url: mention.url })),
+      subjectOf: pressMentions.map((mention) => 'videoId' in mention && mention.videoId
+        ? { '@type': 'VideoObject', name: mention.title, description: mention.description, uploadDate: '2026-08-18', publisher: { '@type': 'Organization', name: mention.outlet }, thumbnailUrl: `https://i.ytimg.com/vi/${mention.videoId}/hqdefault.jpg`, embedUrl: `https://www.youtube-nocookie.com/embed/${mention.videoId}`, contentUrl: mention.url }
+        : { '@type': 'CreativeWork', name: mention.title, publisher: mention.outlet, url: mention.url }),
     },
   });
 
@@ -23,7 +26,7 @@ export default function PressPage() {
       <div><span>GLOBAL RECOGNITION AWARDS</span><h2>{awardFacts.name}</h2><p>{awardFacts.description}</p><p>{awardFacts.selection}</p><div><b>5,8%</b><small>de los participantes recibe reconocimiento</small></div></div>
       <img src="/winner3.png" alt="MixingMusic.AI ganador del 2026 Global Recognition Award" />
     </section>
-    <section className="press-v3-mentions"><div><span>COBERTURA EDITORIAL</span><h2>MixingMusic.AI en los medios</h2></div><div className="press-v3-grid">{pressMentions.map((mention)=><article key={mention.url} style={{'--press-color':mention.color} as React.CSSProperties}><span>{mention.type}</span><small>{mention.date}</small><h3>{mention.outlet}</h3><h4>{mention.title}</h4><p>{mention.description}</p><div><a href={mention.url} target="_blank" rel="noreferrer">Ver publicación original ↗</a>{'secondaryUrl' in mention && mention.secondaryUrl && <a href={mention.secondaryUrl} target="_blank" rel="noreferrer">Ver en X ↗</a>}</div></article>)}</div></section>
+    <section className="press-v3-mentions"><div><span>COBERTURA EDITORIAL</span><h2>MixingMusic.AI en los medios</h2></div><div className="press-v3-grid">{pressMentions.map((mention)=><article key={mention.url} style={{'--press-color':mention.color} as React.CSSProperties}>{'videoId' in mention && mention.videoId && <div className="press-v3-video"><iframe src={`https://www.youtube-nocookie.com/embed/${mention.videoId}`} title={mention.title} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /></div>}<span>{mention.type}</span><small>{mention.date}</small><h3>{mention.outlet}</h3><h4>{mention.title}</h4><p>{mention.description}</p><div className="press-v3-actions"><a href={mention.url} target="_blank" rel="noreferrer">Ver publicación original ↗</a>{'secondaryUrl' in mention && mention.secondaryUrl && <a href={mention.secondaryUrl} target="_blank" rel="noreferrer">Ver en X ↗</a>}</div></article>)}</div></section>
     <section className="press-v3-founder"><span>FUNDADOR</span><h2>Daniel Palacio</h2><p>Emprendedor y estratega colombiano de inteligencia artificial, marketing digital y producción musical. Fundó MixingMusic.AI con la misión de acercar herramientas profesionales de mezcla y mastering a artistas independientes.</p><Link to="/auth/register?mode=master">Probar MixingMusic.AI →</Link></section>
   </main>;
 }
