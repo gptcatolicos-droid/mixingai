@@ -1,6 +1,7 @@
 
 import { seoArticles } from './seoArticles';
 import { masteringStandardsArticles } from './masteringStandardsArticles';
+import { historicAlbumArticles } from './historicAlbumArticles';
 
 export interface BlogArticle {
   id: string;
@@ -2281,5 +2282,6 @@ Las interfaces Focusrite siguen siendo la elección inteligente para home studio
   },
   ...seoArticles,
   ...masteringStandardsArticles,
+  ...historicAlbumArticles,
   // Se pueden agregar más artículos aquí...
 ];
