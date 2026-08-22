@@ -52,7 +52,7 @@ function inspectCompletedOrder(order: any, expectedUserId: string, expectedAmoun
   const amountMatches = Number(capture?.amount?.value) === Number(expectedAmount)
   const currencyMatches = capture?.amount?.currency_code === expectedCurrency
   const customIdMatches = !purchaseUnit?.custom_id || purchaseUnit.custom_id === expectedUserId
-  const referenceMatches = purchaseUnit?.reference_id === 'MIXINGMUSIC_V3_UNLIMITED'
+  const referenceMatches = !purchaseUnit?.reference_id || purchaseUnit.reference_id === 'MIXINGMUSIC_V3_UNLIMITED'
   const verified = Boolean(
     order?.status === 'COMPLETED' &&
     capture?.id &&
@@ -90,6 +90,22 @@ serve(async (req) => {
     const configuredPrice = Number(Deno.env.get('MASTERING_V3_PRICE_USD') ?? '14.99')
     const price = (Number.isFinite(configuredPrice) && configuredPrice > 0 ? configuredPrice : 14.99).toFixed(2)
     const currency = 'USD'
+
+    if (action === 'report_client_event') {
+      const allowedEvents = new Set(['paypal_error', 'paypal_cancel', 'webview_detected'])
+      const eventType = String(body?.eventType ?? '')
+      if (!allowedEvents.has(eventType)) return json({ error: 'INVALID_EVENT_TYPE' }, 400)
+      const clean = (value: unknown, max: number) => String(value ?? '').replace(/[\r\n]/g, ' ').slice(0, max) || null
+      const { error: diagnosticError } = await admin.from('mastering_checkout_diagnostics').insert({
+        user_id: user.id,
+        order_id: clean(body?.orderID, 64),
+        event_type: eventType,
+        error_code: clean(body?.errorCode, 120),
+        browser_context: clean(body?.browserContext, 80),
+      })
+      if (diagnosticError) throw diagnosticError
+      return json({ received: true })
+    }
 
     const grantUnlimited = async () => {
       const now = new Date().toISOString()
@@ -212,6 +228,15 @@ serve(async (req) => {
             status: canonicalData?.status ?? captureData?.status ?? 'unknown',
             paypal_http_status: captureResponse.status,
             paypal_error: captureData?.name ?? null,
+            verification: {
+              order_status: canonicalData?.status ?? null,
+              capture_status: inspection.capture?.status ?? null,
+              has_capture_id: Boolean(inspection.capture?.id),
+              amount: inspection.capture?.amount?.value ?? null,
+              currency: inspection.capture?.amount?.currency_code ?? null,
+              custom_id_present: Boolean(inspection.purchaseUnit?.custom_id),
+              reference_id_present: Boolean(inspection.purchaseUnit?.reference_id),
+            },
             issues: Array.isArray(captureData?.details)
               ? captureData.details.map((detail: any) => detail?.issue).filter(Boolean)
               : [],
@@ -244,3 +269,4 @@ serve(async (req) => {
     return json({ error: 'CHECKOUT_ERROR' }, 500)
   }
 })
+

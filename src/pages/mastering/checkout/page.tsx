@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSecureAccessToken, secureMasteringAccessEnabled } from '../masteringAccess';
-import { captureMasteringOrder, createMasteringOrder } from '../masteringCheckout';
+import { captureMasteringOrder, createMasteringOrder, reportMasteringCheckoutEvent } from '../masteringCheckout';
 import './checkout.css';
 
 declare global {
@@ -11,10 +11,13 @@ declare global {
 export default function MasteringCheckoutPage() {
   const navigate = useNavigate();
   const buttonsRendered = useRef(false);
+  const currentOrderId = useRef('');
+  const webviewReported = useRef(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [status, setStatus] = useState<'ready' | 'processing' | 'success'>('ready');
   const [error, setError] = useState('');
+  const [isInAppBrowser] = useState(() => /Instagram|FBAN|FBAV/i.test(navigator.userAgent));
 
   useEffect(() => {
     if (!localStorage.getItem('audioMixerUser')) {
@@ -26,6 +29,15 @@ export default function MasteringCheckoutPage() {
       .then(() => setSessionReady(true))
       .catch(() => navigate('/auth/login?mode=checkout', { replace: true }));
   }, [navigate]);
+
+  useEffect(() => {
+    if (!sessionReady || !isInAppBrowser || webviewReported.current) return;
+    webviewReported.current = true;
+    reportMasteringCheckoutEvent({
+      eventType: 'webview_detected',
+      browserContext: /Instagram/i.test(navigator.userAgent) ? 'instagram_webview' : 'facebook_webview',
+    }).catch(() => undefined);
+  }, [sessionReady, isInAppBrowser]);
 
   useEffect(() => {
     if (!sessionReady || !secureMasteringAccessEnabled) return;
@@ -59,6 +71,7 @@ export default function MasteringCheckoutPage() {
         setStatus('processing');
         try {
           const order = await createMasteringOrder();
+          currentOrderId.current = order.orderID;
           return order.orderID;
         } catch (checkoutError) {
           setStatus('ready');
@@ -78,15 +91,30 @@ export default function MasteringCheckoutPage() {
           localStorage.setItem('audioMixerUser', JSON.stringify({ ...stored, is_pro: true, plan: 'unlimited' }));
           setStatus('success');
           setError('');
-        } catch {
+        } catch (captureError) {
+          const errorCode = captureError instanceof Error ? captureError.message : 'CAPTURE_CALLBACK_FAILED';
+          reportMasteringCheckoutEvent({
+            eventType: 'paypal_error', orderID: data.orderID, errorCode,
+            browserContext: isInAppBrowser ? 'in_app_webview' : 'supported_browser',
+          }).catch(() => undefined);
           setStatus('ready');
           setError('PayPal recibió la operación, pero no pudimos verificarla. No repitas el pago; contáctanos con el número de orden.');
         }
       },
-      onCancel: () => { setStatus('ready'); setError('Pago cancelado. No se realizó ningún cargo.'); },
-      onError: () => { setStatus('ready'); setError('PayPal no pudo completar la operación. Inténtalo nuevamente.'); },
+      onCancel: (data: { orderID?: string }) => {
+        reportMasteringCheckoutEvent({ eventType: 'paypal_cancel', orderID: data?.orderID || currentOrderId.current }).catch(() => undefined);
+        setStatus('ready'); setError('Pago cancelado. No se realizó ningún cargo.');
+      },
+      onError: (paypalError: { code?: string; message?: string }) => {
+        reportMasteringCheckoutEvent({
+          eventType: 'paypal_error', orderID: currentOrderId.current,
+          errorCode: paypalError?.code || paypalError?.message || 'PAYPAL_SDK_ERROR',
+          browserContext: isInAppBrowser ? 'in_app_webview' : 'supported_browser',
+        }).catch(() => undefined);
+        setStatus('ready'); setError('PayPal no pudo completar la operación. Abre MixingMusic en Safari o Chrome e inténtalo nuevamente.');
+      },
     }).render('#mixingmusic-v3-paypal-button');
-  }, [sdkReady, status]);
+  }, [sdkReady, status, isInAppBrowser]);
 
   return (
     <main className="checkout-v3-page">
@@ -123,6 +151,11 @@ export default function MasteringCheckoutPage() {
               <div className="checkout-v3-divider" />
               {!secureMasteringAccessEnabled ? (
                 <div className="checkout-v3-pending"><button className="checkout-v3-paypal-preview" disabled><span>P</span>Pagar US$14.99 con PayPal</button><small>Falta conectar esta vista previa con el backend seguro antes de aceptar pagos reales.</small></div>
+              ) : isInAppBrowser ? (
+                <div className="checkout-v3-webview-warning">
+                  <strong>Abre el pago en Safari o Chrome</strong>
+                  <span>El navegador interno de Instagram/Facebook puede interrumpir la confirmación de PayPal. Usa el menú de la app y selecciona “Abrir en navegador”.</span>
+                </div>
               ) : !sdkReady ? (
                 <div className="checkout-v3-pending"><strong>Cargando pago seguro…</strong><span>Conectando con PayPal.</span></div>
               ) : (
@@ -139,3 +172,4 @@ export default function MasteringCheckoutPage() {
     </main>
   );
 }
+
