@@ -31,3 +31,11 @@ export const captureMasteringOrder = (orderID: string) => checkoutRequest<{
   unlimited: true;
 }>({ action: 'capture_order', orderID });
 
+
+export const reportMasteringCheckoutEvent = (payload: {
+  eventType: 'paypal_error' | 'paypal_cancel' | 'webview_detected';
+  orderID?: string;
+  errorCode?: string;
+  browserContext?: string;
+}) => checkoutRequest<{ received: true }>({ action: 'report_client_event', ...payload });
+
