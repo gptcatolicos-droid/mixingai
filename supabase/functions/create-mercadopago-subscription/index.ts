@@ -30,10 +30,22 @@ serve(async (req) => {
     const userId = authData.user.id
     const userEmail = authData.user.email
 
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    if (!serviceRoleKey) throw new Error('PAYMENT_PROVIDER_NOT_CONFIGURED')
+    const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } })
+    const { data: entitlement, error: entitlementError } = await admin
+      .from('mastering_entitlements')
+      .select('tier')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (entitlementError) throw entitlementError
+    if (entitlement?.tier === 'unlimited') {
+      return new Response(JSON.stringify({ error: 'ALREADY_UNLIMITED' }), { status: 409, headers: { ...cors, 'Content-Type': 'application/json' } })
+    }
+
     const MP_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ?? ''
     if (!MP_TOKEN) throw new Error('MERCADOPAGO_ACCESS_TOKEN no configurado en Supabase secrets')
-    const configuredPrice = Number(Deno.env.get('MASTERING_V3_PRICE_USD') ?? '14.99')
-    const unitPrice = Number.isFinite(configuredPrice) && configuredPrice > 0 ? configuredPrice : 14.99
+    const unitPrice = 49900
 
     const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
@@ -44,12 +56,12 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         items: [{
-          id: 'unlimited_mixes',
-          title: 'MixingMusic.AI — Mezclas Ilimitadas',
-          description: 'Acceso ilimitado al mezclador IA + IA EQ 12 bandas',
+          id: 'mixingmusic_v3_unlimited',
+          title: 'MixingMusic.AI — Unlimited para siempre',
+          description: 'Pago único: mezclas, mastering y modo álbum ilimitados',
           quantity: 1,
           unit_price: unitPrice,
-          currency_id: 'USD',
+          currency_id: 'COP',
         }],
         payer: { email: userEmail },
         external_reference: userId,
@@ -60,6 +72,7 @@ serve(async (req) => {
         },
         auto_return: 'approved',
         notification_url: `${supabaseUrl}/functions/v1/mercadopago-webhook`,
+        metadata: { product_id: 'mixingmusic_v3_unlimited', user_id: userId },
         statement_descriptor: 'MIXINGMUSIC',
         expires: false,
       })
@@ -68,11 +81,25 @@ serve(async (req) => {
     const data = await res.json()
     if (!res.ok) throw new Error(data.message || data.error || JSON.stringify(data))
 
+    const { error: orderError } = await admin.from('mastering_orders').upsert({
+      order_id: String(data.id),
+      user_id: userId,
+      provider: 'mercadopago',
+      amount: unitPrice,
+      currency: 'COP',
+      status: 'created',
+      provider_payload: { preference_id: data.id },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'order_id' })
+    if (orderError) throw orderError
+
     return new Response(
       JSON.stringify({
         init_point: data.init_point,
         sandbox_init_point: data.sandbox_init_point,
         preference_id: data.id,
+        amount: unitPrice,
+        currency: 'COP',
       }),
       { headers: { ...cors, 'Content-Type': 'application/json' } }
     )
