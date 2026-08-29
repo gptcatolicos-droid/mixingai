@@ -20,6 +20,22 @@ async function checkoutRequest<T>(payload: Record<string, unknown>): Promise<T> 
   return data as T;
 }
 
+async function mercadoPagoRequest<T>(): Promise<T> {
+  const accessToken = await getSecureAccessToken();
+  if (!supabaseUrl || !supabaseAnonKey) throw new Error('CHECKOUT_NOT_CONFIGURED');
+  const response = await fetch(`${supabaseUrl}/functions/v1/create-mercadopago-subscription`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'MERCADOPAGO_CHECKOUT_ERROR');
+  return data as T;
+}
+
 export const createMasteringOrder = () => checkoutRequest<{
   orderID: string;
   amount: string;
@@ -31,6 +47,12 @@ export const captureMasteringOrder = (orderID: string) => checkoutRequest<{
   unlimited: true;
 }>({ action: 'capture_order', orderID });
 
+export const createMercadoPagoOrder = () => mercadoPagoRequest<{
+  init_point: string;
+  preference_id: string;
+  amount: number;
+  currency: 'COP';
+}>();
 
 export const reportMasteringCheckoutEvent = (payload: {
   eventType: 'paypal_error' | 'paypal_cancel' | 'webview_detected';
@@ -38,4 +60,3 @@ export const reportMasteringCheckoutEvent = (payload: {
   errorCode?: string;
   browserContext?: string;
 }) => checkoutRequest<{ received: true }>({ action: 'report_client_event', ...payload });
-
