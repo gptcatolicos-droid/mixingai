@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSecureAccessToken, secureMasteringAccessEnabled } from '../masteringAccess';
-import { captureMasteringOrder, createMasteringOrder, reportMasteringCheckoutEvent } from '../masteringCheckout';
+import { captureMasteringOrder, createMasteringOrder, createMercadoPagoOrder, reportMasteringCheckoutEvent } from '../masteringCheckout';
 import './checkout.css';
 
 declare global {
@@ -16,6 +16,7 @@ export default function MasteringCheckoutPage() {
   const [sdkReady, setSdkReady] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [status, setStatus] = useState<'ready' | 'processing' | 'success'>('ready');
+  const [activeProvider, setActiveProvider] = useState<'paypal' | 'mercadopago' | null>(null);
   const [error, setError] = useState('');
   const [isInAppBrowser] = useState(() => /Instagram|FBAN|FBAV/i.test(navigator.userAgent));
 
@@ -68,6 +69,7 @@ export default function MasteringCheckoutPage() {
       style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal', height: 48 },
       createOrder: async () => {
         setError('');
+        setActiveProvider('paypal');
         setStatus('processing');
         try {
           const order = await createMasteringOrder();
@@ -84,26 +86,32 @@ export default function MasteringCheckoutPage() {
           throw checkoutError;
         }
       },
-      onApprove: async (data: { orderID: string }) => {
+      onApprove: async (data: { orderID: string }, actions: { restart?: () => Promise<void> }) => {
         try {
           await captureMasteringOrder(data.orderID);
           const stored = JSON.parse(localStorage.getItem('audioMixerUser') || '{}');
           localStorage.setItem('audioMixerUser', JSON.stringify({ ...stored, is_pro: true, plan: 'unlimited' }));
           setStatus('success');
           setError('');
-        } catch (captureError) {
-          const errorCode = captureError instanceof Error ? captureError.message : 'CAPTURE_CALLBACK_FAILED';
+        } catch (checkoutError) {
+          const code = checkoutError instanceof Error ? checkoutError.message : '';
+          if (code.includes('INSTRUMENT_DECLINED') && actions.restart) {
+            setStatus('ready');
+            setActiveProvider(null);
+            return actions.restart();
+          }
           reportMasteringCheckoutEvent({
-            eventType: 'paypal_error', orderID: data.orderID, errorCode,
+            eventType: 'paypal_error', orderID: data.orderID, errorCode: code || 'CAPTURE_CALLBACK_FAILED',
             browserContext: isInAppBrowser ? 'in_app_webview' : 'supported_browser',
           }).catch(() => undefined);
           setStatus('ready');
+          setActiveProvider(null);
           setError('PayPal recibió la operación, pero no pudimos verificarla. No repitas el pago; contáctanos con el número de orden.');
         }
       },
       onCancel: (data: { orderID?: string }) => {
         reportMasteringCheckoutEvent({ eventType: 'paypal_cancel', orderID: data?.orderID || currentOrderId.current }).catch(() => undefined);
-        setStatus('ready'); setError('Pago cancelado. No se realizó ningún cargo.');
+        setStatus('ready'); setActiveProvider(null); setError('Pago cancelado. No se realizó ningún cargo.');
       },
       onError: (paypalError: { code?: string; message?: string }) => {
         reportMasteringCheckoutEvent({
@@ -111,10 +119,36 @@ export default function MasteringCheckoutPage() {
           errorCode: paypalError?.code || paypalError?.message || 'PAYPAL_SDK_ERROR',
           browserContext: isInAppBrowser ? 'in_app_webview' : 'supported_browser',
         }).catch(() => undefined);
-        setStatus('ready'); setError('PayPal no pudo completar la operación. Abre MixingMusic en Safari o Chrome e inténtalo nuevamente.');
+        setStatus('ready'); setActiveProvider(null); setError('PayPal no pudo completar la operación. Puedes intentarlo en Safari o Chrome, o pagar con Mercado Pago.');
       },
     }).render('#mixingmusic-v3-paypal-button');
   }, [sdkReady, status, isInAppBrowser]);
+
+  const payWithMercadoPago = async () => {
+    setError('');
+    setActiveProvider('mercadopago');
+    setStatus('processing');
+    try {
+      const preference = await createMercadoPagoOrder();
+      if (!preference.init_point) throw new Error('MERCADOPAGO_REDIRECT_MISSING');
+      localStorage.setItem('mixingmusic_pending_payment', JSON.stringify({
+        provider: 'mercadopago',
+        preferenceId: preference.preference_id,
+        amount: preference.amount,
+        currency: preference.currency,
+      }));
+      window.location.assign(preference.init_point);
+    } catch (checkoutError) {
+      setStatus('ready');
+      setActiveProvider(null);
+      const code = checkoutError instanceof Error ? checkoutError.message : '';
+      setError(code === 'ALREADY_UNLIMITED'
+        ? 'Tu cuenta ya tiene Unlimited activo.'
+        : code === 'SECURE_SESSION_REQUIRED' || code === 'Unauthorized'
+          ? 'Tu sesión expiró. Ingresa nuevamente para continuar.'
+          : 'No pudimos abrir Mercado Pago. Inténtalo nuevamente o usa PayPal.');
+    }
+  };
 
   return (
     <main className="checkout-v3-page">
@@ -146,25 +180,35 @@ export default function MasteringCheckoutPage() {
           ) : (
             <>
               <div className="checkout-v3-price-label">PRECIO FUNDADOR</div>
-              <div className="checkout-v3-price"><sup>US$</sup>14.99</div>
+              <div className="checkout-v3-price checkout-v3-price-cop"><sup>COP $</sup>49.900</div>
               <p>Un solo pago · no es suscripción · acceso permanente</p>
               <div className="checkout-v3-divider" />
               {!secureMasteringAccessEnabled ? (
-                <div className="checkout-v3-pending"><button className="checkout-v3-paypal-preview" disabled><span>P</span>Pagar US$14.99 con PayPal</button><small>Falta conectar esta vista previa con el backend seguro antes de aceptar pagos reales.</small></div>
-              ) : isInAppBrowser ? (
-                <div className="checkout-v3-webview-warning">
-                  <strong>Abre el pago en Safari o Chrome</strong>
-                  <span>El navegador interno de Instagram/Facebook puede interrumpir la confirmación de PayPal. Usa el menú de la app y selecciona “Abrir en navegador”.</span>
-                </div>
-              ) : !sdkReady ? (
-                <div className="checkout-v3-pending"><strong>Cargando pago seguro…</strong><span>Conectando con PayPal.</span></div>
+                <div className="checkout-v3-pending"><strong>Pago seguro no disponible</strong><span>El checkout todavía no está conectado.</span></div>
               ) : (
-                <div id="mixingmusic-v3-paypal-button" />
+                <div className="checkout-v3-payment-methods">
+                  <div className="checkout-v3-provider-label"><span>Tarjeta, PSE o saldo</span><strong>COP $49.900</strong></div>
+                  <button className="checkout-v3-mercadopago-button" onClick={payWithMercadoPago} disabled={status === 'processing'}>
+                    {activeProvider === 'mercadopago' ? 'Abriendo Mercado Pago…' : 'Pagar COP $49.900 con Mercado Pago'}
+                  </button>
+                  <div className="checkout-v3-or"><span>o paga con PayPal</span></div>
+                  <div className="checkout-v3-provider-label"><span>PayPal</span><strong>US$14.99</strong></div>
+                  {isInAppBrowser ? (
+                    <div className="checkout-v3-webview-warning">
+                      <strong>Para PayPal, abre Safari o Chrome</strong>
+                      <span>El navegador interno de Instagram/Facebook puede interrumpir la confirmación. Mercado Pago continúa disponible arriba.</span>
+                    </div>
+                  ) : !sdkReady ? (
+                    <div className="checkout-v3-pending"><strong>Cargando PayPal…</strong><span>Conectando de forma segura.</span></div>
+                  ) : (
+                    <div id="mixingmusic-v3-paypal-button" />
+                  )}
+                </div>
               )}
-              {status === 'processing' && <div className="checkout-v3-processing">Verificando operación…</div>}
+              {status === 'processing' && <div className="checkout-v3-processing">{activeProvider === 'mercadopago' ? 'Preparando Mercado Pago…' : 'Verificando operación…'}</div>}
               {error && <div className="checkout-v3-error">{error}</div>}
-              <div className="checkout-v3-paypal-only">Pago único procesado de forma segura por PayPal</div>
-              <small>El acceso se activa únicamente después de que PayPal confirma el pago. No almacenamos los datos de tu tarjeta.</small>
+              <div className="checkout-v3-paypal-only">Pago único seguro con Mercado Pago o PayPal</div>
+              <small>Unlimited se activa únicamente cuando el proveedor confirma el pago. MixingMusic no almacena los datos de tu tarjeta.</small>
             </>
           )}
         </aside>
@@ -172,4 +216,3 @@ export default function MasteringCheckoutPage() {
     </main>
   );
 }
-
