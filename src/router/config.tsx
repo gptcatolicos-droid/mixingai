@@ -55,6 +55,8 @@ const appRoutes: RouteObject[] = [
   { path: '/prensa', element: <PressPage /> },
   ...seoLandingPaths.map((path) => ({ path, element: <SeoLandingPage /> })),
   ...pluginDirectoryRoutes.map((path) => ({ path, element: <PluginDirectoryPage /> })),
+  { path: '/en/blog', element: <BlogPage /> },
+  { path: '/en/blog/:slug', element: <BlogArticlePage /> },
   { path: '/blog', element: <BlogPage /> },
   { path: '/blog/:slug', element: <BlogArticlePage /> },
   { path: '/terms', element: <TermsPage /> },

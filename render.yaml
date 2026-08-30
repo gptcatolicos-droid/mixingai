@@ -4,10 +4,9 @@ services:
     runtime: static
     buildCommand: npm install && npm run build
     staticPublishPath: ./out
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    # Every public route and private app entry has its own static HTML.
+    # No catch-all rewrite: unknown URLs must retain an HTTP 404.
+    routes: []
     headers:
       - path: /*
         name: X-Frame-Options

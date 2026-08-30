@@ -61,6 +61,7 @@ export default defineConfig({
   ],
   base: '/',
   build: {
+    manifest: true,
     sourcemap: false,
     outDir: 'out',
     minify: 'esbuild',

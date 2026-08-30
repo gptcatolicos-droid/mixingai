@@ -17,9 +17,9 @@ const PrivacyPage: React.FC = () => {
                 style={{ width: '200px', height: '42.7px' }}
               />
               <div>
-                <h1 className="text-2xl font-bold text-white" style={{ fontFamily: '"Pacifico", serif' }}>
+                <p className="text-2xl font-bold text-white" style={{ fontFamily: '"Pacifico", serif' }}>
                   mixingmusic.ai
-                </h1>
+                </p>
                 <p className="text-blue-200 text-sm">Studio Pro</p>
               </div>
             </Link>
