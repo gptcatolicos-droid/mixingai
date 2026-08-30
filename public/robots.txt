@@ -1,48 +1,8 @@
+# Public pages and brand assets are crawlable by all search engines.
+# Account/application pages use noindex in their own HTML; allow crawling so it can be read.
 User-agent: *
 Allow: /
-Disallow: /admin
-Disallow: /admin/
-Disallow: /admin/dashboard
 Disallow: /api/
-Disallow: /auth/verify
-Disallow: /profile
-Disallow: /billing
-Disallow: /checkout-v3
-Disallow: /payment-confirmation
+Disallow: /seo-meta/
 
-# Allow Google to crawl everything else
-User-agent: Googlebot
-Allow: /
-Disallow: /admin
-Disallow: /admin/
-
-# Allow Bingbot
-User-agent: Bingbot
-Allow: /
-Disallow: /admin
-
-# AI search and answer engines
-User-agent: OAI-SearchBot
-Allow: /
-Disallow: /admin
-
-User-agent: ChatGPT-User
-Allow: /
-Disallow: /admin
-
-User-agent: PerplexityBot
-Allow: /
-Disallow: /admin
-
-User-agent: ClaudeBot
-Allow: /
-Disallow: /admin
-
-# Sitemap
 Sitemap: https://mixingmusic.ai/sitemap.xml
-
-# Crawl-delay for heavy bots
-User-agent: AhrefsBot
-Crawl-delay: 10
-User-agent: SemrushBot
-Crawl-delay: 10

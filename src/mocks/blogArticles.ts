@@ -35,7 +35,7 @@ export interface BlogArticle {
 }
 
 // Agregar los nuevos artículos 2025 al final del array existente
-export const blogArticles: BlogArticle[] = [
+const articleCandidates: BlogArticle[] = [
   {
     id: '1',
     slug: 'how-to-mix-music-with-ai-complete-guide',
@@ -90,7 +90,7 @@ AI can automatically separate mixed audio into individual stems:
 - Instruments
 - Ambience
 
-For better stem separation results, check out our comprehensive guide on [Moises stem separation and mixing techniques](/blog/moises-stem-separation-mixing-guide).
+
 
 ### 2. Intelligent EQ Application
 AI applies frequency corrections based on:
@@ -99,7 +99,7 @@ AI applies frequency corrections based on:
 - Tonal balance optimization
 - Harmonic enhancement
 
-Learn more about professional EQ techniques in our detailed article about [professional mixing techniques](/blog/professional-mixing-techniques-2026).
+Learn more about professional EQ techniques in our detailed article about [professional mixing techniques](/blog/professional-mixing-techniques-2025).
 
 ### 3. Dynamic Range Optimization
 Advanced compression algorithms that:
@@ -137,7 +137,7 @@ For optimal recording quality with your home studio setup, read our guide on [us
 3. **Final Quality Control**: Listen for artifacts or issues
 4. **Version Management**: Save multiple mix versions
 
-For detailed information about loudness standards, check our comprehensive [LUFS normalization guide for streaming platforms](/blog/lufs-normalization-streaming-mastering-guide).
+For detailed information about loudness standards, check our comprehensive [LUFS normalization guide for streaming platforms](/blog/lufs-mastering-streaming-guia).
 
 ## AI Mixing Tools and Platforms
 
@@ -147,7 +147,7 @@ For detailed information about loudness standards, check our comprehensive [LUFS
 - **eMastered**: Automated mastering with AI
 - **CloudBounce**: AI-powered mixing and mastering
 
-For a complete comparison of available tools, read our [best online mixing tools 2026 review](/blog/best-online-mixing-tools-2026).
+For a complete comparison of available tools, read our [best online mixing tools 2026 review](/blog/best-online-mixing-tools-2025).
 
 ### Key Features to Look For:
 1. Multi-genre support
@@ -179,7 +179,7 @@ Different musical genres require unique approaches:
 - Detailed high-frequency content
 - Creative spatial effects
 
-For electronic music producers, our [mixing electronic music with AI automation](/blog/mixing-electronic-music-ai-automation) guide offers specialized techniques.
+
 
 ### 2. Vocal Processing Excellence
 AI excels at vocal processing through:
@@ -189,7 +189,7 @@ AI excels at vocal processing through:
 - Reverb and delay optimization
 - Frequency conflict resolution with instruments
 
-Learn advanced vocal techniques in our [professional vocal mixing with AI guide](/blog/professional-vocal-mixing-ai-techniques).
+
 
 ### 3. Rhythm Section Balance
 Perfect drum and bass relationships through:
@@ -250,7 +250,7 @@ Ready to transform your music production? Here's your action plan:
 
 The future of music production is here, and it's powered by artificial intelligence. Join thousands of artists who are already using AI to create professional-quality mixes in minutes, not hours.
 
-For more insights on the future of music production, read our analysis on [why AI mixing is the future of music production](/blog/why-ai-mixing-future-music-production).`,
+`,
     contentEs: `# Cómo Mezclar Música con IA: Guía Profesional Completa 2026
 
 ## Introducción a la Mezcla Musical con IA
@@ -298,7 +298,7 @@ La IA puede separar automáticamente audio mezclado en stems individuales:
 - Instrumentos
 - Ambiente
 
-Para mejores resultados en separación de stems, consulta nuestra guía completa sobre [técnicas de separación de stems con Moises](/blog/moises-stem-separation-mixing-guide).
+
 
 ### 2. Aplicación Inteligente de EQ
 La IA aplica correcciones de frecuencia basadas en:
@@ -307,7 +307,7 @@ La IA aplica correcciones de frecuencia basadas en:
 - Optimización de balance tonal
 - Mejora armónica
 
-Aprende más sobre técnicas profesionales de EQ en nuestro artículo detallado sobre [técnicas de mezcla profesional](/blog/professional-mixing-techniques-2026).
+Aprende más sobre técnicas profesionales de EQ en nuestro artículo detallado sobre [técnicas de mezcla profesional](/blog/professional-mixing-techniques-2025).
 
 ### 3. Optimización de Rango Dinámico
 Algoritmos avanzados de compresión que:
@@ -345,7 +345,7 @@ Para calidad óptima de grabación con tu configuración de home studio, lee nue
 3. **Control de Calidad Final**: Escucha por artefactos o problemas
 4. **Gestión de Versiones**: Guarda múltiples versiones de mezcla
 
-Para información detallada sobre estándares de volumen, consulta nuestra [guía completa de normalización LUFS para plataformas de streaming](/blog/lufs-normalization-streaming-mastering-guide).
+Para información detallada sobre estándares de volumen, consulta nuestra [guía completa de normalización LUFS para plataformas de streaming](/blog/lufs-mastering-streaming-guia).
 
 ## Herramientas y Plataformas de Mezcla con IA
 
@@ -355,7 +355,7 @@ Para información detallada sobre estándares de volumen, consulta nuestra [guí
 - **eMastered**: Mastering automatizado con IA
 - **CloudBounce**: Mezcla y mastering impulsado por IA
 
-Para una comparación completa de herramientas disponibles, lee nuestra [revisión de las mejores herramientas de mezcla online 2026](/blog/best-online-mixing-tools-2026).
+Para una comparación completa de herramientas disponibles, lee nuestra [revisión de las mejores herramientas de mezcla online 2026](/blog/best-online-mixing-tools-2025).
 
 ### Características Clave a Buscar:
 1. Soporte multi-género
@@ -387,7 +387,7 @@ Diferentes géneros musicales requieren enfoques únicos:
 - Contenido detallado de alta frecuencia
 - Efectos espaciales creativos
 
-Para productores de música electrónica, nuestra guía de [mezcla de música electrónica con automatización IA](/blog/mixing-electronic-music-ai-automation) ofrece técnicas especializadas.
+
 
 ### 2. Excelencia en Procesamiento Vocal
 La IA excele en procesamiento vocal a través de:
@@ -397,7 +397,7 @@ La IA excele en procesamiento vocal a través de:
 - Optimización de reverb y delay
 - Resolución de conflictos de frecuencia con instrumentos
 
-Aprende técnicas vocales avanzadas en nuestra [guía de mezcla vocal profesional con IA](/blog/professional-vocal-mixing-ai-techniques).
+
 
 ### 3. Balance de Sección Rítmica
 Relaciones perfectas entre batería y bajo a través de:
@@ -458,7 +458,7 @@ Ya seas un artista independiente, productor o ingeniero de audio, incorporar her
 
 El futuro de la producción musical está aquí, y está impulsado por inteligencia artificial. Únete a miles de artistas que ya están usando IA para crear mezclas de calidad profesional en minutos, no horas.
 
-Para más insights sobre el futuro de la producción musical, lee nuestro análisis sobre [por qué la mezcla con IA es el futuro de la producción musical](/blog/why-ai-mixing-future-music-production).`,
+`,
     category: 'ai',
     categoryName: 'AI Music Production',
     categoryNameEs: 'Producción Musical con IA',
@@ -2285,3 +2285,9 @@ Las interfaces Focusrite siguen siendo la elección inteligente para home studio
   ...historicAlbumArticles,
   // Se pueden agregar más artículos aquí...
 ];
+
+// Preserve the first article, matching the existing article route's find() behavior.
+// A legacy standards entry repeats one slug; indexes and metadata must agree.
+export const blogArticles = articleCandidates.filter((article, index, articles) =>
+  articles.findIndex(candidate => candidate.slug === article.slug) === index,
+);

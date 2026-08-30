@@ -1,72 +1,88 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { load } from 'cheerio';
 
-const projectRoot = resolve(import.meta.dirname, '..');
-const ssrBundle = resolve(projectRoot, '.seo-prerender/seoPrerenderEntry.js');
-const { renderSeoRoute, seoRoutes } = await import(pathToFileURL(ssrBundle).href);
+const root = resolve(import.meta.dirname, '..');
+const { publicRoutes, privatePaths, renderPublicRoute, renderNotFound } = await import(pathToFileURL(resolve(root, '.seo-prerender/seoPrerenderEntry.js')).href);
 const ORIGIN = 'https://mixingmusic.ai';
-
-const escapeXml = (value) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-const escapeHtml = escapeXml;
-
-function buildSitemap() {
-  const today = new Date().toISOString().slice(0, 10);
-  const staticPages = [
-    ['/', '1.0', 'weekly'], ['/blog', '0.9', 'weekly'], ['/pricing', '0.9', 'monthly'], ['/capacidades', '0.8', 'monthly'],
-    ['/conceptos-audio', '0.8', 'monthly'], ['/prensa', '0.8', 'monthly'], ['/terms', '0.3', 'yearly'], ['/privacy', '0.3', 'yearly'],
-  ];
-  const staticEntries = staticPages.map(([path, priority, frequency]) => `  <url><loc>${ORIGIN}${path}</loc><lastmod>${today}</lastmod><changefreq>${frequency}</changefreq><priority>${priority}</priority></url>`);
-  const seoEntries = seoRoutes.map((path) => {
-    const { landing } = renderSeoRoute(path);
-    const priority = landing.kind === 'genre' || landing.kind === 'preset' ? '0.85' : landing.kind === 'plugin-directory' ? '0.88' : '0.9';
-    const esHref = landing.lang === 'es' ? `${ORIGIN}${landing.path}` : `${ORIGIN}${landing.alternatePath}`;
-    const enHref = landing.lang === 'en' ? `${ORIGIN}${landing.path}` : `${ORIGIN}${landing.alternatePath}`;
-    return `  <url><loc>${escapeXml(`${ORIGIN}${landing.path}`)}</loc><lastmod>${today}</lastmod><changefreq>monthly</changefreq><priority>${priority}</priority><xhtml:link rel="alternate" hreflang="es" href="${escapeXml(esHref)}"/><xhtml:link rel="alternate" hreflang="en" href="${escapeXml(enHref)}"/><xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(enHref)}"/></url>`;
-  });
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${[...staticEntries, ...seoEntries].join('\n')}\n</urlset>\n`;
-  writeFileSync(resolve(projectRoot, 'public/sitemap-pages.xml'), xml);
-  console.log(`Generated sitemap-pages.xml with ${staticEntries.length + seoEntries.length} URLs.`);
+const escape = value => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+function write(path, text) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text); }
+const urlset = entries => `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${entries.join('\n')}\n</urlset>\n`;
+function sitemap() {
+  const entries = route => {
+    const { meta } = route;
+    const alternate = Object.entries(meta.alternates || {}).map(([lang, path]) => `<xhtml:link rel="alternate" hreflang="${lang}" href="${escape(ORIGIN + path)}"/>`).join('');
+    // Do not invent a modification date from the build time or a fixed historical date.
+    return `  <url><loc>${escape(ORIGIN + meta.path)}</loc>${alternate}</url>`;
+  };
+  write(resolve(root, 'public/sitemap-pages.xml'), urlset(publicRoutes.filter(route => route.meta.type !== 'article').map(entries)));
+  write(resolve(root, 'public/sitemap-blog.xml'), urlset(publicRoutes.filter(route => route.meta.type === 'article').map(entries)));
+  write(resolve(root, 'public/sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><sitemap><loc>${ORIGIN}/sitemap-pages.xml</loc></sitemap><sitemap><loc>${ORIGIN}/sitemap-blog.xml</loc></sitemap></sitemapindex>\n`);
+  console.log(`Sitemaps: ${publicRoutes.length} public URLs generated from the render catalog.`);
 }
-
-function replaceMeta(html, attribute, key, content) {
-  const expression = new RegExp(`<meta\\s+${attribute}=["']${key}["'][^>]*>`, 'i');
-  const replacement = `<meta ${attribute}="${key}" content="${escapeHtml(content)}" />`;
-  return expression.test(html) ? html.replace(expression, replacement) : html.replace('</head>', `  ${replacement}\n</head>`);
-}
-
-function renderPages() {
-  const outputRoot = resolve(projectRoot, 'out');
-  const template = readFileSync(resolve(outputRoot, 'index.html'), 'utf8');
-
-  for (const path of seoRoutes) {
-    const { landing, schema, html: body } = renderSeoRoute(path);
-    let html = template;
-    html = html.replace(/<html\s+lang=["'][^"']+["']/, `<html lang="${landing.lang}"`);
-    html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(landing.metaTitle)}</title>`);
-    html = replaceMeta(html, 'name', 'description', landing.metaDescription);
-    html = replaceMeta(html, 'property', 'og:title', landing.metaTitle);
-    html = replaceMeta(html, 'property', 'og:description', landing.metaDescription);
-    html = replaceMeta(html, 'property', 'og:url', `${ORIGIN}${landing.path}`);
-    html = replaceMeta(html, 'name', 'twitter:title', landing.metaTitle);
-    html = replaceMeta(html, 'name', 'twitter:description', landing.metaDescription);
-    html = html.replace(/<link\s+rel=["']canonical["'][^>]*>/i, `<link rel="canonical" href="${ORIGIN}${landing.path}" />`);
-    html = html.replace(/\s*<link\s+rel=["']alternate["'][^>]*>\s*/gi, '\n');
-    html = html.replace(/\s*<script\s+type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>\s*/gi, '\n');
-    const alternates = `  <link rel="alternate" hreflang="${landing.lang}" href="${ORIGIN}${landing.path}" />\n  <link rel="alternate" hreflang="${landing.lang === 'es' ? 'en' : 'es'}" href="${ORIGIN}${landing.alternatePath}" />\n  <link rel="alternate" hreflang="x-default" href="${ORIGIN}${landing.lang === 'en' ? landing.path : landing.alternatePath}" />`;
-    const schemas = schema.map((item) => `  <script type="application/ld+json">${JSON.stringify(item).replaceAll('<', '\\u003c')}</script>`).join('\n');
-    html = html.replace('</head>', `${alternates}\n${schemas}\n</head>`);
-    html = html.replace('<div id="root"></div>', `<div id="root">${body}</div>`);
-    const destination = resolve(outputRoot, path.replace(/^\//, ''), 'index.html');
-    mkdirSync(dirname(destination), { recursive: true });
-    writeFileSync(destination, html);
+function render() {
+  const out = resolve(root, 'out');
+  const template = readFileSync(resolve(out, 'index.html'), 'utf8');
+  const manifest = JSON.parse(readFileSync(resolve(out, '.vite/manifest.json'), 'utf8'));
+  function styles(path) {
+    const pages = { '/': 'home', '/pricing': 'pricing', '/capacidades': 'capabilities', '/conceptos-audio': 'concepts', '/prensa': 'press', '/terms': 'terms', '/privacy': 'privacy', '/cookies': 'cookies', '/blog': 'blog', '/en/blog': 'blog' };
+    const page = pages[path] || (/^\/(en\/)?blog\//.test(path) ? 'blog/article' : /plugins|plugin/.test(path) ? 'plugin-directory' : 'seo-landings');
+    const css = new Set(), seen = new Set();
+    function collect(key) {
+      if (seen.has(key)) return; seen.add(key);
+      const entry = manifest[key];
+      if (!entry) throw new Error(`Missing Vite manifest entry: ${key}`);
+      for (const file of entry.css || []) css.add('/' + file);
+      for (const key of entry.imports || []) collect(key);
+    }
+    collect(`src/pages/${page}/page.tsx`);
+    return css;
   }
-
-  rmSync(resolve(projectRoot, '.seo-prerender'), { recursive: true, force: true });
-  console.log(`Prerendered ${seoRoutes.length} bilingual SEO pages.`);
+  function document(meta, content) {
+    const $ = load(template);
+    $('link[rel="canonical"], link[hreflang], script[type="application/ld+json"], meta[name="googlebot"], meta[property^="og:"], meta[name^="twitter:"], meta[property^="article:"]').remove();
+    const tag = (attribute, name, value) => {
+      $(`meta[${attribute}="${name}"]`).remove();
+      $('<meta>').attr(attribute, name).attr('content', value).appendTo('head');
+    };
+    tag('name', 'robots', meta ? 'index, follow, max-image-preview:large' : 'noindex, follow');
+    $('title').text(meta?.title || 'Página no encontrada | MixingMusic.AI');
+    $('html').attr('lang', meta?.lang || 'es').removeAttr('data-page-language');
+    if (meta) {
+      $('html').attr('data-page-language', meta.lang);
+      tag('name', 'description', meta.description);
+      $('<link>').attr({ rel: 'canonical', href: ORIGIN + meta.path }).appendTo('head');
+      for (const [lang, path] of Object.entries(meta.alternates || {})) $('<link>').attr({ rel: 'alternate', hreflang: lang, href: ORIGIN + path }).appendTo('head');
+      const image = meta.image || `${ORIGIN}/og-mixingmusic.png`;
+      for (const [key, value] of Object.entries({ title: meta.title, description: meta.description, url: ORIGIN + meta.path, type: meta.type || 'website', image, site_name: 'MixingMusic.AI', locale: meta.lang === 'en' ? 'en_US' : 'es_ES' })) tag('property', `og:${key}`, value);
+      if (!meta.image) { tag('property', 'og:image:width', '512'); tag('property', 'og:image:height', '512'); }
+      for (const [key, value] of Object.entries({ title: meta.title, description: meta.description, image, card: meta.image ? 'summary_large_image' : 'summary' })) tag('name', `twitter:${key}`, value);
+      if (meta.published) tag('property', 'article:published_time', meta.published);
+      for (const schema of meta.schema) $('<script>').attr('type', 'application/ld+json').text(JSON.stringify(schema).replaceAll('<', '\\u003c')).appendTo('head');
+    } else $('meta[name="description"]').remove();
+    if (meta) {
+      for (const href of styles(meta.path)) if (!$(`link[rel="stylesheet"][href="${href}"]`).length) $('<link>').attr({ rel: 'stylesheet', href }).appendTo('head');
+      const classes = { '/': 'page-home page-home-v3', '/capacidades': 'capabilities-page', '/conceptos-audio': 'concepts-page' };
+      if (classes[meta.path]) $('body').attr('class', classes[meta.path]);
+    }
+    $('#root').html(content);
+    return $.html();
+  }
+  for (const route of publicRoutes) {
+    const path = route.meta.path.replace(/^\//, '');
+    write(resolve(out, path, 'index.html'), document(route.meta, renderPublicRoute(route)));
+    write(resolve(out, 'seo-meta', path, 'index.json'), JSON.stringify(route.meta));
+  }
+  // Private deep links remain valid without a catch-all rewrite or marketing metadata.
+  const shell = load(document(undefined, ''));
+  shell('title').text('MixingMusic.AI');
+  for (const path of privatePaths) write(resolve(out, path.slice(1), 'index.html'), shell.html());
+  write(resolve(out, '404.html'), document(undefined, renderNotFound()));
+  write(resolve(out, 'seo-route-manifest.json'), JSON.stringify({ public: publicRoutes.map(route => route.meta.path), private: privatePaths }, null, 2));
+  rmSync(resolve(root, '.seo-prerender'), { recursive: true, force: true });
+  console.log(`Rendered ${publicRoutes.length} public pages, ${privatePaths.length} private shells and a noindex 404.`);
 }
-
-const command = process.argv[2];
-if (command === 'sitemap') buildSitemap();
-else if (command === 'render') renderPages();
-else throw new Error('Use "sitemap" or "render".');
+if (process.argv[2] === 'sitemap') sitemap();
+else if (process.argv[2] === 'render') render();
+else throw new Error('Use sitemap or render');

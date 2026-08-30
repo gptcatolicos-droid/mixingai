@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PRESETS } from './mixTypes';
@@ -95,13 +96,13 @@ export default function HomeHeroV3() {
           <strong> O masteriza una mezcla.</strong>
         </h1>
         <p className="v3-hero-copy">
-          Si tienes pistas separadas, crea la mezcla completa. Si ya tienes una mezcla estéreo,
+          Mezcla y mastering con IA para tu música. Si tienes pistas separadas, crea la mezcla completa. Si ya tienes una mezcla estéreo,
           mejórala y masterízala para dejarla lista para publicar.
         </p>
 
         <div className="v3-function-strip" aria-label="Las tres funciones de MixingMusic">
           {coreFunctions.map((item) => (
-            <div key={item.number} style={{ '--function-color': item.preset.color } as React.CSSProperties}>
+            <div key={item.number} style={{ '--function-color': item.preset.color } as CSSProperties}>
               <div className="v3-function-wave" aria-hidden="true">
                 {item.preset.wavePattern.slice(0, 12).map((height, index) => <i key={index} style={{ height: `${Math.max(16, height * 100)}%` }} />)}
               </div>
@@ -157,6 +158,42 @@ export default function HomeHeroV3() {
         </button>
       </section>
 
+      <section className="v3-section v3-pricing" id="planes">
+        <div className="v3-section-heading">
+          <span className="v3-kicker">PRECIO SIMPLE</span>
+          <h2>Empieza gratis. Paga una sola vez.</h2>
+          <p>Sin renovación mensual, créditos confusos ni contratos anuales.</p>
+        </div>
+        <div className="v3-price-grid">
+          <article className="v3-price-card">
+            <div className="v3-plan-name">GRATIS</div>
+            <div className="v3-price"><sup>$</sup>0</div>
+            <p>Para conocer el flujo completo.</p>
+            <ul>
+              <li>3 mezclas desde stems</li>
+              <li>1 master descargable</li>
+              <li>Descarga master en MP3</li>
+              <li>Presets MixingMusic</li>
+            </ul>
+            <button className="v3-button v3-button-outline" onClick={() => begin('mix')}>Crear cuenta gratis</button>
+          </article>
+          <article className="v3-price-card v3-price-featured">
+            <div className="v3-founders">PRECIO FUNDADOR</div>
+            <div className="v3-plan-name">ILIMITADO PARA SIEMPRE</div>
+            <div className="v3-price"><sup>$</sup>14.99</div>
+            <p>Un solo pago · no es suscripción · acceso permanente.</p>
+            <ul>
+              <li>Mezclas y masters ilimitados</li>
+              <li>MP3 + WAV real de 24 bits</li>
+              <li>Configuraciones guardadas</li>
+              <li>Modo álbum hasta 12 canciones</li>
+            </ul>
+            <button className="v3-button v3-button-accent" onClick={() => navigate('/checkout-v3')}>Activar Unlimited</button>
+            <small>Precio regular posterior: US$29.99</small>
+          </article>
+        </div>
+      </section>
+
       <section className="v3-trust" aria-label="Beneficios principales">
         <div><strong>12</strong><span>stems por mezcla</span></div>
         <div><strong>24-bit</strong><span>WAV profesional</span></div>
@@ -187,7 +224,7 @@ export default function HomeHeroV3() {
         </div>
         <div className="v3-press-home-grid">
           {pressMentions.map((mention) => (
-            <a key={mention.url} href={mention.url} target="_blank" rel="noreferrer" style={{ '--press-color': mention.color } as React.CSSProperties}>
+            <a key={mention.url} href={mention.url} target="_blank" rel="noreferrer" style={{ '--press-color': mention.color } as CSSProperties}>
               <span>{mention.type} · {mention.date}</span><strong>{mention.outlet}</strong><p>{mention.title}</p><i>Leer o escuchar ↗</i>
             </a>
           ))}
@@ -224,7 +261,7 @@ export default function HomeHeroV3() {
         </div>
         <div className="v3-presets-grid">
           {PRESETS.map((preset) => (
-            <div className="v3-preset" key={preset.id} style={{ '--preset-color': preset.color } as React.CSSProperties}>
+            <div className="v3-preset" key={preset.id} style={{ '--preset-color': preset.color } as CSSProperties}>
               <div className="v3-preset-wave">
                 {preset.wavePattern.slice(0, 8).map((height, index) => (
                   <i key={index} style={{ height: `${Math.max(18, height * 100)}%` }} />
@@ -306,41 +343,7 @@ export default function HomeHeroV3() {
         </div>
       </section>
 
-      <section className="v3-section v3-pricing" id="planes">
-        <div className="v3-section-heading">
-          <span className="v3-kicker">PRECIO SIMPLE</span>
-          <h2>Empieza gratis. Paga una sola vez.</h2>
-          <p>Sin renovación mensual, créditos confusos ni contratos anuales.</p>
-        </div>
-        <div className="v3-price-grid">
-          <article className="v3-price-card">
-            <div className="v3-plan-name">GRATIS</div>
-            <div className="v3-price"><sup>$</sup>0</div>
-            <p>Para conocer el flujo completo.</p>
-            <ul>
-              <li>3 mezclas desde stems</li>
-              <li>1 master descargable</li>
-              <li>Descarga master en MP3</li>
-              <li>Presets MixingMusic</li>
-            </ul>
-            <button className="v3-button v3-button-outline" onClick={() => begin('mix')}>Crear cuenta gratis</button>
-          </article>
-          <article className="v3-price-card v3-price-featured">
-            <div className="v3-founders">PRECIO FUNDADOR</div>
-            <div className="v3-plan-name">ILIMITADO PARA SIEMPRE</div>
-            <div className="v3-price"><sup>$</sup>14.99</div>
-            <p>Un solo pago · no es suscripción · acceso permanente.</p>
-            <ul>
-              <li>Mezclas y masters ilimitados</li>
-              <li>MP3 + WAV real de 24 bits</li>
-              <li>Configuraciones guardadas</li>
-              <li>Modo álbum hasta 12 canciones</li>
-            </ul>
-            <button className="v3-button v3-button-accent" onClick={() => navigate('/checkout-v3')}>Activar Unlimited</button>
-            <small>Precio regular posterior: US$29.99</small>
-          </article>
-        </div>
-      </section>
+
 
       <section className="v3-guitarraia" aria-label="GuitarraIA">
         <div className="v3-guitarraia-copy">

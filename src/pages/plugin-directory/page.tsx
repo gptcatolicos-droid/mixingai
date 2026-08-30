@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   audioPlugins, brandNames, brandPath, categoryNames, categoryPath, directoryPath, pluginBrands,
@@ -153,11 +153,7 @@ export function PluginDirectoryContent({ path }: { path: string }) {
 }
 
 export default function PluginDirectoryPage() {
-  const { pathname } = useLocation(); const view = resolvePluginView(pathname);
-  useEffect(() => {
-    if (!view) return; const meta = pluginViewMeta(view); document.title = meta.title;
-    const description = document.querySelector('meta[name="description"]'); if (description) description.setAttribute('content', meta.description);
-  }, [view]);
+  const { pathname } = useLocation();
   return <PluginDirectoryContent path={pathname} />;
 }
 

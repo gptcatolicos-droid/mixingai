@@ -1,24 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import LanguageSelector from './LanguageSelector';
 import RuntimeLocaleTranslator from './RuntimeLocaleTranslator';
 import './site-footer.css';
+import RouteSeo from '../../seo/RouteSeo';
+import { isPrivatePath } from '../../seo/routes';
+import type { PageMetadata } from '../../seo/routes';
 
-const PRIVATE_PREFIXES = [
-  '/auth',
-  '/onboarding',
-  '/profile',
-  '/billing',
-  '/feed',
-  '/analytics',
-  '/admin',
-  '/payment-confirmation',
-  '/mastering',
-  '/checkout-v3',
-];
-
-function isPublicPath(pathname: string) {
-  return !PRIVATE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+function PublicLanguages({ metadata }: { metadata?: PageMetadata }) {
+  const { pathname } = useLocation();
+  const [alternates, setAlternates] = useState(metadata?.alternates || {});
+  useEffect(() => {
+    const read = () => setAlternates(Object.fromEntries(Array.from(document.head.querySelectorAll<HTMLLinkElement>('link[hreflang]')).filter(link => ['es', 'en'].includes(link.hreflang)).map(link => [link.hreflang, new URL(link.href).pathname])));
+    read(); window.addEventListener('mixingmusic:seo', read);
+    return () => window.removeEventListener('mixingmusic:seo', read);
+  }, [pathname]);
+  return <nav className="site-language" aria-label="Idioma / Language">{Object.entries(alternates).filter(([lang]) => ['es','en'].includes(lang)).map(([lang, href]) => <Link key={lang} to={href} lang={lang} hrefLang={lang} aria-current={pathname === href ? 'page' : undefined} style={{ padding: '4px 8px', fontWeight: pathname === href ? 800 : 400 }}>{lang.toUpperCase()}</Link>)}</nav>;
 }
 
 function PublicHeader({ english }: { english: boolean }) {
@@ -33,7 +30,7 @@ function PublicHeader({ english }: { english: boolean }) {
     <header className="public-header">
       <div className="public-header-inner">
         <Link className="public-header-brand" to="/" onClick={close} aria-label="MixingMusic.AI inicio">
-          <img src="/logo-brand.png" alt="MixingMusic.AI" />
+          <img src="/logo-brand.png" alt="MixingMusic.AI" width={1260} height={323} />
           <span>V3</span>
         </Link>
         <button className="public-header-toggle" type="button" aria-label={labels.menu} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
@@ -45,7 +42,7 @@ function PublicHeader({ english }: { english: boolean }) {
           <Link to="/conceptos-audio" onClick={close}>{labels.concepts}</Link>
           <Link to="/prensa" onClick={close}>{labels.press}</Link>
           <Link to="/pricing" onClick={close}>{labels.plans}</Link>
-          <Link to="/blog" onClick={close}>{labels.blog}</Link>
+          <Link to={english ? '/en/blog' : '/blog'} onClick={close}>{labels.blog}</Link>
           <Link className="public-header-login" to="/auth/login" onClick={close}>{labels.login}</Link>
           <Link className="public-header-cta" to="/auth/register?mode=master" onClick={close}>{labels.trial}</Link>
         </nav>
@@ -54,7 +51,7 @@ function PublicHeader({ english }: { english: boolean }) {
   );
 }
 
-function PublicPricing({ english }: { english: boolean }) {
+export function PublicPricing({ english }: { english: boolean }) {
   const copy = english
     ? {
         kicker: 'SIMPLE PRICING',
@@ -116,31 +113,35 @@ function PublicPricing({ english }: { english: boolean }) {
   );
 }
 
-export default function SiteLayout() {
-  const { pathname, search } = useLocation();
-  const publicPage = isPublicPath(pathname);
-  const english = pathname.startsWith('/en/') || new URLSearchParams(search).get('lang') === 'en';
+export default function SiteLayout({ metadata }: { metadata?: PageMetadata } = {}) {
+  const { pathname } = useLocation();
+  const publicPage = !isPrivatePath(pathname);
+  const english = pathname.startsWith('/en/');
   const showGlobalPricing = publicPage && pathname !== '/' && pathname !== '/pricing';
 
   return <div className="site-v3-layout">
-    <div className="site-locale-float"><LanguageSelector /></div>
-    <RuntimeLocaleTranslator />
+    <RouteSeo />
+    <div className="site-locale-float">{publicPage ? <PublicLanguages metadata={metadata} /> : <LanguageSelector />}</div>
+    {!publicPage && <RuntimeLocaleTranslator />}
     {publicPage && <PublicHeader english={english} />}
     <div className={publicPage ? 'site-public-content' : undefined}><Outlet /></div>
     {showGlobalPricing && <PublicPricing english={english} />}
     <footer className="site-v3-footer">
       <div className="site-v3-footer-main">
-        <Link to="/" className="site-v3-footer-brand"><img src="/logo-brand.png" alt="MixingMusic.AI" /><span>V3</span></Link>
-        <p>Mezcla y mastering con inteligencia artificial, presets propios y control para el artista.</p>
+        <Link to="/" className="site-v3-footer-brand"><img src="/logo-brand.png" alt="MixingMusic.AI" width={1260} height={323} /><span>V3</span></Link>
+        <p>{english ? 'AI mixing and mastering, original presets and creative control for artists.' : 'Mezcla y mastering con inteligencia artificial, presets propios y control para el artista.'}</p>
         <nav aria-label="Enlaces del pie de página">
-          <Link to="/pricing">Precios</Link>
-          <Link to="/capacidades">Funciones</Link>
-          <Link to="/presets">Presets</Link>
-          <Link to="/generos">Guías por género</Link>
-          <Link to="/plugins-audio">Plugins de audio</Link>
-          <Link to="/conceptos-audio">Conceptos</Link>
-          <Link to="/terms">Términos</Link>
-          <Link to="/privacy">Privacidad</Link>
+          <Link to="/pricing">{english ? 'Pricing' : 'Precios'}</Link>
+          <Link to="/capacidades">{english ? 'Features' : 'Funciones'}</Link>
+          <Link to={english ? '/en/presets' : '/presets'}>Presets</Link>
+          <Link to={english ? '/en/genres' : '/generos'}>{english ? 'Genre guides' : 'Guías por género'}</Link>
+          <Link to={english ? '/en/audio-plugins' : '/plugins-audio'}>{english ? 'Audio plugins' : 'Plugins de audio'}</Link>
+          <Link to={english ? '/en/blog' : '/blog'}>Blog</Link>
+          <Link to="/prensa">{english ? 'Press' : 'Prensa'}</Link>
+          <Link to="/cookies">Cookies</Link>
+          <Link to="/conceptos-audio">{english ? 'Concepts' : 'Conceptos'}</Link>
+          <Link to="/terms">{english ? 'Terms' : 'Términos'}</Link>
+          <Link to="/privacy">{english ? 'Privacy' : 'Privacidad'}</Link>
         </nav>
       </div>
       <div className="site-v3-network">

@@ -1,181 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams, Link, Navigate } from 'react-router-dom';
+import type React from 'react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { blogArticles } from '../../../mocks/blogArticles';
 import ArticleComparison from './ArticleComparison';
+import NotFound from '../../NotFound';
 
 const BlogArticlePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  const [searchParams] = useSearchParams();
-  const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'es'>('es');
-
-  // Spanish is the default; English remains available through ?lang=en.
-  useEffect(() => {
-    const lang = searchParams.get('lang') as 'en' | 'es';
-    if (lang === 'en' || lang === 'es') {
-      setSelectedLanguage(lang);
-    }
-  }, [searchParams]);
-
-  // Find the article by slug
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const selectedLanguage = pathname.startsWith('/en/') ? 'en' : 'es';
+  const blogPath = selectedLanguage === 'en' ? '/en/blog' : '/blog';
   const article = blogArticles.find(a => a.slug === slug);
-
-  if (!article) {
-    return <Navigate to="/blog" replace />;
-  }
-
-  // Update URL when language changes
-  const handleLanguageChange = (lang: 'en' | 'es') => {
-    setSelectedLanguage(lang);
-    const newUrl = `/blog/${slug}?lang=${lang}`;
-    window.history.replaceState({}, '', newUrl);
-  };
-
-  // Get content based on selected language
+  if (!article) return <NotFound />;
+  const handleLanguageChange = (lang: 'en' | 'es') => navigate(`${lang === 'en' ? '/en' : ''}/blog/${slug}`);
   const title = selectedLanguage === 'en' ? article.title : article.titleEs;
   const content = selectedLanguage === 'en' ? article.content : article.contentEs;
-  const metaDescription = selectedLanguage === 'en' ? article.metaDescription : article.metaDescriptionEs;
-  const keywords = selectedLanguage === 'en' ? article.seoKeywords.en : article.seoKeywords.es;
   const tags = selectedLanguage === 'en' ? article.tags : article.tagsEs;
 
-  // Add meta tags for SEO
-  useEffect(() => {
-    document.title = `${title} | MixingMusic.ai Blog`;
-    
-    // Update meta description
-    let metaDesc = document.querySelector('meta[name="description"]');
-    if (!metaDesc) {
-      metaDesc = document.createElement('meta');
-      metaDesc.setAttribute('name', 'description');
-      document.head.appendChild(metaDesc);
-    }
-    metaDesc.setAttribute('content', metaDescription);
-
-    // Update meta keywords
-    let metaKeywords = document.querySelector('meta[name="keywords"]');
-    if (!metaKeywords) {
-      metaKeywords = document.createElement('meta');
-      metaKeywords.setAttribute('name', 'keywords');
-      document.head.appendChild(metaKeywords);
-    }
-    metaKeywords.setAttribute('content', keywords.join(', '));
-
-    const canonicalUrl = `https://mixingmusic.ai/blog/${article.slug}`;
-
-    // Add Open Graph tags
-    let ogTitle = document.querySelector('meta[property="og:title"]');
-    if (!ogTitle) {
-      ogTitle = document.createElement('meta');
-      ogTitle.setAttribute('property', 'og:title');
-      document.head.appendChild(ogTitle);
-    }
-    ogTitle.setAttribute('content', title);
-
-    let ogDesc = document.querySelector('meta[property="og:description"]');
-    if (!ogDesc) {
-      ogDesc = document.createElement('meta');
-      ogDesc.setAttribute('property', 'og:description');
-      document.head.appendChild(ogDesc);
-    }
-    ogDesc.setAttribute('content', metaDescription);
-
-    let ogImage = document.querySelector('meta[property="og:image"]');
-    if (!ogImage) {
-      ogImage = document.createElement('meta');
-      ogImage.setAttribute('property', 'og:image');
-      document.head.appendChild(ogImage);
-    }
-    ogImage.setAttribute('content', article.image);
-
-    const setMeta = (selector: string, attribute: 'name' | 'property', key: string, value: string) => {
-      let element = document.querySelector<HTMLMetaElement>(selector);
-      if (!element) {
-        element = document.createElement('meta');
-        element.setAttribute(attribute, key);
-        document.head.appendChild(element);
-      }
-      element.content = value;
-    };
-    setMeta('meta[property="og:type"]', 'property', 'og:type', 'article');
-    setMeta('meta[property="og:url"]', 'property', 'og:url', canonicalUrl);
-    setMeta('meta[property="article:published_time"]', 'property', 'article:published_time', new Date(article.publishDate).toISOString());
-    setMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image');
-    setMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
-    setMeta('meta[name="twitter:description"]', 'name', 'twitter:description', metaDescription);
-    setMeta('meta[name="twitter:image"]', 'name', 'twitter:image', article.image);
-
-    let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
-    if (!canonical) {
-      canonical = document.createElement('link');
-      canonical.rel = 'canonical';
-      document.head.appendChild(canonical);
-    }
-    canonical.href = canonicalUrl;
-
-    document.head.querySelectorAll('link[data-article-hreflang]').forEach((node) => node.remove());
-    for (const lang of ['es', 'en']) {
-      const alternate = document.createElement('link');
-      alternate.rel = 'alternate';
-      alternate.hreflang = lang;
-      alternate.href = `${canonicalUrl}?lang=${lang}`;
-      alternate.dataset.articleHreflang = 'true';
-      document.head.appendChild(alternate);
-    }
-
-    const schema = document.createElement('script');
-    schema.type = 'application/ld+json';
-    schema.dataset.articleSchema = 'true';
-    schema.textContent = JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'BlogPosting',
-      headline: title,
-      description: metaDescription,
-      image: article.image,
-      datePublished: new Date(article.publishDate).toISOString(),
-      inLanguage: selectedLanguage,
-      mainEntityOfPage: canonicalUrl,
-      author: { '@type': 'Person', name: article.author.name },
-      publisher: {
-        '@type': 'Organization',
-        name: 'MixingMusic.AI',
-        url: 'https://mixingmusic.ai',
-        logo: { '@type': 'ImageObject', url: 'https://mixingmusic.ai/logo-brand.png' },
-      },
-    });
-    document.head.querySelectorAll('script[data-article-schema]').forEach((node) => node.remove());
-    document.head.appendChild(schema);
-
-    // Cleanup function
-    return () => {
-      document.head.querySelectorAll('script[data-article-schema], link[data-article-hreflang]').forEach((node) => node.remove());
-    };
-  }, [title, metaDescription, keywords, article, selectedLanguage]);
-
-  // Process content for better display
-  const formatContent = (content: string) => {
-    return content
-      .split('\n')
-      .map((paragraph, index) => {
-        if (paragraph.startsWith('# ')) {
-          return <h1 key={index} className="text-4xl font-bold text-gray-900 mb-8 mt-12">{paragraph.slice(2)}</h1>;
-        } else if (paragraph.startsWith('## ')) {
-          return <h2 key={index} className="text-3xl font-bold text-gray-900 mb-6 mt-10">{paragraph.slice(3)}</h2>;
-        } else if (paragraph.startsWith('### ')) {
-          return <h3 key={index} className="text-2xl font-bold text-gray-900 mb-4 mt-8">{paragraph.slice(4)}</h3>;
-        } else if (paragraph.startsWith('#### ')) {
-          return <h4 key={index} className="text-xl font-bold text-gray-900 mb-3 mt-6">{paragraph.slice(5)}</h4>;
-        } else if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
-          return <p key={index} className="font-bold text-gray-900 mb-4">{paragraph.slice(2, -2)}</p>;
-        } else if (paragraph.startsWith('- ')) {
-          return <li key={index} className="text-gray-700 mb-2 ml-4">{paragraph.slice(2)}</li>;
-        } else if (paragraph.match(/^\d+\./)) {
-          return <li key={index} className="text-gray-700 mb-2 ml-4 list-decimal">{paragraph.replace(/^\d+\.\s*/, '')}</li>;
-        } else if (paragraph.trim() === '') {
-          return <br key={index} />;
-        } else {
-          return <p key={index} className="text-gray-700 mb-4 leading-relaxed">{paragraph}</p>;
-        }
-      });
-  };
+  // The page title is the only H1. Markdown keeps real lists, tables and source links.
+  const markdown = content.replace(/^# (.+)$/m, (heading, text) => text.trim() === title.trim() ? '' : heading);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
@@ -191,15 +36,15 @@ const BlogArticlePage: React.FC = () => {
                 style={{ width: '200px', height: '42.7px' }}
               />
               <div>
-                <h1 className="text-2xl font-bold text-white" style={{ fontFamily: '"Pacifico", serif' }}>
+                <p className="text-2xl font-bold text-white" style={{ fontFamily: '"Pacifico", serif' }}>
                   mixingmusic.ai
-                </h1>
+                </p>
                 <p className="text-blue-200 text-sm">Blog</p>
               </div>
             </Link>
 
             <div className="flex items-center space-x-4">
-              <Link to="/blog" className="text-white hover:text-blue-200 transition-colors">
+              <Link to={blogPath} className="text-white hover:text-blue-200 transition-colors">
                 <i className="ri-arrow-left-line mr-2"></i>
                 {selectedLanguage === 'en' ? 'Back to Blog' : 'Volver al Blog'}
               </Link>
@@ -250,6 +95,9 @@ const BlogArticlePage: React.FC = () => {
         </div>
         
         <div className="relative max-w-4xl mx-auto px-6 py-16">
+          <nav aria-label={selectedLanguage === 'en' ? 'Breadcrumb' : 'Ruta de navegación'} className="text-blue-100 mb-6 flex flex-wrap gap-2">
+            <Link to="/">MixingMusic.AI</Link><span aria-hidden="true">/</span><Link to={blogPath}>Blog</Link>
+          </nav>
           <div className="mb-6">
             <span className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 text-white font-semibold">
               {selectedLanguage === 'en' ? article.categoryName : article.categoryNameEs}
@@ -298,10 +146,23 @@ const BlogArticlePage: React.FC = () => {
       <div className="max-w-4xl mx-auto px-6 py-16">
         <div className="bg-white rounded-2xl shadow-lg p-8 lg:p-12">
           <div className="prose prose-lg max-w-none">
-            {formatContent(content)}
+            <Markdown remarkPlugins={[remarkGfm]} components={{
+              h1: ({ children }) => <h2 className="text-3xl font-bold text-gray-900 mb-6 mt-10">{children}</h2>,
+              h2: ({ children }) => <h2 className="text-3xl font-bold text-gray-900 mb-6 mt-10">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-2xl font-bold text-gray-900 mb-4 mt-8">{children}</h3>,
+              h4: ({ children }) => <h4 className="text-xl font-bold text-gray-900 mb-3 mt-6">{children}</h4>,
+              p: ({ children }) => <p className="text-gray-700 mb-4 leading-relaxed">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc pl-6 mb-4 text-gray-700 space-y-2">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal pl-6 mb-4 text-gray-700 space-y-2">{children}</ol>,
+              a: ({ href, children }) => <a className="text-purple-700 underline break-words" href={href?.startsWith('/blog/') ? `${selectedLanguage === 'en' ? '/en' : ''}${href}` : href}>{children}</a>,
+              table: ({ children }) => <div className="overflow-x-auto my-6"><table className="w-full text-left border-collapse">{children}</table></div>,
+              th: ({ children }) => <th className="p-3 border bg-slate-100">{children}</th>,
+              td: ({ children }) => <td className="p-3 border text-gray-700">{children}</td>,
+              img: ({ src, alt }) => <img src={src} alt={alt || ''} loading="lazy" decoding="async" />,
+            }}>{markdown}</Markdown>
           </div>
 
-          <ArticleComparison />
+          <ArticleComparison english={selectedLanguage === 'en'} />
           
           {/* Author Bio */}
           <div className="border-t border-gray-200 pt-8 mt-12">
@@ -357,6 +218,7 @@ const BlogArticlePage: React.FC = () => {
               <article key={relatedArticle.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
                 <div className="relative h-48 overflow-hidden">
                   <img
+                    loading="lazy" decoding="async" width={640} height={360}
                     src={relatedArticle.image}
                     alt={selectedLanguage === 'en' ? relatedArticle.title : relatedArticle.titleEs}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -377,7 +239,7 @@ const BlogArticlePage: React.FC = () => {
                   </p>
                   
                   <Link
-                    to={`/blog/${relatedArticle.slug}?lang=${selectedLanguage}`}
+                    to={`${blogPath}/${relatedArticle.slug}`}
                     className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center space-x-1 group"
                   >
                     <span>{selectedLanguage === 'en' ? 'Read More' : 'Leer Más'}</span>

@@ -7,6 +7,7 @@ i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
+    lng: typeof document !== 'undefined' ? document.documentElement.dataset.pageLanguage : undefined,
     supportedLngs: ['es', 'en', 'fr', 'zh'],
     fallbackLng: 'es',
     nonExplicitSupportedLngs: true,

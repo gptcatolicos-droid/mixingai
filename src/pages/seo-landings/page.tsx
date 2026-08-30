@@ -1,8 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useMemo } from 'react';
-import { usePageSeo } from '../../utils/usePageSeo';
 import { seoLandingByPath, seoLandings, type SeoLanding } from './seoLandingData';
-import { buildSeoSchema } from './seoSchema';
 import './seo-landings.css';
 
 const ORIGIN = 'https://mixingmusic.ai';
@@ -47,10 +44,6 @@ export function SeoLandingContent({ landing }: { landing: SeoLanding }) {
 export default function SeoLandingPage() {
   const location = useLocation();
   const landing = seoLandingByPath[location.pathname];
-  const schema = useMemo(() => landing ? buildSeoSchema(landing) : [], [landing]);
-
-  usePageSeo(landing ? { title: landing.metaTitle, description: landing.metaDescription, canonical: `${ORIGIN}${landing.path}`, lang: landing.lang, alternate: { lang: landing.lang === 'es' ? 'en' : 'es', href: `${ORIGIN}${landing.alternatePath}` }, schema } : { title: 'MixingMusic.AI', description: 'AI music mixing and mastering.', canonical: `${ORIGIN}/` });
-
   if (!landing) return <Navigate to="/" replace />;
   return <SeoLandingContent landing={landing} />;
 }

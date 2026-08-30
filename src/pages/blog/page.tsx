@@ -1,25 +1,18 @@
 
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { blogArticles } from '../../mocks/blogArticles';
 import { pressMentions } from '../../content/pressMentions';
 import './press-blog.css';
 
 const BlogPage: React.FC = () => {
-  const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'es'>('es');
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const selectedLanguage = pathname.startsWith('/en/') ? 'en' : 'es';
+  const blogPath = selectedLanguage === 'en' ? '/en/blog' : '/blog';
+  const setSelectedLanguage = (lang: 'en' | 'es') => navigate(lang === 'en' ? '/en/blog' : '/blog');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    document.title = 'Blog de mezcla y mastering con IA | MixingMusic.AI';
-    const description = 'Guías de mezcla musical, mastering con IA, LUFS, referencias de mezcla, producción de voz e instrumentos y noticias de MixingMusic.AI.';
-    let meta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
-    if (!meta) { meta = document.createElement('meta'); meta.name = 'description'; document.head.appendChild(meta); }
-    meta.content = description;
-    let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
-    if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical); }
-    canonical.href = 'https://mixingmusic.ai/blog';
-  }, []);
 
   const categories = [
     { id: 'all', name: 'All Articles', nameEs: 'Todos los Artículos' },
@@ -49,9 +42,9 @@ const BlogPage: React.FC = () => {
                 className="object-contain w-32 h-7 sm:w-40 sm:h-8 lg:w-48 lg:h-10"
               />
               <div className="hidden sm:block">
-                <h1 className="text-lg font-medium text-white">
+                <p className="text-lg font-medium text-white">
                   mixingmusic.ai
-                </h1>
+                </p>
                 <p className="text-blue-200 text-sm">Blog</p>
               </div>
             </Link>
@@ -184,9 +177,9 @@ const BlogPage: React.FC = () => {
       </div>
 
       <section className="blog-press-v3">
-        <div><span>PRENSA Y RECONOCIMIENTO</span><h2>MixingMusic.AI en los medios</h2><p>Entrevistas y publicaciones sobre innovación colombiana en producción musical con inteligencia artificial.</p></div>
-        <div className="blog-press-v3-grid">{pressMentions.map((mention)=><a key={mention.url} href={mention.url} target="_blank" rel="noreferrer" style={{'--press-color':mention.color} as React.CSSProperties}><span>{mention.outlet}</span><strong>{mention.title}</strong><small>{mention.date} · Ver fuente ↗</small></a>)}</div>
-        <Link to="/prensa">Ver reconocimiento y cobertura completa →</Link>
+        <div><span>{selectedLanguage === 'en' ? 'PRESS AND RECOGNITION' : 'PRENSA Y RECONOCIMIENTO'}</span><h2>{selectedLanguage === 'en' ? 'MixingMusic.AI in the news' : 'MixingMusic.AI en los medios'}</h2><p>{selectedLanguage === 'en' ? 'Interviews and coverage of Colombian innovation in AI music production.' : 'Entrevistas y publicaciones sobre innovación colombiana en producción musical con inteligencia artificial.'}</p></div>
+        <div className="blog-press-v3-grid">{pressMentions.map((mention)=><a key={mention.url} href={mention.url} target="_blank" rel="noreferrer" style={{'--press-color':mention.color} as React.CSSProperties}><span>{mention.outlet}</span><strong>{mention.title}</strong><small>{mention.date} · {selectedLanguage === 'en' ? 'View source ↗' : 'Ver fuente ↗'}</small></a>)}</div>
+        <Link to="/prensa">{selectedLanguage === 'en' ? 'View recognition and full coverage →' : 'Ver reconocimiento y cobertura completa →'}</Link>
       </section>
 
       {/* Categories Filter */}
@@ -215,7 +208,8 @@ const BlogPage: React.FC = () => {
             <article key={article.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
               <div className="relative h-48 overflow-hidden">
                 <img
-                  src={article.image}
+                  loading="lazy" decoding="async" width={640} height={360}
+                      src={article.image}
                   alt={selectedLanguage === 'en' ? article.title : article.titleEs}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
@@ -253,7 +247,7 @@ const BlogPage: React.FC = () => {
                   </div>
                   
                   <Link
-                    to={`/blog/${article.slug}?lang=${selectedLanguage}`}
+                    to={`${blogPath}/${article.slug}`}
                     className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center space-x-1 group whitespace-nowrap"
                   >
                     <span>{selectedLanguage === 'en' ? 'Read More' : 'Leer Más'}</span>
