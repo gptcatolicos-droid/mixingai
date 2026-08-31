@@ -28,8 +28,8 @@ async function resolveUnlimitedAccess(accessToken: string, fallback: boolean) {
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const requestedMode = searchParams.get('mode') === 'checkout' ? 'checkout' : searchParams.get('mode') === 'album' ? 'album' : searchParams.get('mode') === 'master' ? 'master' : 'mix';
-  const destination = requestedMode === 'checkout' ? '/checkout-v3' : requestedMode === 'album' ? '/mastering/album' : requestedMode === 'master' ? '/mastering' : '/';
+  const requestedMode = searchParams.get('mode') === 'admin' ? 'admin' : searchParams.get('mode') === 'checkout' ? 'checkout' : searchParams.get('mode') === 'album' ? 'album' : searchParams.get('mode') === 'master' ? 'master' : 'mix';
+  const destination = requestedMode === 'admin' ? '/admin' : requestedMode === 'checkout' ? '/checkout-v3' : requestedMode === 'album' ? '/mastering/album' : requestedMode === 'master' ? '/mastering' : '/';
   const registerTarget = requestedMode === 'mix' ? '/auth/register' : `/auth/register?mode=${requestedMode}`;
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);

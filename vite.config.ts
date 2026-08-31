@@ -32,6 +32,9 @@ const SECURITY_HEADERS = {
 };
 
 export default defineConfig({
+  // Only public application configuration may reach a browser bundle.
+  envPrefix: ['VITE_PUBLIC_SUPABASE_URL', 'VITE_PUBLIC_SUPABASE_ANON_KEY',
+    'VITE_MASTERING_SECURE_ACCESS', 'VITE_PAYPAL_CLIENT_ID', 'VITE_GOOGLE_ANALYTICS_ID'],
   define: {
    __BASE_PATH__: JSON.stringify('/'),
    __IS_PREVIEW__: JSON.stringify(false)

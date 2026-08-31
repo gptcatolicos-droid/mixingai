@@ -8,7 +8,7 @@
 
 ## 🎛️ ADMIN PANEL (NEW)
 **URL**: `/admin`  
-**Contraseña**: `mixing2024!`
+**Contraseña**: `[Retirado: utiliza la cuenta autorizada de MixingMusic]`
 
 ### 3 Editores Completamente Funcionales:
 
@@ -324,4 +324,4 @@ Render static site hosting
 **Versión**: 2.0.0  
 **URL Live**: www.mixingmusic.ai  
 **Admin URL**: www.mixingmusic.ai/admin  
-**Admin Password**: mixing2024!
+**Admin Password**: [Retirado: utiliza la cuenta autorizada de MixingMusic]

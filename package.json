@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --ssr scripts/seoPrerenderEntry.tsx --outDir .seo-prerender && node scripts/seoArtifacts.mjs sitemap && vite build && node scripts/seoArtifacts.mjs render && node scripts/validateSeoArtifacts.mjs",
+    "build": "vite build --ssr scripts/seoPrerenderEntry.tsx --outDir .seo-prerender && node scripts/seoArtifacts.mjs sitemap && vite build && node scripts/seoArtifacts.mjs render && node scripts/validateSeoArtifacts.mjs && node scripts/checkPublicSecrets.mjs",
     "preview": "vite preview",
-    "test:seo": "tsc --noEmit -p tsconfig.seo.json && node scripts/validateSeoArtifacts.mjs && node scripts/testSeoNavigation.mjs"
+    "test:seo": "tsc --noEmit -p tsconfig.seo.json && node scripts/validateSeoArtifacts.mjs && node scripts/testSeoNavigation.mjs",
+    "test:admin-security": "node --experimental-strip-types --test scripts/testAdminSecurity.mjs"
   },
   "dependencies": {
     "@mediabunny/mp3-encoder": "1.52.3",
