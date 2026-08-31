@@ -47,7 +47,7 @@ git push origin main
 ## ✅ QUÉ SE DEPLOYA
 
 ### Features:
-- ✅ **Admin Panel** (`/admin` - contraseña: `mixing2024!`)
+- ✅ **Admin Panel** (`/admin` - contraseña: `[Retirado: utiliza la cuenta autorizada de MixingMusic]`)
   - 🎨 Theme Editor (edita colores en tiempo real)
   - 📄 Home Editor (edita contenido de inicio)
   - 📝 Blog Editor (crear/editar/eliminar posts)
@@ -84,7 +84,7 @@ git push origin main
 ```
 Ir a: www.mixingmusic.ai/admin
 ☐ Formulario de contraseña visible
-☐ Ingresa: mixing2024!
+☐ Ingresa: [Retirado: utiliza la cuenta autorizada de MixingMusic]
 ☐ 5 tabs visibles: Overview, Usuarios, Tema, Inicio, Blog
 ```
 
@@ -140,7 +140,7 @@ Ir a: www.mixingmusic.ai/admin
 | Campo | Valor |
 |-------|-------|
 | URL | www.mixingmusic.ai/admin |
-| Contraseña | mixing2024! |
+| Contraseña | [Retirado: utiliza la cuenta autorizada de MixingMusic] |
 | Sesión | 4 horas (localStorage) |
 | Bloqueo | 5 intentos fallidos = 30 min bloqueado |
 
@@ -231,7 +231,7 @@ SOLUCIÓN:
 ## 🎉 Una Vez Deployado
 
 1. **Comparte la URL**: www.mixingmusic.ai
-2. **Admin Panel**: www.mixingmusic.ai/admin (contraseña: mixing2024!)
+2. **Admin Panel**: www.mixingmusic.ai/admin (contraseña: [Retirado: utiliza la cuenta autorizada de MixingMusic])
 3. **Documentación**: Toda está en repo root
 
 ---

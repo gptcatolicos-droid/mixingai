@@ -1,8 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const SUPABASE_URL = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_URL ?? '';
-const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_PUBLIC_SUPABASE_ANON_KEY ?? '';
-const ADMIN_PW = 'mixing2024!';
+import { getSecureAccessToken } from '../mastering/masteringAccess';
+
+const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
+
+async function adminRequest(method = 'GET', body?: Record<string, unknown>, page = 1) {
+  const token = await getSecureAccessToken();
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/admin-console?page=${page}`, {
+    method,
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'ADMIN_OPERATION_FAILED');
+  return data;
+}
+
+const errorMessage = (code: string) => ({
+  SECURE_SESSION_REQUIRED: 'Inicia sesión con tu cuenta de administrador.',
+  SESSION_REQUIRED: 'Tu sesión venció. Inicia sesión nuevamente.',
+  ADMIN_REQUIRED: 'Esta cuenta no tiene permisos de administrador.',
+  PAID_ACCESS_PROTECTED: 'El acceso comprado está protegido. No se puede revocar desde este panel.',
+  OWNER_ACCESS_PROTECTED: 'El acceso del propietario está protegido.',
+  USER_NOT_FOUND: 'No se encontró la cuenta.',
+} as Record<string, string>)[code] || 'No se pudo completar la operación. Recarga para comprobar el estado e inténtalo nuevamente.';
 
 interface AdminUser {
   id: string;
@@ -15,15 +37,13 @@ interface AdminUser {
   confirmed: boolean;
   plan: 'free' | 'unlimited';
   is_pro: boolean;
+  paidAccessProtected?: boolean;
 }
 
 const fmt = (d: string) => d ? new Date(d).toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
 
 export default function AdminDashboard() {
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [password, setPassword] = useState('');
-  const [attempts, setAttempts] = useState(0);
-  const [blocked, setBlocked] = useState<number|null>(null);
   const [tab, setTab] = useState<'overview'|'users'>('users');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,180 +51,54 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [grantEmail, setGrantEmail] = useState('');
   const [grantMsg, setGrantMsg] = useState('');
-  const [cursor, setCursor] = useState(0);
-  const PER = 50;
+  const [updatingUser, setUpdatingUser] = useState<string | null>(null);
 
-  // ── Session ───────────────────────────────────────────────
-  useEffect(() => {
-    const s = localStorage.getItem('mixingai_admin_session');
-    if (s) {
-      try {
-        const parsed = JSON.parse(s);
-        if (Date.now() - parsed.ts < 4 * 3600000) { setIsAuthorized(true); }
-        else localStorage.removeItem('mixingai_admin_session');
-      } catch { localStorage.removeItem('mixingai_admin_session'); }
-    }
-    const b = localStorage.getItem('mixingai_admin_block');
-    if (b) setBlocked(parseInt(b));
-  }, []);
-
-  // ── Load users ───────────────────────────────────────────
+  // The server verifies the existing Supabase session on every operation.
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const serviceKey = (import.meta as any).env?.VITE_SUPABASE_SERVICE_KEY;
-
-      // ── Strategy 1: Use service role key → auth.users (all users) ──
-      if (serviceKey && serviceKey !== 'your_service_role_key_here') {
-        const res = await fetch(
-          `${SUPABASE_URL}/auth/v1/admin/users?per_page=500&page=1`,
-          {
-            headers: {
-              'apikey': serviceKey,
-              'Authorization': `Bearer ${serviceKey}`,
-            },
-          }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          const rawUsers = Array.isArray(data) ? data : (data.users || []);
-          const mapped: AdminUser[] = rawUsers.map((u: any) => {
-            const meta = u.user_metadata || {};
-            const appMeta = u.app_metadata || {};
-            const isPro = !!(meta.is_pro || meta.plan === 'unlimited' || appMeta.is_pro || appMeta.plan === 'unlimited');
-            return {
-              id: u.id,
-              email: u.email || '—',
-              firstName: meta.first_name || u.email?.split('@')[0] || '—',
-              lastName: meta.last_name || '',
-              country: meta.country || '—',
-              createdAt: u.created_at || '',
-              lastLogin: u.last_sign_in_at || '',
-              confirmed: !!u.email_confirmed_at,
-              plan: isPro ? 'unlimited' : 'free',
-              is_pro: isPro,
-            };
-          });
-          mapped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          setUsers(mapped);
-          setLoading(false);
-          return;
-        }
+      const collected: AdminUser[] = [];
+      let page: number | null = 1;
+      while (page !== null) {
+        const data = await adminRequest('GET', undefined, page);
+        collected.push(...data.users);
+        page = data.nextPage;
       }
-
-      // ── Strategy 2: Fallback → public users table (anon key) ──
-      const res2 = await fetch(
-        `${SUPABASE_URL}/rest/v1/users?select=*&order=created_at.desc&limit=500`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-        }
-      );
-
-      if (res2.ok) {
-        const rows: any[] = await res2.json();
-        if (rows.length === 0 && !serviceKey) {
-          setError('⚠ Se necesita configurar VITE_SUPABASE_SERVICE_KEY en Render para ver todos los usuarios. Ve a Supabase → Project Settings → API → service_role y agrégalo en Render → Environment Variables.');
-        }
-        const mapped: AdminUser[] = rows.map(u => ({
-          id: u.id,
-          email: u.email || '—',
-          firstName: u.first_name || u.email?.split('@')[0] || '—',
-          lastName: u.last_name || '',
-          country: u.country || '—',
-          createdAt: u.created_at || '',
-          lastLogin: u.last_login || u.updated_at || '',
-          confirmed: !!u.email_verified,
-          plan: (u.is_pro || u.plan === 'unlimited') ? 'unlimited' : 'free',
-          is_pro: !!(u.is_pro || u.plan === 'unlimited'),
-        }));
-        setUsers(mapped);
-      } else {
-        const err = await res2.json();
-        throw new Error(err?.message || err?.hint || `Error ${res2.status}`);
-      }
-    } catch (e: any) {
-      setError('Error: ' + (e.message || 'No se pudo conectar con Supabase'));
-    } finally {
-      setLoading(false);
-    }
+      collected.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setUsers(collected);
+      setIsAuthorized(true);
+    } catch (error) {
+      setUsers([]);
+      setIsAuthorized(false);
+      setError(errorMessage(error instanceof Error ? error.message : ''));
+    } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    if (isAuthorized) loadUsers();
-  }, [isAuthorized, loadUsers]);
+  useEffect(() => { void loadUsers(); }, [loadUsers]);
 
-  // ── Grant/Revoke pro via Supabase Auth Admin API ──────────
   const updateUserPro = async (userId: string, isPro: boolean) => {
-    const serviceKey = (import.meta as any).env?.VITE_SUPABASE_SERVICE_KEY;
+    if (updatingUser) return false;
+    setUpdatingUser(userId);
     try {
-      // Try updating auth.users metadata with service key
-      if (serviceKey && serviceKey !== 'your_service_role_key_here') {
-        const r1 = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': serviceKey,
-            'Authorization': `Bearer ${serviceKey}`,
-          },
-          body: JSON.stringify({
-            user_metadata: { is_pro: isPro, plan: isPro ? 'unlimited' : 'free' },
-            app_metadata: { is_pro: isPro, plan: isPro ? 'unlimited' : 'free' },
-          }),
-        });
-        if (!r1.ok) throw new Error('Error en auth.users');
-      }
-      // Always update users table too
-      await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': serviceKey || SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${serviceKey || SUPABASE_ANON_KEY}`,
-          'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({ is_pro: isPro, plan: isPro ? 'unlimited' : 'free' }),
-      });
-      setUsers(prev => prev.map(u => u.id === userId
-        ? { ...u, is_pro: isPro, plan: isPro ? 'unlimited' : 'free' }
-        : u
-      ));
-    } catch (e: any) {
-      alert('Error actualizando usuario: ' + e.message);
-    }
+      await adminRequest('PUT', { userId, isPro });
+      await loadUsers();
+      return true;
+    } catch (error) {
+      setError(errorMessage(error instanceof Error ? error.message : ''));
+      return false;
+    } finally { setUpdatingUser(null); }
   };
 
-  // ── Grant pro by email ────────────────────────────────────
   const grantByEmail = async () => {
     const email = grantEmail.trim().toLowerCase();
     if (!email) return;
-    const user = users.find(u => u.email.toLowerCase() === email);
-    if (!user) { setGrantMsg('❌ Email no encontrado en Supabase'); setTimeout(() => setGrantMsg(''), 4000); return; }
-    await updateUserPro(user.id, true);
-    setGrantMsg(`✓ ${email} → Mezclas ilimitadas activadas`);
-    setGrantEmail('');
-    setTimeout(() => setGrantMsg(''), 4000);
-  };
-
-  // ── Auth ──────────────────────────────────────────────────
-  const handleAuth = () => {
-    if (blocked && Date.now() < blocked) {
-      alert(`Bloqueado ${Math.ceil((blocked - Date.now()) / 60000)} min más`); return;
+    const user = users.find(user => user.email.toLowerCase() === email);
+    if (!user) { setGrantMsg('Email no encontrado.'); return; }
+    if (await updateUserPro(user.id, true)) {
+      setGrantMsg(`Acceso ilimitado activado para ${email}`);
+      setGrantEmail('');
     }
-    if (password !== ADMIN_PW) {
-      const n = attempts + 1; setAttempts(n); setPassword('');
-      if (n >= 5) {
-        const until = Date.now() + 30 * 60 * 1000;
-        setBlocked(until); localStorage.setItem('mixingai_admin_block', String(until));
-        alert('5 intentos fallidos. Bloqueado 30 minutos.');
-      } else alert(`Contraseña incorrecta. ${5 - n} intentos restantes.`);
-      return;
-    }
-    setIsAuthorized(true); setAttempts(0);
-    localStorage.setItem('mixingai_admin_session', JSON.stringify({ ts: Date.now() }));
   };
 
   const S = {
@@ -231,11 +125,11 @@ export default function AdminDashboard() {
         <div style={{ width:'60px', height:'60px', background:'linear-gradient(135deg,#EC4899,#C026D3)', borderRadius:'16px', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px', fontSize:'24px', boxShadow:'0 0 28px rgba(192,38,211,0.4)' }}>⚙️</div>
         <h2 style={{ fontSize:'20px', fontWeight:800, marginBottom:'6px' }}>Panel Administrador</h2>
         <p style={{ fontSize:'12px', color:'rgba(155,126,200,0.6)', marginBottom:'24px' }}>mixingmusic.ai · acceso restringido</p>
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleAuth()}
-          placeholder="Contraseña" style={{ ...S.input, marginBottom:'12px', textAlign:'center' }} />
-        <button onClick={handleAuth} style={{ ...S.btn(), width:'100%', padding:'12px', fontSize:'14px' }}>Ingresar</button>
-        {attempts > 0 && <p style={{ fontSize:'11px', color:'#f87171', marginTop:'10px' }}>{5 - attempts} intentos restantes</p>}
+        <p style={{ fontSize: '13px', marginBottom: '16px' }}>
+          {loading ? 'Verificando tu sesión…' : error || 'Accede con tu cuenta existente de MixingMusic.'}
+        </p>
+        {!loading && <a href="/auth/login?mode=admin" style={{ ...S.btn(), display: 'inline-block', textDecoration: 'none' }}>Iniciar sesión</a>}
+
       </div>
     </div>
   );
@@ -252,7 +146,7 @@ export default function AdminDashboard() {
         </div>
         <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
           <button onClick={loadUsers} style={S.ghost} title="Recargar">🔄 Recargar</button>
-          <button onClick={() => { localStorage.removeItem('mixingai_admin_session'); setIsAuthorized(false); }} style={S.ghost}>Salir</button>
+          <button onClick={() => { window.location.assign('/'); }} style={S.ghost}>Volver al sitio</button>
         </div>
       </div>
 
@@ -291,7 +185,7 @@ export default function AdminDashboard() {
                 <input value={grantEmail} onChange={e => setGrantEmail(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && grantByEmail()}
                   placeholder="email@ejemplo.com" style={{ ...S.input, maxWidth:'320px' }} />
-                <button onClick={grantByEmail} style={S.btn()}>∞ Dar Ilimitado</button>
+                <button disabled={!!updatingUser} onClick={grantByEmail} style={S.btn()}>∞ Dar Ilimitado</button>
               </div>
               {grantMsg && <p style={{ fontSize:'12px', color:'#4ade80', marginTop:'8px' }}>{grantMsg}</p>}
             </div>
@@ -316,8 +210,7 @@ export default function AdminDashboard() {
               <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:'10px', padding:'12px 16px', marginBottom:'16px', fontSize:'13px', color:'#fca5a5' }}>
                 ⚠ {error}
                 <div style={{ fontSize:'11px', color:'rgba(155,126,200,0.5)', marginTop:'4px' }}>
-                  Nota: Para leer auth.users necesitas configurar el Service Role Key en Supabase Edge Functions.
-                  Alternativamente, los usuarios aparecen en Authentication → Users en el dashboard de Supabase.
+                  El servidor verifica tu cuenta y permisos. Si una operación falla, recarga antes de repetirla.
                 </div>
               </div>
             )}
@@ -384,14 +277,14 @@ export default function AdminDashboard() {
                         <td style={{ padding:'10px 12px' }}>
                           <div style={{ display:'flex', gap:'6px' }}>
                             {!u.is_pro ? (
-                              <button onClick={() => updateUserPro(u.id, true)}
+                              <button disabled={!!updatingUser} onClick={() => updateUserPro(u.id, true)}
                                 style={{ ...S.btn(), padding:'5px 10px', fontSize:'11px' }}>
                                 ∞ Dar Pro
                               </button>
                             ) : (
-                              <button onClick={() => updateUserPro(u.id, false)}
+                              <button disabled={!!updatingUser || u.paidAccessProtected} title={u.paidAccessProtected ? 'Acceso comprado protegido' : 'Revocar acceso manual'} onClick={() => updateUserPro(u.id, false)}
                                 style={{ ...S.btn('#6b7280'), padding:'5px 10px', fontSize:'11px' }}>
-                                Revocar
+                                {u.paidAccessProtected ? 'Protegido' : 'Revocar'}
                               </button>
                             )}
                           </div>

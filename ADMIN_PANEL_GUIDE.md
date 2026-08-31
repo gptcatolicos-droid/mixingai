@@ -3,8 +3,8 @@
 ## Acceso
 
 **URL**: `/admin`  
-**Contraseña**: `mixing2024!`  
-**Nota**: La contraseña se valida localmente. Para cambiarla, edita `src/pages/admin/page.tsx` línea 5.
+**Acceso**: cuenta autorizada de MixingMusic.
+**Nota**: El servidor verifica la sesión de Supabase del propietario en cada operación. No se admite una contraseña compartida ni claves privadas en el navegador.
 
 ---
 
@@ -188,7 +188,7 @@ netlify deploy --prod --dir=out
 
 ### Cambiar color primario
 1. Ve a `/admin`
-2. Ingresa contraseña: `mixing2024!`
+2. Ingresa contraseña: `[Retirado: utiliza la cuenta autorizada de MixingMusic]`
 3. Abre tab "Tema" (🎨)
 4. Click en input de color "Color Primario"
 5. Selecciona nuevo color
@@ -239,7 +239,7 @@ Cuando quieras persistencia en servidor en lugar de localStorage:
 ## ✅ Checklist de Deployment
 
 - [ ] Admin panel accesible en `/admin`
-- [ ] Contraseña funciona (por defecto: `mixing2024!`)
+- [ ] Contraseña funciona (por defecto: `[Retirado: utiliza la cuenta autorizada de MixingMusic]`)
 - [ ] Tema editor guarda colores correctamente
 - [ ] Home editor actualiza contenido
 - [ ] Blog editor crea/edita/elimina posts
