@@ -128,20 +128,22 @@ export default function SiteLayout({ metadata }: { metadata?: PageMetadata } = {
     {showGlobalPricing && <PublicPricing english={english} />}
     <footer className="site-v3-footer">
       <div className="site-v3-footer-main">
-        <Link to="/" className="site-v3-footer-brand"><img src="/logo-brand.png" alt="MixingMusic.AI" width={1260} height={323} /><span>V3</span></Link>
+        <Link reloadDocument to="/" className="site-v3-footer-brand"><img src="/logo-brand.png" alt="MixingMusic.AI" width={1260} height={323} /><span>V3</span></Link>
         <p>{english ? 'AI mixing and mastering, original presets and creative control for artists.' : 'Mezcla y mastering con inteligencia artificial, presets propios y control para el artista.'}</p>
         <nav aria-label="Enlaces del pie de página">
-          <Link to="/pricing">{english ? 'Pricing' : 'Precios'}</Link>
-          <Link to="/capacidades">{english ? 'Features' : 'Funciones'}</Link>
-          <Link to={english ? '/en/presets' : '/presets'}>Presets</Link>
-          <Link to={english ? '/en/genres' : '/generos'}>{english ? 'Genre guides' : 'Guías por género'}</Link>
-          <Link to={english ? '/en/audio-plugins' : '/plugins-audio'}>{english ? 'Audio plugins' : 'Plugins de audio'}</Link>
-          <Link to={english ? '/en/blog' : '/blog'}>Blog</Link>
-          <Link to="/prensa">{english ? 'Press' : 'Prensa'}</Link>
-          <Link to="/cookies">Cookies</Link>
-          <Link to="/conceptos-audio">{english ? 'Concepts' : 'Conceptos'}</Link>
-          <Link to="/terms">{english ? 'Terms' : 'Términos'}</Link>
-          <Link to="/privacy">{english ? 'Privacy' : 'Privacidad'}</Link>
+          {/* Public destinations are prerendered. Native navigation starts at the
+              top and lets the browser restore scroll on Back/Forward. */}
+          <Link reloadDocument to="/pricing">{english ? 'Pricing' : 'Precios'}</Link>
+          <Link reloadDocument to="/capacidades">{english ? 'Features' : 'Funciones'}</Link>
+          <Link reloadDocument to={english ? '/en/presets' : '/presets'}>Presets</Link>
+          <Link reloadDocument to={english ? '/en/genres' : '/generos'}>{english ? 'Genre guides' : 'Guías por género'}</Link>
+          <Link reloadDocument to={english ? '/en/audio-plugins' : '/plugins-audio'}>{english ? 'Audio plugins' : 'Plugins de audio'}</Link>
+          <Link reloadDocument to={english ? '/en/blog' : '/blog'}>Blog</Link>
+          <Link reloadDocument to="/prensa">{english ? 'Press' : 'Prensa'}</Link>
+          <Link reloadDocument to="/cookies">Cookies</Link>
+          <Link reloadDocument to="/conceptos-audio">{english ? 'Concepts' : 'Conceptos'}</Link>
+          <Link reloadDocument to="/terms">{english ? 'Terms' : 'Términos'}</Link>
+          <Link reloadDocument to="/privacy">{english ? 'Privacy' : 'Privacidad'}</Link>
         </nav>
       </div>
       <div className="site-v3-network">
