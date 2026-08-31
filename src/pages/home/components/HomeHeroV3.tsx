@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PRESETS } from './mixTypes';
 import { pressMentions } from '../../../content/pressMentions';
+import PublicPlanPrice from '../../../components/feature/PublicPlanPrice';
 import './home-v3.css';
 
 const benefits = [
@@ -180,7 +181,7 @@ export default function HomeHeroV3() {
           <article className="v3-price-card v3-price-featured">
             <div className="v3-founders">PRECIO FUNDADOR</div>
             <div className="v3-plan-name">ILIMITADO PARA SIEMPRE</div>
-            <div className="v3-price"><sup>$</sup>14.99</div>
+            <div className="v3-price"><PublicPlanPrice /></div>
             <p>Un solo pago · no es suscripción · acceso permanente.</p>
             <ul>
               <li>Mezclas y masters ilimitados</li>
