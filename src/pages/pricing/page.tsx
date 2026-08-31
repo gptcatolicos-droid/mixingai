@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import PublicPlanPrice from '../../components/feature/PublicPlanPrice';
 import './pricing-v3.css';
 
 const rows = [
@@ -28,12 +29,12 @@ export default function PricingPage() {
         <ul><li>✓ 3 mezclas desde stems</li><li>✓ 1 master descargable en MP3</li><li>✓ Hasta 12 stems por canción</li><li>✓ Presets y recomendación IA</li></ul>
         <button onClick={() => navigate(user ? '/' : '/auth/register')}>Empezar gratis →</button>
       </article>
-      <article className="featured"><b>PRECIO FUNDADOR</b><span>UNLIMITED PARA SIEMPRE</span><h2>Todo el estudio, sin límites</h2><div className="pricing-v3-price"><sup>COP $</sup>49.900</div><p>Un solo pago con Mercado Pago o PayPal.</p>
+      <article className="featured"><b>PRECIO FUNDADOR</b><span>UNLIMITED PARA SIEMPRE</span><h2>Todo el estudio, sin límites</h2><div className="pricing-v3-price"><PublicPlanPrice /></div><p>Un solo pago con Mercado Pago o PayPal.</p>
         <ul><li>✓ Mezclas y masters ilimitados</li><li>✓ WAV PCM real de 24 bits</li><li>✓ Guardar configuraciones</li><li>✓ Modo álbum de hasta 12 canciones</li></ul>
         <button onClick={() => navigate(user ? '/checkout-v3' : '/auth/register?mode=checkout')}>Elegir método de pago →</button>
       </article>
     </section>
     <section className="pricing-v3-table-section"><div><span>COMPARACIÓN COMPLETA</span><h2>Sabes exactamente qué recibes.</h2><p>Unlimited es una compra permanente para la cuenta, no una suscripción.</p></div><div className="pricing-v3-table"><div className="head"><strong>Funcionalidad</strong><strong>Gratis</strong><strong>Unlimited</strong></div>{rows.map(([name,free,unlimited])=><div key={name}><strong>{name}</strong><span>{free}</span><b>{unlimited}</b></div>)}</div></section>
-    <section className="pricing-v3-faq"><h2>Antes de comprar</h2><div><article><strong>¿Me cobrarán otra vez?</strong><p>No. COP $49.900 es un pago único y no existe renovación automática. En PayPal se cobra el equivalente publicado de US$14.99.</p></article><article><strong>¿Cómo se activa?</strong><p>Mercado Pago o PayPal confirma el pago y Unlimited queda asociado permanentemente a tu cuenta.</p></article><article><strong>¿Qué pasa con mis archivos?</strong><p>El audio original permanece intacto. Solo procesamos una copia para generar la mezcla o el master.</p></article></div></section>
+    <section className="pricing-v3-faq"><h2>Antes de comprar</h2><div><article><strong>¿Me cobrarán otra vez?</strong><p>No. Es un pago único y no existe renovación automática. Puedes elegir Mercado Pago o PayPal al pagar.</p></article><article><strong>¿Cómo se activa?</strong><p>Mercado Pago o PayPal confirma el pago y Unlimited queda asociado permanentemente a tu cuenta.</p></article><article><strong>¿Qué pasa con mis archivos?</strong><p>El audio original permanece intacto. Solo procesamos una copia para generar la mezcla o el master.</p></article></div></section>
   </main>;
 }

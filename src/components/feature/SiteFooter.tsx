@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import LanguageSelector from './LanguageSelector';
 import RuntimeLocaleTranslator from './RuntimeLocaleTranslator';
+import PublicPlanPrice from './PublicPlanPrice';
 import './site-footer.css';
 import RouteSeo from '../../seo/RouteSeo';
 import { isPrivatePath } from '../../seo/routes';
@@ -102,7 +103,7 @@ export function PublicPricing({ english }: { english: boolean }) {
         <article className="public-price-card public-price-featured">
           <div className="public-price-founder">{copy.founder}</div>
           <div className="public-plan-name">{copy.unlimited}</div>
-          <div className="public-price"><sup>$</sup>14.99</div>
+          <div className="public-price"><PublicPlanPrice /></div>
           <p>{copy.unlimitedDescription}</p>
           <ul>{copy.unlimitedItems.map((item) => <li key={item}>{item}</li>)}</ul>
           <Link className="public-price-button public-price-button-accent" to="/checkout-v3">{copy.unlimitedCta}</Link>

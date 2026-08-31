@@ -1,0 +1,20 @@
+.public-plan-price-usd {
+  display: block;
+  white-space: nowrap;
+}
+
+.public-plan-price-currency {
+  margin-right: .16em;
+  font-size: .4em;
+  letter-spacing: 0;
+}
+
+.public-plan-price-cop {
+  display: block;
+  margin-top: 8px;
+  color: #b9adbf;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
