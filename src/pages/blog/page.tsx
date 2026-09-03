@@ -20,6 +20,9 @@ const BlogPage: React.FC = () => {
     { id: 'ai', name: 'AI Music Production', nameEs: 'Producción Musical con IA' },
     { id: 'tools', name: 'Music Tools', nameEs: 'Herramientas Musicales' },
     { id: 'tutorials', name: 'Tutorials', nameEs: 'Tutoriales' },
+    { id: 'engineering', name: 'Audio Engineering', nameEs: 'Ingeniería de Audio' },
+    { id: 'voice', name: 'Vocal Production', nameEs: 'Producción Vocal' },
+    { id: 'instruments', name: 'Instrument Mixing', nameEs: 'Mezcla de Instrumentos' },
   ];
 
   const filteredArticles = (selectedCategory === 'all'

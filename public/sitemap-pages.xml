@@ -8,6 +8,8 @@
   <url><loc>https://mixingmusic.ai/terms</loc></url>
   <url><loc>https://mixingmusic.ai/privacy</loc></url>
   <url><loc>https://mixingmusic.ai/cookies</loc></url>
+  <url><loc>https://mixingmusic.ai/about</loc><xhtml:link rel="alternate" hreflang="es" href="https://mixingmusic.ai/about"/><xhtml:link rel="alternate" hreflang="en" href="https://mixingmusic.ai/en/about"/><xhtml:link rel="alternate" hreflang="x-default" href="https://mixingmusic.ai/about"/></url>
+  <url><loc>https://mixingmusic.ai/en/about</loc><xhtml:link rel="alternate" hreflang="es" href="https://mixingmusic.ai/about"/><xhtml:link rel="alternate" hreflang="en" href="https://mixingmusic.ai/en/about"/><xhtml:link rel="alternate" hreflang="x-default" href="https://mixingmusic.ai/about"/></url>
   <url><loc>https://mixingmusic.ai/blog</loc><xhtml:link rel="alternate" hreflang="es" href="https://mixingmusic.ai/blog"/><xhtml:link rel="alternate" hreflang="en" href="https://mixingmusic.ai/en/blog"/><xhtml:link rel="alternate" hreflang="x-default" href="https://mixingmusic.ai/blog"/></url>
   <url><loc>https://mixingmusic.ai/en/blog</loc><xhtml:link rel="alternate" hreflang="es" href="https://mixingmusic.ai/blog"/><xhtml:link rel="alternate" hreflang="en" href="https://mixingmusic.ai/en/blog"/><xhtml:link rel="alternate" hreflang="x-default" href="https://mixingmusic.ai/blog"/></url>
   <url><loc>https://mixingmusic.ai/mezcla-con-ia</loc><xhtml:link rel="alternate" hreflang="es" href="https://mixingmusic.ai/mezcla-con-ia"/><xhtml:link rel="alternate" hreflang="en" href="https://mixingmusic.ai/ai-music-mixing"/><xhtml:link rel="alternate" hreflang="x-default" href="https://mixingmusic.ai/mezcla-con-ia"/></url>

@@ -30,11 +30,14 @@ const AudioConceptsPage = lazy(() => import('../pages/concepts/page'));
 const PressPage = lazy(() => import('../pages/press/page'));
 const SeoLandingPage = lazy(() => import('../pages/seo-landings/page'));
 const PluginDirectoryPage = lazy(() => import('../pages/plugin-directory/page'));
+const AboutPage = lazy(() => import('../pages/about/page'));
 
 const seoLandingPaths = seoLandings.map((landing) => landing.path);
 
 const appRoutes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
+  { path: '/about', element: <AboutPage /> },
+  { path: '/en/about', element: <AboutPage /> },
   { path: '/auth/login', element: <LoginPage /> },
   { path: '/auth/register', element: <RegisterPage /> },
   { path: '/auth/verify', element: <VerifyEmailPage /> },

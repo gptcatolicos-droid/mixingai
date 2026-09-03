@@ -140,6 +140,7 @@ export default function SiteLayout({ metadata }: { metadata?: PageMetadata } = {
           <Link reloadDocument to={english ? '/en/genres' : '/generos'}>{english ? 'Genre guides' : 'Guías por género'}</Link>
           <Link reloadDocument to={english ? '/en/audio-plugins' : '/plugins-audio'}>{english ? 'Audio plugins' : 'Plugins de audio'}</Link>
           <Link reloadDocument to={english ? '/en/blog' : '/blog'}>Blog</Link>
+          <Link reloadDocument to={english ? '/en/about' : '/about'}>{english ? 'About' : 'Acerca de'}</Link>
           <Link reloadDocument to="/prensa">{english ? 'Press' : 'Prensa'}</Link>
           <Link reloadDocument to="/cookies">Cookies</Link>
           <Link reloadDocument to="/conceptos-audio">{english ? 'Concepts' : 'Conceptos'}</Link>

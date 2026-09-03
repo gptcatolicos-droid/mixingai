@@ -5,4 +5,30 @@ Allow: /
 Disallow: /api/
 Disallow: /seo-meta/
 
+# Search and user-directed retrieval for AI assistants.
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /api/
+Disallow: /seo-meta/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /api/
+Disallow: /seo-meta/
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /api/
+Disallow: /seo-meta/
+
+User-agent: Claude-User
+Allow: /
+Disallow: /api/
+Disallow: /seo-meta/
+
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+Disallow: /seo-meta/
+
 Sitemap: https://mixingmusic.ai/sitemap.xml

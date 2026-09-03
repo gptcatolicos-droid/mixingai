@@ -1,8 +1,10 @@
 
 import { seoArticles } from './seoArticles';
-import { masteringStandardsArticles } from './masteringStandardsArticles';
+import { knowledgePillarArticles } from './knowledgePillarArticles';
 import { historicAlbumArticles } from './historicAlbumArticles';
 import { platformWorkflowArticles } from './platformWorkflowArticles';
+import { aiPromptArticle } from './aiPromptArticle';
+import { aiPlatformDirectoryArticle } from './aiPlatformDirectoryArticle';
 
 export interface BlogArticle {
   id: string;
@@ -2283,7 +2285,9 @@ Las interfaces Focusrite siguen siendo la elección inteligente para home studio
     }
   },
   ...seoArticles,
-  ...masteringStandardsArticles,
+  ...knowledgePillarArticles,
+  aiPromptArticle,
+  aiPlatformDirectoryArticle,
   ...historicAlbumArticles,
   ...platformWorkflowArticles,
   // Se pueden agregar más artículos aquí...

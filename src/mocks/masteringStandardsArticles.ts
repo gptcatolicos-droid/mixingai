@@ -105,6 +105,10 @@ const seeds: Seed[] = [
   ['version-instrumental-master', 'Master de versión instrumental, clean y radio edit', 'Masters for instrumental, clean and radio edits', 'Cómo mantener coherencia entre versiones de una canción para diferentes usos.', 'Masteriza cada versión por separado y comprueba relaciones de nivel entre ellas.'],
 ];
 
+// Kept as a migration catalog so retired, repetitive article URLs can receive
+// a relevant permanent redirect instead of becoming broken links.
+export const masteringStandardsSlugs = seeds.map(([slug]) => slug);
+
 const author = { name: 'Equipo MixingMusic.AI', avatar: '/logo-brand.png', bio: 'Equipo editorial de MixingMusic.AI.', bioEs: 'Equipo editorial de MixingMusic.AI, enfocado en producción musical, mezcla y mastering.' };
 
 function categoryFor(index: number) { return index % 3 === 0 ? 'mixing' : index % 3 === 1 ? 'tools' : 'ai'; }
