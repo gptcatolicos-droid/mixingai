@@ -162,7 +162,7 @@ const BlogArticlePage: React.FC = () => {
             }}>{markdown}</Markdown>
           </div>
 
-          <ArticleComparison english={selectedLanguage === 'en'} />
+          {article.showComparison !== false && <ArticleComparison english={selectedLanguage === 'en'} />}
           
           {/* Author Bio */}
           <div className="border-t border-gray-200 pt-8 mt-12">
