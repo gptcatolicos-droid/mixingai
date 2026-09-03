@@ -83,6 +83,14 @@ for (const [name, size] of [...[16,32,48,96,192,512].map(size => [`favicon-${siz
   check(file.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])) && file.readUInt32BE(16) === size && file.readUInt32BE(20) === size, `Invalid PNG ${name}`);
 }
 check(readFileSync(resolve(out,'favicon.ico')).subarray(0,4).equals(Buffer.from([0,0,1,0])), 'Invalid ICO signature');
+const redirects = readFileSync(resolve(out, '_redirects'), 'utf8').trim().split('\n').filter(Boolean);
+const redirectSources = new Set();
+for (const line of redirects) {
+  const [from, to, status, extra] = line.trim().split(/\s+/);
+  check(Boolean(from && to) && status === '301' && !extra, `Invalid redirect rule: ${line}`);
+  check(!redirectSources.has(from), `Duplicate redirect source: ${from}`); redirectSources.add(from);
+  check(!publicPaths.has(from) && publicPaths.has(to), `Redirect must map a retired URL to a public page: ${line}`);
+}
 const appManifest = JSON.parse(readFileSync(resolve(out,'site.webmanifest'),'utf8'));
 check(appManifest.icons.every(icon => existsSync(resolve(out, icon.src.slice(1)))), 'Manifest references missing icons');
 check(pages.get('/')('.v3-hero').next().hasClass('v3-pricing'), 'Home pricing must follow hero in the DOM');

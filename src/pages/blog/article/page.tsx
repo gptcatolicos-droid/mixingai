@@ -3,8 +3,9 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { blogArticles } from '../../../mocks/blogArticles';
-import ArticleComparison from './ArticleComparison';
 import NotFound from '../../NotFound';
+import AiMusicPromptLibrary from './AiMusicPromptLibrary';
+import AiMusicPlatformDirectory from './AiMusicPlatformDirectory';
 
 const BlogArticlePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -160,10 +161,10 @@ const BlogArticlePage: React.FC = () => {
               td: ({ children }) => <td className="p-3 border text-gray-700">{children}</td>,
               img: ({ src, alt }) => <img src={src} alt={alt || ''} loading="lazy" decoding="async" />,
             }}>{markdown}</Markdown>
+            {article.slug === 'ai-music-prompts-free-100-prompts' && <AiMusicPromptLibrary english={selectedLanguage === 'en'} />}
+            {article.slug === 'top-100-ai-music-platforms-tools' && <AiMusicPlatformDirectory english={selectedLanguage === 'en'} />}
           </div>
 
-          <ArticleComparison english={selectedLanguage === 'en'} />
-          
           {/* Author Bio */}
           <div className="border-t border-gray-200 pt-8 mt-12">
             <div className="flex items-start space-x-4">

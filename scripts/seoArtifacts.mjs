@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { load } from 'cheerio';
 
 const root = resolve(import.meta.dirname, '..');
-const { publicRoutes, privatePaths, renderPublicRoute, renderNotFound } = await import(pathToFileURL(resolve(root, '.seo-prerender/seoPrerenderEntry.js')).href);
+const { publicRoutes, privatePaths, legacyRedirects, renderPublicRoute, renderNotFound } = await import(pathToFileURL(resolve(root, '.seo-prerender/seoPrerenderEntry.js')).href);
 const ORIGIN = 'https://mixingmusic.ai';
 const escape = value => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 function write(path, text) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text); }
@@ -19,6 +19,14 @@ function sitemap() {
   write(resolve(root, 'public/sitemap-pages.xml'), urlset(publicRoutes.filter(route => route.meta.type !== 'article').map(entries)));
   write(resolve(root, 'public/sitemap-blog.xml'), urlset(publicRoutes.filter(route => route.meta.type === 'article').map(entries)));
   write(resolve(root, 'public/sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><sitemap><loc>${ORIGIN}/sitemap-pages.xml</loc></sitemap><sitemap><loc>${ORIGIN}/sitemap-blog.xml</loc></sitemap></sitemapindex>\n`);
+  const articles = publicRoutes.filter(route => route.meta.type === 'article').sort((a, b) => new Date(b.meta.published || 0) - new Date(a.meta.published || 0));
+  const items = articles.slice(0, 100).map(({ meta }) => `<item><title>${escape(meta.title)}</title><link>${escape(ORIGIN + meta.path)}</link><guid isPermaLink="true">${escape(ORIGIN + meta.path)}</guid><description>${escape(meta.description)}</description>${meta.published ? `<pubDate>${new Date(meta.published).toUTCString()}</pubDate>` : ''}</item>`).join('');
+  write(resolve(root, 'public/feed.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>MixingMusic.AI Blog</title><link>${ORIGIN}/blog</link><description>Bilingual mixing, mastering and AI music guides.</description><language>es</language>${items}</channel></rss>\n`);
+  const redirects = legacyRedirects.flatMap(({ from, to }) => [
+    `/blog/${from} /blog/${to} 301`,
+    `/en/blog/${from} /en/blog/${to} 301`,
+  ]);
+  write(resolve(root, 'public/_redirects'), `${redirects.join('\n')}\n`);
   console.log(`Sitemaps: ${publicRoutes.length} public URLs generated from the render catalog.`);
 }
 function render() {
@@ -26,7 +34,7 @@ function render() {
   const template = readFileSync(resolve(out, 'index.html'), 'utf8');
   const manifest = JSON.parse(readFileSync(resolve(out, '.vite/manifest.json'), 'utf8'));
   function styles(path) {
-    const pages = { '/': 'home', '/pricing': 'pricing', '/capacidades': 'capabilities', '/conceptos-audio': 'concepts', '/prensa': 'press', '/terms': 'terms', '/privacy': 'privacy', '/cookies': 'cookies', '/blog': 'blog', '/en/blog': 'blog' };
+    const pages = { '/': 'home', '/pricing': 'pricing', '/capacidades': 'capabilities', '/conceptos-audio': 'concepts', '/prensa': 'press', '/terms': 'terms', '/privacy': 'privacy', '/cookies': 'cookies', '/about': 'about', '/en/about': 'about', '/blog': 'blog', '/en/blog': 'blog' };
     const page = pages[path] || (/^\/(en\/)?blog\//.test(path) ? 'blog/article' : /plugins|plugin/.test(path) ? 'plugin-directory' : 'seo-landings');
     const css = new Set(), seen = new Set();
     function collect(key) {
@@ -53,6 +61,7 @@ function render() {
       $('html').attr('data-page-language', meta.lang);
       tag('name', 'description', meta.description);
       $('<link>').attr({ rel: 'canonical', href: ORIGIN + meta.path }).appendTo('head');
+      $('<link>').attr({ rel: 'alternate', type: 'application/rss+xml', title: 'MixingMusic.AI Blog', href: `${ORIGIN}/feed.xml` }).appendTo('head');
       for (const [lang, path] of Object.entries(meta.alternates || {})) $('<link>').attr({ rel: 'alternate', hreflang: lang, href: ORIGIN + path }).appendTo('head');
       const image = meta.image || `${ORIGIN}/og-mixingmusic.png`;
       for (const [key, value] of Object.entries({ title: meta.title, description: meta.description, url: ORIGIN + meta.path, type: meta.type || 'website', image, site_name: 'MixingMusic.AI', locale: meta.lang === 'en' ? 'en_US' : 'es_ES' })) tag('property', `og:${key}`, value);

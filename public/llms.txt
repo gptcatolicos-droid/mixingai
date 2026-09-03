@@ -15,6 +15,16 @@ The directory covers Universal Audio, Waves, Slate Digital, iZotope, and Brainwo
 - [AI Mastering](https://mixingmusic.ai/en/ai-mastering)
 - [Pricing](https://mixingmusic.ai/pricing)
 
+## Knowledge center
+
+- [Mixing and mastering blog](https://mixingmusic.ai/en/blog)
+- [100 free AI music prompts](https://mixingmusic.ai/en/blog/ai-music-prompts-free-100-prompts)
+- [100 AI music platforms and tools](https://mixingmusic.ai/en/blog/top-100-ai-music-platforms-tools)
+- [What is AI-generated music?](https://mixingmusic.ai/en/blog/que-es-musica-generada-ia)
+- [How to mix AI-generated music](https://mixingmusic.ai/en/blog/mezclar-musica-generada-ia)
+- [How to master AI-generated music](https://mixingmusic.ai/en/blog/masterizar-musica-generada-ia)
+- [About and editorial methodology](https://mixingmusic.ai/en/about)
+
 ## Spanish resources
 
 - [Mezcla con IA](https://mixingmusic.ai/mezcla-con-ia)
