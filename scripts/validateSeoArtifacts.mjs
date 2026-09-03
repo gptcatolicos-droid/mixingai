@@ -90,6 +90,14 @@ for (const line of redirects) {
   check(Boolean(from && to) && status === '301' && !extra, `Invalid redirect rule: ${line}`);
   check(!redirectSources.has(from), `Duplicate redirect source: ${from}`); redirectSources.add(from);
   check(!publicPaths.has(from) && publicPaths.has(to), `Redirect must map a retired URL to a public page: ${line}`);
+  const fallbackPath = htmlAt(from);
+  check(existsSync(fallbackPath), `Missing static redirect fallback: ${from}`);
+  if (existsSync(fallbackPath)) {
+    const $ = load(readFileSync(fallbackPath, 'utf8'));
+    check($('meta[name="robots"]').attr('content') === 'noindex,follow', `Redirect fallback must be noindex,follow: ${from}`);
+    check($('meta[http-equiv="refresh"]').attr('content') === `0;url=${ORIGIN + to}`, `Redirect fallback target differs: ${from}`);
+    check($('link[rel="canonical"]').attr('href') === ORIGIN + to, `Redirect fallback canonical differs: ${from}`);
+  }
 }
 const appManifest = JSON.parse(readFileSync(resolve(out,'site.webmanifest'),'utf8'));
 check(appManifest.icons.every(icon => existsSync(resolve(out, icon.src.slice(1)))), 'Manifest references missing icons');

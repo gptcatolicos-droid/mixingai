@@ -78,10 +78,26 @@ function render() {
     $('#root').html(content);
     return $.html();
   }
+  function redirectDocument(from, to) {
+    const destination = ORIGIN + to;
+    const lang = from.startsWith('/en/') ? 'en' : 'es';
+    const label = lang === 'en' ? 'Continue to the updated guide' : 'Continuar a la guía actualizada';
+    return `<!doctype html>\n<html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,follow"><meta http-equiv="refresh" content="0;url=${escape(destination)}"><link rel="canonical" href="${escape(destination)}"><title>${lang === 'en' ? 'Guide moved' : 'Guía actualizada'} | MixingMusic.AI</title><script>location.replace(${JSON.stringify(destination)});</script></head><body><main><p><a href="${escape(destination)}">${label}</a></p></main></body></html>\n`;
+  }
   for (const route of publicRoutes) {
     const path = route.meta.path.replace(/^\//, '');
     write(resolve(out, path, 'index.html'), document(route.meta, renderPublicRoute(route)));
     write(resolve(out, 'seo-meta', path, 'index.json'), JSON.stringify(route.meta));
+  }
+  // Render does not consume Netlify-style `_redirects` files. Keep the rules for
+  // hosts that support them and also emit crawlable fallback documents so legacy
+  // URLs never become dead links on the current static-site service.
+  for (const { from, to } of legacyRedirects) {
+    for (const prefix of ['', '/en']) {
+      const source = `${prefix}/blog/${from}`;
+      const destination = `${prefix}/blog/${to}`;
+      write(resolve(out, source.slice(1), 'index.html'), redirectDocument(source, destination));
+    }
   }
   // Private deep links remain valid without a catch-all rewrite or marketing metadata.
   const shell = load(document(undefined, ''));
@@ -90,7 +106,7 @@ function render() {
   write(resolve(out, '404.html'), document(undefined, renderNotFound()));
   write(resolve(out, 'seo-route-manifest.json'), JSON.stringify({ public: publicRoutes.map(route => route.meta.path), private: privatePaths }, null, 2));
   rmSync(resolve(root, '.seo-prerender'), { recursive: true, force: true });
-  console.log(`Rendered ${publicRoutes.length} public pages, ${privatePaths.length} private shells and a noindex 404.`);
+  console.log(`Rendered ${publicRoutes.length} public pages, ${legacyRedirects.length * 2} legacy redirect fallbacks, ${privatePaths.length} private shells and a noindex 404.`);
 }
 if (process.argv[2] === 'sitemap') sitemap();
 else if (process.argv[2] === 'render') render();
