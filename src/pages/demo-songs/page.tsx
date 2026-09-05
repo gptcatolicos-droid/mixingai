@@ -10,7 +10,7 @@ export default function DemoSongsPage() {
       <header className="demo-songs-hero">
         <span>{english ? 'MIXINGMUSIC DEMO SONGS' : 'CANCIONES DEMO DE MIXINGMUSIC'}</span>
         <h1>{english ? 'MixingMusic demo songs: hear real mixes and masters.' : 'Canciones demo de MixingMusic: escucha mezclas y masters reales.'}</h1>
-        <p>{english ? 'Explore finished songs mixed and mastered with MixingMusic.AI. Listen directly on SoundCloud and Spotify to hear the final sound in released music.' : 'Explora canciones terminadas que fueron mezcladas y masterizadas con MixingMusic.AI. Escúchalas directamente en SoundCloud y Spotify para conocer el sonido final en música publicada.'}</p>
+        <p>{english ? 'Explore finished songs mixed and mastered with MixingMusic.AI. Listen directly on SoundCloud to hear the final sound in released music.' : 'Explora canciones terminadas que fueron mezcladas y masterizadas con MixingMusic.AI. Escúchalas directamente en SoundCloud para conocer el sonido final en música publicada.'}</p>
       </header>
 
       <DemoSongs english={english} />
