@@ -102,6 +102,12 @@ for (const line of redirects) {
 const appManifest = JSON.parse(readFileSync(resolve(out,'site.webmanifest'),'utf8'));
 check(appManifest.icons.every(icon => existsSync(resolve(out, icon.src.slice(1)))), 'Manifest references missing icons');
 check(pages.get('/')('.v3-hero').next().hasClass('v3-pricing'), 'Home pricing must follow hero in the DOM');
+check(pages.get('/')('.v3-award').next().hasClass('demo-songs-section'), 'Home demo songs must follow the award in the DOM');
+for (const path of ['/', '/canciones-demo-mixing-music', '/en/mixing-music-demo-songs']) {
+  const $ = pages.get(path);
+  check($('.demo-songs-section iframe').length === 3, `Demo songs must contain exactly three embeds: ${path}`);
+  check(!$('.demo-songs-section iframe').toArray().some(node => $(node).attr('src')?.includes('auto_play=true')), `Demo songs must not autoplay: ${path}`);
+}
 for (const path of ['/blog', '/en/blog']) {
   const $ = pages.get(path);
   const articleLinks = new Set($('a[href]').toArray().map(node => $(node).attr('href')).filter(href => href?.startsWith(path + '/')));

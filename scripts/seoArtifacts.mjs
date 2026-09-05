@@ -34,7 +34,7 @@ function render() {
   const template = readFileSync(resolve(out, 'index.html'), 'utf8');
   const manifest = JSON.parse(readFileSync(resolve(out, '.vite/manifest.json'), 'utf8'));
   function styles(path) {
-    const pages = { '/': 'home', '/pricing': 'pricing', '/capacidades': 'capabilities', '/conceptos-audio': 'concepts', '/prensa': 'press', '/terms': 'terms', '/privacy': 'privacy', '/cookies': 'cookies', '/about': 'about', '/en/about': 'about', '/blog': 'blog', '/en/blog': 'blog' };
+    const pages = { '/': 'home', '/pricing': 'pricing', '/capacidades': 'capabilities', '/conceptos-audio': 'concepts', '/prensa': 'press', '/terms': 'terms', '/privacy': 'privacy', '/cookies': 'cookies', '/about': 'about', '/en/about': 'about', '/canciones-demo-mixing-music': 'demo-songs', '/en/mixing-music-demo-songs': 'demo-songs', '/blog': 'blog', '/en/blog': 'blog' };
     const page = pages[path] || (/^\/(en\/)?blog\//.test(path) ? 'blog/article' : /plugins|plugin/.test(path) ? 'plugin-directory' : 'seo-landings');
     const css = new Set(), seen = new Set();
     function collect(key) {

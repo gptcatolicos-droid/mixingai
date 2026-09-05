@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { PRESETS } from './mixTypes';
 import { pressMentions } from '../../../content/pressMentions';
 import PublicPlanPrice from '../../../components/feature/PublicPlanPrice';
+import DemoSongs from '../../../components/feature/DemoSongs';
 import './home-v3.css';
 
 const benefits = [
@@ -216,6 +217,8 @@ export default function HomeHeroV3() {
           <img src="/winner3.png" alt="MixingMusic.AI, ganador del 2026 Global Recognition Award por innovación en inteligencia artificial aplicada a la producción musical" />
         </div>
       </section>
+
+      <DemoSongs home />
 
       <section className="v3-section v3-press-home" aria-labelledby="press-home-title">
         <div className="v3-section-heading">
