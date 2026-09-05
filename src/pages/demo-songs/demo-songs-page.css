@@ -1,0 +1,73 @@
+.demo-songs-page {
+  background: #08070d;
+  color: #fff;
+}
+
+.demo-songs-hero {
+  background:
+    linear-gradient(90deg, rgba(8, 7, 13, 0.95), rgba(8, 7, 13, 0.72)),
+    radial-gradient(circle at 80% 20%, rgba(203, 54, 184, 0.25), transparent 38%);
+  padding: clamp(5rem, 10vw, 9rem) max(5vw, calc((100vw - 1100px) / 2));
+}
+
+.demo-songs-hero > span,
+.demo-songs-explanation > div:first-child > span {
+  color: #ef8cdd;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.demo-songs-hero h1 {
+  font-size: clamp(2.6rem, 6vw, 5.6rem);
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+  margin: 1rem 0 1.5rem;
+  max-width: 1020px;
+}
+
+.demo-songs-hero p {
+  color: #c8c1cf;
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  line-height: 1.75;
+  margin: 0;
+  max-width: 760px;
+}
+
+.demo-songs-page > .demo-songs-section {
+  padding-top: 2rem;
+}
+
+.demo-songs-explanation {
+  background: #f7f4f8;
+  color: #17121b;
+  display: grid;
+  gap: 3rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding: clamp(4rem, 8vw, 7rem) max(5vw, calc((100vw - 1100px) / 2));
+}
+
+.demo-songs-explanation h2 {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  letter-spacing: -0.045em;
+  line-height: 1.06;
+  margin: 0.8rem 0 0;
+}
+
+.demo-songs-explanation p {
+  color: #514957;
+  line-height: 1.75;
+  margin: 0 0 1rem;
+}
+
+.demo-songs-explanation a {
+  color: #8b176f;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+}
+
+@media (max-width: 760px) {
+  .demo-songs-explanation { grid-template-columns: 1fr; }
+}

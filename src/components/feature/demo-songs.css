@@ -1,0 +1,100 @@
+.demo-songs-section {
+  --demo-panel: rgba(18, 12, 25, 0.84);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(217, 61, 174, 0.15), transparent 34%),
+    radial-gradient(circle at 88% 100%, rgba(111, 66, 193, 0.16), transparent 38%),
+    #08070d;
+  color: #fff;
+  padding: clamp(4rem, 8vw, 7rem) max(5vw, calc((100vw - 1240px) / 2));
+}
+
+.demo-songs-home {
+  border-bottom: 1px solid rgba(228, 70, 184, 0.18);
+  border-top: 1px solid rgba(228, 70, 184, 0.18);
+}
+
+.demo-songs-heading {
+  max-width: 780px;
+  margin-bottom: 2rem;
+}
+
+.demo-songs-heading > span {
+  color: #ef8cdd;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.demo-songs-heading h2 {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+  margin: 0.75rem 0 1rem;
+}
+
+.demo-songs-heading p {
+  color: #c8c1cf;
+  font-size: 1rem;
+  line-height: 1.75;
+  margin: 0;
+}
+
+.demo-songs-grid {
+  align-items: start;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.demo-song-card {
+  background: var(--demo-panel);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  overflow: hidden;
+  padding: 1rem;
+}
+
+.demo-song-card h3 {
+  font-size: 1rem;
+  line-height: 1.35;
+  margin: 0 0 0.85rem;
+  min-height: 2.7em;
+}
+
+.demo-song-card iframe {
+  border: 0;
+  border-radius: 12px;
+  display: block;
+}
+
+.demo-song-card > a {
+  color: #f0a4e2;
+  display: inline-flex;
+  font-size: 0.8rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+  text-decoration: none;
+}
+
+.demo-song-card > a:hover,
+.demo-song-card > a:focus-visible,
+.demo-songs-link:hover,
+.demo-songs-link:focus-visible {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.demo-songs-link {
+  color: #f0a4e2;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 0.4rem;
+  margin-top: 2rem;
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .demo-songs-grid { grid-template-columns: 1fr; }
+  .demo-song-card h3 { min-height: auto; }
+}
