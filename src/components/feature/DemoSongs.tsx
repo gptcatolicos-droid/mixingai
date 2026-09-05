@@ -14,19 +14,15 @@ export default function DemoSongs({ english = false, home = false }: DemoSongsPr
     ? {
         kicker: 'HEAR THE RESULT',
         title: 'Songs mixed and mastered with MixingMusic.',
-        intro: 'Listen to finished music on SoundCloud and Spotify. These releases show how MixingMusic can support the final sound while the artist keeps the creative decisions.',
+        intro: 'Listen to finished music on SoundCloud. These releases show how MixingMusic can support the final sound while the artist keeps the creative decisions.',
         soundcloud: 'Listen on SoundCloud',
-        spotifyTitle: 'Dany Palacio album on Spotify',
-        spotify: 'Listen on Spotify',
         link: 'Explore all demo songs',
       }
     : {
         kicker: 'ESCUCHA EL RESULTADO',
         title: 'Canciones mezcladas y masterizadas con MixingMusic.',
-        intro: 'Escucha música terminada en SoundCloud y Spotify. Estos lanzamientos muestran cómo MixingMusic puede apoyar el sonido final mientras el artista conserva las decisiones creativas.',
+        intro: 'Escucha música terminada en SoundCloud. Estos lanzamientos muestran cómo MixingMusic puede apoyar el sonido final mientras el artista conserva las decisiones creativas.',
         soundcloud: 'Escuchar en SoundCloud',
-        spotifyTitle: 'Álbum de Dany Palacio en Spotify',
-        spotify: 'Escuchar en Spotify',
         link: 'Explorar todas las canciones demo',
       };
 
@@ -56,20 +52,20 @@ export default function DemoSongs({ english = false, home = false }: DemoSongsPr
           </a>
         </article>
 
-        <article className="demo-song-card demo-song-spotify">
-          <h3>{copy.spotifyTitle}</h3>
+        <article className="demo-song-card demo-song-soundcloud">
+          <h3>Tormentos</h3>
           <iframe
-            title={copy.spotifyTitle}
-            src="https://open.spotify.com/embed/album/5e7yQsYIvc7Eww3HLlk5hs?utm_source=generator"
+            title="Tormentos — DanyPalacio en SoundCloud"
+            src={soundCloudPlayer('2391682107')}
             width="100%"
-            height="352"
+            height="166"
+            scrolling="no"
             frameBorder="0"
-            allowFullScreen
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            allow="autoplay; encrypted-media"
             loading="lazy"
           />
-          <a href="https://open.spotify.com/album/5e7yQsYIvc7Eww3HLlk5hs" target="_blank" rel="noreferrer">
-            {copy.spotify} <span aria-hidden="true">↗</span>
+          <a href="https://soundcloud.com/danipalacio/tormentos" target="_blank" rel="noreferrer">
+            {copy.soundcloud} <span aria-hidden="true">↗</span>
           </a>
         </article>
 

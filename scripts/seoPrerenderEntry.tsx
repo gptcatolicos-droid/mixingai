@@ -62,15 +62,15 @@ const alternates = (es: string, en: string) => ({ es, en, 'x-default': es });
 const demoSongsSchema = (lang: 'es' | 'en', path: string) => {
   const name = lang === 'en' ? 'MixingMusic demo songs' : 'Canciones demo de MixingMusic';
   const description = lang === 'en'
-    ? 'Songs mixed and mastered with MixingMusic.AI, available to hear on SoundCloud and Spotify.'
-    : 'Canciones mezcladas y masterizadas con MixingMusic.AI, disponibles para escuchar en SoundCloud y Spotify.';
+    ? 'Songs mixed and mastered with MixingMusic.AI, available to hear on SoundCloud.'
+    : 'Canciones mezcladas y masterizadas con MixingMusic.AI, disponibles para escuchar en SoundCloud.';
   return [
     { '@context': 'https://schema.org', '@type': 'CollectionPage', name, description, url: origin + path, inLanguage: lang, about: { '@id': `${origin}/#organization` } },
     {
       '@context': 'https://schema.org', '@type': 'ItemList', name, numberOfItems: 3,
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Al Otro Lado del Silencio', url: 'https://soundcloud.com/danipalacio/al-otor-lado-del-silencio' },
-        { '@type': 'ListItem', position: 2, name: lang === 'en' ? 'Dany Palacio album on Spotify' : 'Álbum de Dany Palacio en Spotify', url: 'https://open.spotify.com/album/5e7yQsYIvc7Eww3HLlk5hs' },
+        { '@type': 'ListItem', position: 2, name: 'Tormentos', url: 'https://soundcloud.com/danipalacio/tormentos' },
         { '@type': 'ListItem', position: 3, name: 'Igual Que Ayer', url: 'https://soundcloud.com/danipalacio/igual-que-ayer' },
       ],
     },
@@ -92,8 +92,8 @@ export const publicRoutes: PublicRoute[] = regular.map(([path, title, descriptio
 publicRoutes.push(
   { meta: { path: '/about', title: 'Acerca de MixingMusic.AI y metodología editorial', description: 'Conoce quién publica MixingMusic.AI, cómo verificamos las guías de mezcla, mastering y música con IA, nuestras fuentes, criterios y limitaciones.', lang: 'es', alternates: alternates('/about', '/en/about'), schema: [{ '@context': 'https://schema.org', '@type': 'AboutPage', name: 'Acerca de MixingMusic.AI', url: `${origin}/about`, inLanguage: 'es', about: { '@id': `${origin}/#organization` } }, organization] }, element: <About /> },
   { meta: { path: '/en/about', title: 'About MixingMusic.AI and our editorial methodology', description: 'Learn who publishes MixingMusic.AI and how we verify mixing, mastering and AI music guides, including sources, criteria, corrections and limits.', lang: 'en', alternates: alternates('/about', '/en/about'), schema: [{ '@context': 'https://schema.org', '@type': 'AboutPage', name: 'About MixingMusic.AI', url: `${origin}/en/about`, inLanguage: 'en', about: { '@id': `${origin}/#organization` } }, organization] }, element: <About /> },
-  { meta: { path: '/canciones-demo-mixing-music', title: 'Canciones demo de mezcla y mastering | MixingMusic.AI', description: 'Escucha canciones mezcladas y masterizadas con MixingMusic.AI en SoundCloud y Spotify. Ejemplos reales del sonido final de la plataforma.', lang: 'es', alternates: alternates('/canciones-demo-mixing-music', '/en/mixing-music-demo-songs'), schema: demoSongsSchema('es', '/canciones-demo-mixing-music') }, element: <DemoSongs /> },
-  { meta: { path: '/en/mixing-music-demo-songs', title: 'MixingMusic demo songs: mixing and mastering examples', description: 'Listen to songs mixed and mastered with MixingMusic.AI on SoundCloud and Spotify. Hear real examples of the platform’s finished results.', lang: 'en', alternates: alternates('/canciones-demo-mixing-music', '/en/mixing-music-demo-songs'), schema: demoSongsSchema('en', '/en/mixing-music-demo-songs') }, element: <DemoSongs /> },
+  { meta: { path: '/canciones-demo-mixing-music', title: 'Canciones demo de mezcla y mastering | MixingMusic.AI', description: 'Escucha canciones mezcladas y masterizadas con MixingMusic.AI en SoundCloud. Ejemplos reales del sonido final de la plataforma.', lang: 'es', alternates: alternates('/canciones-demo-mixing-music', '/en/mixing-music-demo-songs'), schema: demoSongsSchema('es', '/canciones-demo-mixing-music') }, element: <DemoSongs /> },
+  { meta: { path: '/en/mixing-music-demo-songs', title: 'MixingMusic demo songs: mixing and mastering examples', description: 'Listen to songs mixed and mastered with MixingMusic.AI on SoundCloud. Hear real examples of the platform’s finished results.', lang: 'en', alternates: alternates('/canciones-demo-mixing-music', '/en/mixing-music-demo-songs'), schema: demoSongsSchema('en', '/en/mixing-music-demo-songs') }, element: <DemoSongs /> },
 );
 publicRoutes[0].meta.schema = [organization,
   { '@context': 'https://schema.org', '@type': 'WebSite', '@id': `${origin}/#website`, name: 'MixingMusic.AI', alternateName: 'MixingMusic', url: origin, publisher: { '@id': `${origin}/#organization` } },
