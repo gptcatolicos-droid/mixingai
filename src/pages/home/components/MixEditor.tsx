@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import UploadModal from '@/components/feature/UploadModal';
 import StudioTabs from '@/components/feature/StudioTabs';
 import AudioChatPanel from '@/components/feature/AudioChatPanel';
+import type { MixerChatBridge } from '@/components/feature/AudioChatPanel';
 import { drawFFTAnalyzer } from '@/utils/drawFFT';
 import { drawWaveform } from '@/utils/drawWaveform';
 import type { MixPreset } from './mixTypes';
@@ -34,7 +35,7 @@ interface Stem {
   tapeShaper: WaveShaperNode;
   noiseGate: BiquadFilterNode;
   sourceNode?: AudioBufferSourceNode;
-  volume: number; pan: number; muted: boolean;
+  volume: number; pan: number; muted: boolean; locked: boolean;
   fftData: Uint8Array; waveformPeaks: Float32Array;
   instrument: string; icon: string; selected: boolean;
   stemPresetId: string | null;
@@ -462,7 +463,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           eqLow, eqMid, eqHigh, compressorNode, tapeShaper, noiseGate,
           reverbNode: stemReverbNode, reverbWet: reverbWetNode, reverbDry: reverbDryNode,
           delayNode: stemDelayNode, delayWet: delayWetNode, delayFeedback: delayFbNode,
-          volume:0, pan:0, muted:false,
+          volume:0, pan:0, muted:false, locked:false,
           fftData: new Uint8Array(analyserNode.frequencyBinCount),
           waveformPeaks: generateWaveformPeaks(buffer, 400),
           instrument, icon, selected:false, stemPresetId:null,
@@ -675,14 +676,14 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const updateStemVolume=(id:string,db:number)=>{
     const ctx=audioContextRef.current;
     setStems(prev=>prev.map(s=>{
-      if(s.id===id){if(ctx)s.gainNode.gain.setTargetAtTime(Math.pow(10,db/20),ctx.currentTime,0.01);return{...s,volume:db};}
+      if(s.id===id&&!s.locked){if(ctx)s.gainNode.gain.setTargetAtTime(Math.pow(10,db/20),ctx.currentTime,0.01);return{...s,volume:db};}
       return s;
     }));
   };
   const updateStemPan=(id:string,pan:number)=>{
     const ctx=audioContextRef.current;
     setStems(prev=>prev.map(s=>{
-      if(s.id===id){if(ctx)s.panNode.pan.setTargetAtTime(pan/50,ctx.currentTime,0.01);return{...s,pan};}
+      if(s.id===id&&!s.locked){if(ctx)s.panNode.pan.setTargetAtTime(pan/50,ctx.currentTime,0.01);return{...s,pan};}
       return s;
     }));
   };
@@ -693,6 +694,12 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       return s;
     }));
   };
+  /** "No toques la batería": a locked stem's volume/pan/mute stay fixed —
+   * checked both here (manual UI, defense in depth) and before any AudioChat
+   * proposal is applied. */
+  const toggleStemLock=(id:string)=>{
+    setStems(prev=>prev.map(s=>s.id===id?{...s,locked:!s.locked}:s));
+  };
   const adjustGlobalEQ=useCallback((band:'bass'|'mid'|'high',dir:'up'|'down')=>{
     const ctx=audioContextRef.current; if(!ctx) return;
     const adj=dir==='up'?1:-1;
@@ -700,6 +707,16 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     if(band==='mid'){const v=Math.max(-12,Math.min(12,midGain+adj));midFilterRef.current?.gain.setTargetAtTime(v,ctx.currentTime,0.01);setMidGain(v);}
     if(band==='high'){const v=Math.max(-12,Math.min(12,highGain+adj));highFilterRef.current?.gain.setTargetAtTime(v,ctx.currentTime,0.01);setHighGain(v);}
   },[bassGain,midGain,highGain]);
+  /** Same three filters as adjustGlobalEQ, but set an absolute clamped value
+   * instead of stepping by 1dB — the manual +/- buttons keep using the
+   * stepped version above; this is for AudioChat proposals. */
+  const setGlobalEQBand=useCallback((band:'bass'|'mid'|'high',value:number)=>{
+    const ctx=audioContextRef.current; if(!ctx) return;
+    const v=Math.max(-12,Math.min(12,value));
+    if(band==='bass'){bassFilterRef.current?.gain.setTargetAtTime(v,ctx.currentTime,0.01);setBassGain(v);}
+    if(band==='mid'){midFilterRef.current?.gain.setTargetAtTime(v,ctx.currentTime,0.01);setMidGain(v);}
+    if(band==='high'){highFilterRef.current?.gain.setTargetAtTime(v,ctx.currentTime,0.01);setHighGain(v);}
+  },[]);
 
   /* ─── Upload more ─── */
   const handleUploadMoreStems=async(newFiles:File[])=>{
@@ -922,6 +939,34 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   );
 
   const presetColor = activePreset?.color ?? '#D946EF';
+
+  /* ─── AudioChat bridge — reuses the exact same setters the manual
+   * controls call; AudioChat never touches audio nodes directly. */
+  const mixerChatBridge: MixerChatBridge = {
+    getState: () => ({
+      stems: stems.map(s => ({ id: s.id, name: s.name.replace(/\.[^/.]+$/, ''), role: s.instrument, volume: s.volume, pan: s.pan, muted: s.muted, locked: s.locked })),
+      master: { bassGain, midGain, highGain, reverbActive, delayActive, widenerActive },
+    }),
+    applyChanges: (changes) => {
+      for (const change of changes) {
+        if (change.target === 'stem') {
+          const stem = stems.find(s => s.id === change.stemId);
+          if (!stem || stem.locked) continue;
+          if (change.param === 'volume') updateStemVolume(stem.id, change.value);
+          else if (change.param === 'pan') updateStemPan(stem.id, change.value);
+          else if (change.param === 'mute' && !stem.muted) toggleStemMute(stem.id);
+          else if (change.param === 'unmute' && stem.muted) toggleStemMute(stem.id);
+        } else {
+          if (change.param === 'bass') setGlobalEQBand('bass', change.value);
+          else if (change.param === 'mid') setGlobalEQBand('mid', change.value);
+          else if (change.param === 'high') setGlobalEQBand('high', change.value);
+          else if (change.param === 'reverb' && reverbActive !== Boolean(change.value)) toggleReverb();
+          else if (change.param === 'delay' && delayActive !== Boolean(change.value)) toggleDelay();
+          else if (change.param === 'widener' && widenerActive !== Boolean(change.value)) setWidenerActive(Boolean(change.value));
+        }
+      }
+    },
+  };
 
   /* ════ MAIN RENDER ════ */
   return (
@@ -1259,7 +1304,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                 const showPresetMenu = openStemPresetId === stem.id;
 
                 return (
-                  <div key={stem.id} className={`stem${stem.muted?' muted':''}`}>
+                  <div key={stem.id} className={`stem${stem.muted?' muted':''}${stem.locked?' locked':''}`}>
                     {/* Color bar */}
                     <div className="stem-color" style={{background:color}}/>
                     {/* Meta */}
@@ -1273,6 +1318,13 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                       </div>
                       <button onClick={()=>toggleStemMute(stem.id)} className={`stem-m${stem.muted?' on':''}`}>
                         M
+                      </button>
+                      <button
+                        onClick={()=>toggleStemLock(stem.id)}
+                        className={`stem-m stem-lock${stem.locked?' on':''}`}
+                        title={stem.locked ? 'Desbloquear pista' : 'Bloquear pista (AudioChat no la tocará)'}
+                      >
+                        {stem.locked ? '🔒' : '🔓'}
                       </button>
                     </div>
 
@@ -1342,7 +1394,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         </div>
 
       </div>{/* .studio */}
-        <AudioChatPanel />
+        <AudioChatPanel mixer={mixerChatBridge} />
       </div>{/* .studio-shell-grid */}
 
       <style>{`

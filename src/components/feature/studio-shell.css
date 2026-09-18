@@ -73,14 +73,35 @@
 .audio-chat-head strong { display: block; font-size: 13px; color: #F5F2FA; }
 .audio-chat-head span { display: block; margin-top: 2px; font-size: 11px; color: #9E94B0; }
 .audio-chat-close { margin-left: auto; padding: 4px; border: 0; background: transparent; color: #9E94B0; font-size: 15px; cursor: pointer; flex-shrink: 0; }
-.audio-chat-body { flex: 1; overflow-y: auto; padding: 18px; }
-.audio-chat-empty { margin: 0 0 16px; font-size: 12.5px; line-height: 1.6; color: #9E94B0; }
-.audio-chat-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+.audio-chat-body { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.audio-chat-empty { margin: 0; font-size: 12.5px; line-height: 1.6; color: #9E94B0; }
+.audio-chat-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 4px; }
 .audio-chat-chip {
   padding: 7px 12px; border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.04);
   color: #9E94B0; font-size: 11px; cursor: not-allowed;
+}
+.audio-chat-chip[role="button"]:hover { border-color: rgba(217,70,239,0.4); color: #F5F2FA; background: rgba(217,70,239,0.1); }
+
+.audio-chat-message { max-width: 92%; padding: 10px 13px; border-radius: 14px; font-size: 12.5px; line-height: 1.5; }
+.audio-chat-message p { margin: 0; }
+.audio-chat-message.user { align-self: flex-end; background: linear-gradient(110deg,#EF4AA8 0%,#B557F3 72%,#8B4DE3 100%); color: #fff; border-bottom-right-radius: 4px; }
+.audio-chat-message.assistant { align-self: flex-start; background: rgba(255,255,255,0.05); color: #F5F2FA; border: 1px solid rgba(255,255,255,0.08); border-bottom-left-radius: 4px; }
+.audio-chat-typing { align-self: flex-start; margin: 0; font-size: 11px; color: #6B6280; font-style: italic; }
+
+.audio-chat-proposal { margin-top: 10px; padding: 10px; border-radius: 10px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.08); }
+.audio-chat-proposal-title { display: block; margin-bottom: 6px; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #B557F3; }
+.audio-chat-proposal-list { margin: 0 0 10px; padding-left: 16px; font-size: 11.5px; color: #d5cbdc; }
+.audio-chat-proposal-list li { margin-bottom: 3px; }
+.audio-chat-proposal-actions { display: flex; gap: 8px; }
+.audio-chat-proposal-actions button {
+  flex: 1; padding: 7px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #d5cbdc;
+}
+.audio-chat-proposal-actions button.primary {
+  border: 0; color: #fff;
+  background: linear-gradient(110deg,#EF4AA8 0%,#B557F3 72%,#8B4DE3 100%);
 }
 .audio-chat-inputbar { display: flex; gap: 8px; padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.08); }
 .audio-chat-inputbar input {

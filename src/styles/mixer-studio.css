@@ -638,6 +638,10 @@
 }
 .stem-m:hover { color: var(--text-primary); }
 .stem-m.on { background: var(--red); color: #1a1a1a; border-color: var(--red); }
+.stem-lock { margin-left: 4px; }
+.stem-lock.on { background: var(--yellow); color: #1a1a1a; border-color: var(--yellow); }
+.stem.locked { opacity: .82; }
+.stem.locked .stem-ctrl { pointer-events: none; opacity: .55; }
 
 /* Stem wave column */
 .stem-wave {
