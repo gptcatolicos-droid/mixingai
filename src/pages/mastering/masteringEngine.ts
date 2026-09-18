@@ -44,7 +44,7 @@ const targetAverageDbfs: Record<LoudnessProfile, number> = {
   competitive: -12.5,
 };
 
-const targetIntegratedLufs: Record<LoudnessProfile, number> = {
+export const targetIntegratedLufs: Record<LoudnessProfile, number> = {
   streaming: -16,
   balanced: -14,
   competitive: -11,

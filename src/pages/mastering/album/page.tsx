@@ -5,10 +5,11 @@ import type { MixPreset } from '../../home/components/mixTypes';
 import { analyzeAudioFile, formatDuration, formatFileSize } from '../audioAnalysis';
 import type { AudioFileAnalysis } from '../audioAnalysis';
 import { getMasteringEntitlements, secureMasteringAccessEnabled } from '../masteringAccess';
-import { createMaster } from '../masteringEngine';
+import { createMaster, targetIntegratedLufs } from '../masteringEngine';
 import type { LoudnessProfile } from '../masteringEngine';
 import { buildAlbumArchive } from './albumArchive';
 import { CompactWaveformComparison } from '../MasteringWaveforms';
+import AlbumCoherenceChart from './AlbumCoherenceChart';
 import StudioTabs from '../../../components/feature/StudioTabs';
 import AudioChatPanel from '../../../components/feature/AudioChatPanel';
 import '../mastering.css';
@@ -43,6 +44,12 @@ const maxFileSize = 600 * 1024 * 1024;
 function getUser() {
   try { return JSON.parse(localStorage.getItem('audioMixerUser') || '{}'); }
   catch { return {}; }
+}
+
+/** Same three checks the single-song Mastering screen already flags — kept
+ * consistent across both tools rather than picking new thresholds here. */
+function trackNeedsReview(analysis: AudioFileAnalysis) {
+  return analysis.isClipping || analysis.headroomDb < 1 || analysis.isDualMono;
 }
 
 export default function AlbumMasteringPage() {
@@ -103,6 +110,18 @@ export default function AlbumMasteringPage() {
     const duration = tracks.reduce((total, track) => total + track.analysis.durationSeconds, 0);
     return { average, crest, duration };
   }, [tracks]);
+
+  const targetBand: [number, number] = [targetIntegratedLufs[loudness] - 1, targetIntegratedLufs[loudness] + 1];
+  const coherenceTracks = useMemo(() => tracks.map((track) => {
+    const lufs = track.integratedLufs ?? track.analysis.integratedLufs;
+    return {
+      id: track.id,
+      name: track.file.name.replace(/\.[^.]+$/, ''),
+      lufs,
+      outOfRange: lufs < targetBand[0] || lufs > targetBand[1],
+    };
+  }), [tracks, targetBand[0], targetBand[1]]);
+  const reviewCount = tracks.filter((track) => trackNeedsReview(track.analysis)).length;
 
   const addFiles = async (fileList: FileList | File[]) => {
     if (!isUnlimited) {
@@ -317,6 +336,21 @@ export default function AlbumMasteringPage() {
               {(stage === 'configure' || stage === 'results') && <button onClick={() => inputRef.current?.click()} disabled={tracks.length >= 12 || analyzing}>{analyzing ? 'Analizando…' : '+ Agregar canciones'}</button>}
             </section>
 
+            {tracks.length > 1 && (
+              <section className="album-coherence">
+                <div className="album-coherence-head">
+                  <h2>Coherencia de álbum</h2>
+                  <span>
+                    {reviewCount > 0
+                      ? `${reviewCount} de ${tracks.length} canciones por revisar`
+                      : 'Todas las canciones listas'}
+                    {' · '}rango objetivo {targetBand[0].toFixed(0)} a {targetBand[1].toFixed(0)} LUFS ({loudness === 'streaming' ? 'streaming' : loudness === 'competitive' ? 'competitivo' : 'balanceado'})
+                  </span>
+                </div>
+                <AlbumCoherenceChart tracks={coherenceTracks} targetBand={targetBand} />
+              </section>
+            )}
+
             <div className="album-layout">
               <section className="album-track-list">
                 {tracks.map((track, index) => (
@@ -324,7 +358,13 @@ export default function AlbumMasteringPage() {
                     <i>{String(index + 1).padStart(2, '0')}</i>
                     <div className="album-track-copy">
                       <strong>{track.file.name}</strong>
-                      <span>{formatDuration(track.analysis.durationSeconds)} · {formatFileSize(track.analysis.sizeBytes)} · {(track.integratedLufs ?? track.analysis.integratedLufs).toFixed(1)} LUFS</span>
+                      <span>
+                        {formatDuration(track.analysis.durationSeconds)} · {formatFileSize(track.analysis.sizeBytes)} · {(track.integratedLufs ?? track.analysis.integratedLufs).toFixed(1)} LUFS
+                        {' '}
+                        <span className={`album-track-badge ${trackNeedsReview(track.analysis) ? 'review' : 'ready'}`}>
+                          {trackNeedsReview(track.analysis) ? '⚠ Por revisar' : '✓ Lista'}
+                        </span>
+                      </span>
                       {(stage === 'processing' || stage === 'results') && <div className="album-track-progress"><b style={{ width: `${track.progress}%` }} /></div>}
                       {track.error && <small>{track.error}</small>}
                     </div>

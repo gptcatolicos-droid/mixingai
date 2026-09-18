@@ -3,3 +3,13 @@
 @media(max-width:850px){.album-layout{grid-template-columns:1fr}.album-controls{position:static;order:-1}.album-track{grid-template-columns:34px minmax(0,1fr) auto}.album-track>em{display:none}.album-downloads{grid-column:2/-1}.album-toolbar{align-items:flex-start;gap:15px}.album-toolbar span{max-width:220px}}
 @media(max-width:520px){.album-shell{padding-top:38px}.album-heading h1{font-size:42px}.album-toolbar{flex-direction:column}.album-track{padding:12px 10px}.album-track-copy span{max-width:210px}}
 .album-empty,.album-toolbar{transition:border-color .2s,background .2s,transform .2s}.album-empty.is-dragging,.album-toolbar.is-dragging{border-color:#e6469c;background:linear-gradient(145deg,rgba(80,25,68,.94),rgba(31,15,42,.98));transform:scale(1.01)}
+
+/* Coherencia de álbum — Fase 2c */
+.album-coherence{margin-bottom:14px;padding:20px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:#121018}
+.album-coherence-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.album-coherence-head h2{margin:0;font-size:18px}
+.album-coherence-head span{color:#948b9e;font-size:11px}
+.album-coherence-chart{margin:0;padding:6px 0 0}
+.album-track-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-size:9px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
+.album-track-badge.ready{background:rgba(74,222,128,.1);color:#5ddb91}
+.album-track-badge.review{background:rgba(251,191,36,.12);color:#f7c85c}
