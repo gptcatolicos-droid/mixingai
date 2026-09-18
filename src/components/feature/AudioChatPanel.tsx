@@ -47,6 +47,11 @@ interface ChatMessage {
    * instead of re-deriving it from current state (which would already
    * reflect the applied change by the time Undo is clicked). */
   previousChanges?: MixerChatChange[];
+  /** Names of locked stems a raw proposal wanted to touch, dropped before
+   * the user ever saw them — surfaced as the "pista protegida" note instead
+   * of silently vanishing. */
+  protectedNames?: string[];
+  time?: string;
 }
 
 const SUGGESTIONS = ['Más claridad', 'Más calidez', 'Menos reverb', 'No toques la batería'];
@@ -73,8 +78,12 @@ function describeChange(change: MixerChatChange, stemName?: string) {
  * Persistent right-rail AudioChat panel. Visual-only unless `mixer` is
  * passed (only MixEditor does, for now) — Mastering/Mejorar mezcla/Álbum
  * still get the "Próximamente" placeholder until they're wired the same way.
+ *
+ * `variant="v4"` renders the same real chat state/logic below as the
+ * `.sidebar-astra` markup from the mixer-v4 reference design (always-visible
+ * sidebar, no floating toggle) instead of the older collapsible overlay.
  */
-export default function AudioChatPanel({ mixer }: { mixer?: MixerChatBridge }) {
+export default function AudioChatPanel({ mixer, variant }: { mixer?: MixerChatBridge; variant?: 'v4' }) {
   const [collapsed, setCollapsed] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -91,7 +100,8 @@ export default function AudioChatPanel({ mixer }: { mixer?: MixerChatBridge }) {
     const trimmed = text.trim();
     if (!trimmed || sending || !mixer) return;
     setInput('');
-    const userMessage: ChatMessage = { id: `u-${Date.now()}`, role: 'user', text: trimmed };
+    const time = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    const userMessage: ChatMessage = { id: `u-${Date.now()}`, role: 'user', text: trimmed, time };
     setMessages((prev) => [...prev, userMessage]);
     setSending(true);
     scrollToBottom();
@@ -113,19 +123,25 @@ export default function AudioChatPanel({ mixer }: { mixer?: MixerChatBridge }) {
       // The edge function already drops changes targeting a locked stem, but
       // filter again here too: the proposal card must never list something
       // that then silently doesn't happen when "Aplicar" is pressed.
-      const lockedIds = new Set(mixer.getState().stems.filter((s) => s.locked).map((s) => s.id));
+      const lockedStems = mixer.getState().stems.filter((s) => s.locked);
+      const lockedIds = new Set(lockedStems.map((s) => s.id));
       const proposal = rawProposal.filter((change) => change.target !== 'stem' || !lockedIds.has(change.stemId ?? ''));
+      const touchedLockedIds = new Set(rawProposal.filter((c) => c.target === 'stem' && lockedIds.has(c.stemId ?? '')).map((c) => c.stemId));
+      const protectedNames = lockedStems.filter((s) => touchedLockedIds.has(s.id)).map((s) => s.name);
       setMessages((prev) => [...prev, {
         id: `a-${Date.now()}`,
         role: 'assistant',
         text: data.reply || 'Listo.',
         proposal: proposal.length ? proposal : undefined,
+        protectedNames: protectedNames.length ? protectedNames : undefined,
+        time: new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }),
       }]);
     } catch {
       setMessages((prev) => [...prev, {
         id: `a-${Date.now()}`,
         role: 'assistant',
         text: 'No pude conectar con AudioChat ahora mismo. Intenta de nuevo en un momento 🎧',
+        time: new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }),
       }]);
     } finally {
       setSending(false);
@@ -174,6 +190,117 @@ export default function AudioChatPanel({ mixer }: { mixer?: MixerChatBridge }) {
     mixer.applyChanges(message.previousChanges);
     setMessages((prev) => prev.map((m) => (m.id === message.id ? { ...m, appliedProposal: false } : m)));
   };
+
+  if (variant === 'v4') {
+    return (
+      <aside className="sidebar-astra" aria-label="AudioChat">
+        <div className="astra-header">
+          <div className="astra-avatar">
+            <svg viewBox="0 0 24 24" fill="#ffffff"><path d="M12 2l1.8 5.4L19 9l-5.2 1.6L12 16l-1.8-5.4L5 9l5.2-1.6z"></path></svg>
+          </div>
+          <div className="astra-title">
+            <div className="name">Audio<em>Chat</em></div>
+            <div className="role">Asistente de mezcla{isLive ? '' : ' · Próximamente'}</div>
+          </div>
+          <button className="astra-menu-btn" aria-label="Más opciones" type="button" disabled title="Próximamente">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+          </button>
+        </div>
+
+        <div className="astra-body" ref={bodyRef}>
+          {messages.length === 0 && (
+            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              {isLive
+                ? 'Cuéntame cómo quieres que suene tu mezcla. Te propongo ajustes de volumen, paneo, EQ o efectos — tú decides si aplicarlos.'
+                : 'Muy pronto vas a poder describir aquí cómo quieres que suene tu mezcla. AudioChat te propondrá ajustes que escuchas y comparas antes de aplicarlos — tú decides cada cambio.'}
+            </p>
+          )}
+
+          {messages.map((message) => (
+            <div key={message.id} className={`chat-msg ${message.role === 'user' ? 'from-user' : 'from-astra'}`}>
+              <div className="meta">{message.role === 'user' ? 'Tú' : 'AudioChat'} {message.time && <span className="time">{message.time}</span>}</div>
+              <div className="chat-bubble">{message.text}</div>
+
+              {message.proposal && (
+                <div className="proposal-card">
+                  <div className="title">Propuesta de mezcla</div>
+                  <div className="proposal-rows">
+                    {message.proposal.map((change, index) => {
+                      const stemName = mixer?.getState().stems.find((s) => s.id === change.stemId)?.name;
+                      const label = stemName ?? PARAM_LABEL[change.param];
+                      let value: string;
+                      if (change.param === 'mute' || change.param === 'unmute') value = PARAM_LABEL[change.param];
+                      else if (change.param === 'pan') value = change.value === 0 ? 'centro' : change.value > 0 ? `${change.value} der.` : `${Math.abs(change.value)} izq.`;
+                      else if (['reverb', 'delay', 'widener'].includes(change.param)) value = change.value ? 'activado' : 'desactivado';
+                      else value = `${change.value > 0 ? '+' : ''}${change.value.toFixed(1)} dB`;
+                      return (
+                        <div className="proposal-row" key={index}>
+                          <span className="label">{label}{change.target === 'stem' ? ` · ${PARAM_LABEL[change.param]}` : ''}</span>
+                          <span className="value">{value}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {message.protectedNames && message.protectedNames.length > 0 && (
+                    <div className="protected-note">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"></rect><path d="M7 11V8a5 5 0 0 1 10 0v3"></path></svg>
+                      <div>
+                        <div className="title">{message.protectedNames.length === 1 ? `${message.protectedNames[0]} protegida` : 'Pistas protegidas'}</div>
+                        <div className="caption">{message.protectedNames.length === 1 ? 'No será modificada.' : `${message.protectedNames.join(', ')} no serán modificadas.`}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="proposal-actions">
+                    {message.appliedProposal ? (
+                      <button className="btn-discard" type="button" onClick={() => undoProposal(message)}>Deshacer</button>
+                    ) : (
+                      <>
+                        <button className="btn-apply" type="button" onClick={() => applyProposal(message)}>Aplicar</button>
+                        <button className="btn-discard" type="button" onClick={() => discardProposal(message)}>Descartar</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {sending && <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>AudioChat está pensando…</p>}
+
+          <div className="quick-suggestions">
+            <span className="heading">Sugerencias rápidas</span>
+            <div className="chip-row">
+              {SUGGESTIONS.map((suggestion) => (
+                <button key={suggestion} className="chip" type="button" disabled={!isLive} onClick={() => send(suggestion)}>
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <form className="astra-input-row" onSubmit={(event) => { event.preventDefault(); send(input); }}>
+          <div className="astra-input">
+            <label className="sr-only" htmlFor="astra-input">Mensaje para AudioChat</label>
+            <input
+              id="astra-input"
+              type="text"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              placeholder={isLive ? '¿Cómo quieres que suene?' : 'Muy pronto podrás escribir aquí…'}
+              disabled={!isLive || sending}
+            />
+            <button className="btn-send" type="submit" disabled={!isLive || sending || !input.trim()} aria-label="Enviar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="13 6 19 12 13 18"></polyline></svg>
+            </button>
+          </div>
+          <div className="astra-footer-note">Tú decides cada cambio.</div>
+        </form>
+      </aside>
+    );
+  }
 
   return (
     <>

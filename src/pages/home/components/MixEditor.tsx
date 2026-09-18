@@ -7,7 +7,7 @@ import { drawFFTAnalyzer } from '@/utils/drawFFT';
 import { drawWaveform } from '@/utils/drawWaveform';
 import type { MixPreset } from './mixTypes';
 import { PRESETS } from './mixTypes';
-import { Knob, EQCurve } from './mixControls';
+import { Knob, EQCurve, PanKnob } from './mixControls';
 import '@/styles/mixer-tokens.css';
 import '@/styles/mixer-studio.css';
 
@@ -36,7 +36,7 @@ interface Stem {
   tapeShaper: WaveShaperNode;
   noiseGate: BiquadFilterNode;
   sourceNode?: AudioBufferSourceNode;
-  volume: number; pan: number; muted: boolean; locked: boolean;
+  volume: number; pan: number; muted: boolean; locked: boolean; soloed: boolean;
   fftData: Uint8Array; waveformPeaks: Float32Array;
   instrument: string; icon: string; selected: boolean;
   stemPresetId: string | null;
@@ -313,6 +313,8 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const [openStemPresetId, setOpenStemPresetId] = useState<string|null>(null);
   const [selectedStemId, setSelectedStemId] = useState<string|null>(null);
   const [mixerMode, setMixerMode] = useState<'simple'|'avanzado'>('simple');
+  const [mixerView, setMixerView] = useState<'mezcla'|'master'>('mezcla');
+  const [stemPanelTab, setStemPanelTab] = useState<'eq'|'comp'|'reverb'>('eq');
   const [showPaywall, setShowPaywall] = useState(false);
   const [iaEqPreset, setIaEqPreset] = useState<IAEQPreset>(IAEQ_PRESETS[0]);
   const [iaEqBands, setIaEqBands] = useState<number[]>([...IAEQ_PRESETS[0].bands]);
@@ -472,7 +474,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           eqLow, eqMid, eqHigh, compressorNode, tapeShaper, noiseGate,
           reverbNode: stemReverbNode, reverbWet: reverbWetNode, reverbDry: reverbDryNode,
           delayNode: stemDelayNode, delayWet: delayWetNode, delayFeedback: delayFbNode,
-          volume:0, pan:0, muted:false, locked:false,
+          volume:0, pan:0, muted:false, locked:false, soloed:false,
           bassGain:0, midGain:0, highGain:0, compressionRatio:4, reverbWet01:0,
           fftData: new Uint8Array(analyserNode.frequencyBinCount),
           waveformPeaks: generateWaveformPeaks(buffer, 400),
@@ -684,12 +686,25 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     if(mg&&ctx) mg.gain.setTargetAtTime(Math.pow(10,db/20),ctx.currentTime,0.01);
     setMasterVolume(db);
   };
+  /** A stem's real audible gain depends on mute AND solo together — if any
+   * stem is soloed, every non-soloed stem goes silent regardless of its own
+   * mute/volume, so this must be recomputed for the whole list whenever any
+   * of those three change, not just the one stem that was touched. */
+  const applyAudibility=(ctx:AudioContext|null,list:Stem[])=>{
+    if(!ctx) return;
+    const anySoloed=list.some(s=>s.soloed);
+    list.forEach(s=>{
+      const audible=anySoloed?s.soloed:!s.muted;
+      s.gainNode.gain.setTargetAtTime(audible?Math.pow(10,s.volume/20):0,ctx.currentTime,0.01);
+    });
+  };
   const updateStemVolume=(id:string,db:number)=>{
     const ctx=audioContextRef.current;
-    setStems(prev=>prev.map(s=>{
-      if(s.id===id&&!s.locked){if(ctx)s.gainNode.gain.setTargetAtTime(Math.pow(10,db/20),ctx.currentTime,0.01);return{...s,volume:db};}
-      return s;
-    }));
+    setStems(prev=>{
+      const next=prev.map(s=>s.id===id&&!s.locked?{...s,volume:db}:s);
+      applyAudibility(ctx,next);
+      return next;
+    });
   };
   const updateStemPan=(id:string,pan:number)=>{
     const ctx=audioContextRef.current;
@@ -700,10 +715,22 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   };
   const toggleStemMute=(id:string)=>{
     const ctx=audioContextRef.current;
-    setStems(prev=>prev.map(s=>{
-      if(s.id===id){const muted=!s.muted;if(ctx)s.gainNode.gain.setTargetAtTime(muted?0:Math.pow(10,s.volume/20),ctx.currentTime,0.01);return{...s,muted};}
-      return s;
-    }));
+    setStems(prev=>{
+      const next=prev.map(s=>s.id===id?{...s,muted:!s.muted}:s);
+      applyAudibility(ctx,next);
+      return next;
+    });
+  };
+  /** No pre-existing solo concept in the engine — added for real (not a
+   * decorative "S" button): soloing a stem silences every other stem
+   * regardless of its own mute state, same as a real console/DAW. */
+  const toggleStemSolo=(id:string)=>{
+    const ctx=audioContextRef.current;
+    setStems(prev=>{
+      const next=prev.map(s=>s.id===id?{...s,soloed:!s.soloed}:s);
+      applyAudibility(ctx,next);
+      return next;
+    });
   };
   /** "No toques la batería": a locked stem's volume/pan/mute stay fixed —
    * checked both here (manual UI, defense in depth) and before any AudioChat
@@ -1005,6 +1032,27 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
     },
   };
 
+  const selectedStem = stems.find(s => s.id === selectedStemId) ?? stems[0];
+  const selectedIdx = selectedStem ? stems.findIndex(s => s.id === selectedStem.id) : -1;
+  const selectedColor = selectedIdx >= 0 ? TC[selectedIdx % TC.length] : '#EF4AA8';
+  const timelineProgress = duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
+
+  /** Resamples a stem's real analysis peaks down to a fixed bar count for the
+   * `.waveform .bar` strip — same peaks StemWave already draws, just as
+   * discrete CSS bars instead of a canvas, to match the reference's look. */
+  const renderWaveBars = (peaks: Float32Array, color: string) => {
+    const count = 90;
+    const step = Math.max(1, Math.floor(peaks.length / count));
+    const bars = [];
+    for (let i = 0; i < count; i++) {
+      const idx = Math.min(peaks.length - 1, i * step);
+      const v = peaks[idx] ?? 0;
+      const h = Math.max(3, Math.min(36, v * 90));
+      bars.push(<span key={i} className="bar" style={{ height: `${h}px`, background: color }} />);
+    }
+    return bars;
+  };
+
   /* ════ MAIN RENDER ════ */
   return (
     <div className="studio-v3-page" style={{minHeight:'100vh',fontFamily:'Inter,-apple-system,system-ui,sans-serif',background:'transparent',color:'var(--text-primary)'}}>
@@ -1015,66 +1063,193 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         <StudioTabs active="mezclar" />
       </div>
 
-      <div className="studio-shell-grid" style={{maxWidth:'1480px',margin:'0 auto',padding:'0 32px 64px'}}>
-      <div className="studio" style={{maxWidth:'none',margin:0,padding:0}}>
+      <div style={{maxWidth:'1480px',margin:'0 auto',padding:'0 32px 64px'}}>
+      <div className="mixer-v4">
+        <div className="app">
+          <header className="topbar">
+            <div className="logo">
+              <div className="logo-mark">{Ico.spark}</div>
+              <span className="logo-text">mixingmusic<em>.ai</em></span>
+              <span className="logo-badge">3</span>
+            </div>
+            <div className="divider-v" />
+            <button className="project-select" type="button" disabled title="Próximamente: varios proyectos por cuenta">
+              <span className="label">Proyecto:</span>
+              <span className="value">{activePreset ? `Mezcla · ${activePreset.name}` : 'Mezcla actual'}</span>
+            </button>
+            <div className="save-status"><span className="dot" /><span>{stems.length} {stems.length===1?'pista cargada':'pistas cargadas'}</span></div>
+            <div className="spacer" />
+            <button className="icon-btn" disabled title="Próximamente" aria-label="Deshacer">↺</button>
+            <button className="icon-btn" disabled title="Próximamente" aria-label="Rehacer">↻</button>
+            <button className="btn-export" type="button" onClick={handleExportClick}>{Ico.dl} Exportar</button>
+          </header>
 
-        {/* ── HEADER ── */}
-        <header className="studio-header">
-          <div className="brand">
-            <div className="brand-mark">{Ico.spark}</div>
-            <div className="brand-text">
-              <div className="brand-name">MixingStudio AI</div>
-              <div className="brand-sub">
-                <span>{stems.length} stems</span>
-                <span className="dot"/>
-                <span>{fmt(duration)}</span>
-                {activePreset && <span className="pill">{Ico.spark}{activePreset.name}</span>}
+          <div className="main">
+            <div className="left-column">
+              <div className="transport">
+                <div className="transport-controls">
+                  <button className="btn-play" type="button" onClick={handlePlayPause} aria-label={isPlaying?'Pausar':'Reproducir'}>{isPlaying?Ico.stop:Ico.play}</button>
+                </div>
+                <div className="time-display">{fmt(currentTime)} <span className="total">/ {fmt(duration)}</span></div>
+                <div className="timeline">
+                  <div className="timeline-marks">{Array.from({length:8}).map((_,i)=>(<span key={i}>{fmt((duration/7)*i)}</span>))}</div>
+                  <div className="timeline-track" onClick={handleTimelineSeek}>
+                    <div className="timeline-fill" style={{width:`${timelineProgress*100}%`}} />
+                    <div className="timeline-handle" style={{left:`${timelineProgress*100}%`}} />
+                  </div>
+                </div>
+                <button className="btn-add-tracks" type="button" onClick={()=>setShowUploadModal(true)}>{Ico.upload} Agregar pistas</button>
+                <div className="segmented">
+                  <button type="button" className={mixerView==='mezcla'?'is-active':''} onClick={()=>setMixerView('mezcla')}>Mezcla</button>
+                  <button type="button" className={mixerView==='master'?'is-active':''} onClick={()=>setMixerView('master')}>Master</button>
+                </div>
+                <div className="segmented segmented--neutral">
+                  <button type="button" className={mixerMode==='simple'?'is-active':''} onClick={()=>setMixerMode('simple')}>Simple</button>
+                  <button type="button" className={mixerMode==='avanzado'?'is-active':''} onClick={()=>setMixerMode('avanzado')}>Avanzado</button>
+                </div>
+              </div>
+
+              {mixerView==='mezcla' && (
+                <div className="track-list">
+                  <div className="playhead-line" style={{left:`${timelineProgress*100}%`}} />
+                  {stems.map((stem,idx)=>{
+                    const color = TC[idx % TC.length];
+                    const volPct = Math.max(0,Math.min(100,((stem.volume+40)/52)*100));
+                    return (
+                      <div key={stem.id} className="track-row" data-locked={stem.locked}
+                        style={{outline:selectedStemId===stem.id?`1px solid ${color}88`:'none',outlineOffset:'-1px',cursor:'pointer',opacity:stem.muted?0.55:1}}
+                        onClick={()=>setSelectedStemId(stem.id)}>
+                        <div className="track-info">
+                          <div className="track-icon" style={{background:`${color}29`,color}}><span style={{fontSize:'15px'}}>{stem.icon}</span></div>
+                          <div className="track-meta">
+                            <div className="track-name" title={stem.name}>{idx+1} {stem.name.replace(/\.[^/.]+$/,'')}</div>
+                            <div className="track-buttons">
+                              <button className={`mini-btn${stem.muted?' is-active':''}`} type="button" onClick={(e)=>{e.stopPropagation();toggleStemMute(stem.id);}}>M</button>
+                              <button className={`mini-btn${stem.soloed?' is-active':''}`} type="button" onClick={(e)=>{e.stopPropagation();toggleStemSolo(stem.id);}}>S</button>
+                              <button className="mini-btn" type="button" onClick={(e)=>{e.stopPropagation();toggleStemLock(stem.id);}} title={stem.locked?'Desbloquear pista':'Bloquear pista (AudioChat no la tocará)'} style={{padding:0,border:'none',background:'none'}}>
+                                {stem.locked ? (
+                                  <span className="lock-badge" aria-label="Pista protegida">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"></rect><path d="M7 11V8a5 5 0 0 1 10 0v3"></path></svg>
+                                  </span>
+                                ) : '🔓'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="waveform">{renderWaveBars(stem.waveformPeaks, stem.muted?'rgba(255,255,255,.18)':color)}</div>
+                        <div className="track-controls" onClick={(e)=>e.stopPropagation()}>
+                          <span className="db-value">{stem.volume.toFixed(1)} dB</span>
+                          <div className="vol-slider" onClick={(e)=>{const r=e.currentTarget.getBoundingClientRect();updateStemVolume(stem.id,-40+(((e.clientX-r.left)/r.width)*52));}}>
+                            <div className="vol-fill" style={{width:`${volPct}%`,background:color}} />
+                            <div className="vol-thumb" style={{left:`${volPct}%`}} />
+                          </div>
+                          <PanKnob value={stem.pan} onChange={(v)=>updateStemPan(stem.id,Math.round(v))} label={stem.pan===0?'C':stem.pan>0?`R${stem.pan}`:`L${Math.abs(stem.pan)}`} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="detail-panel">
+                {mixerView==='mezcla' && (
+                  <div className="eq-panel">
+                    {selectedStem ? (
+                      <>
+                        <div className="eq-header">
+                          <div className="title">
+                            <div className="title-icon" style={{background:`${selectedColor}29`,color:selectedColor}}><span style={{fontSize:'13px'}}>{selectedStem.icon}</span></div>
+                            <span className="title-text">{selectedStem.name.replace(/\.[^/.]+$/,'')}</span>
+                          </div>
+                          <span className="subtitle">EQ paramétrica</span>
+                        </div>
+                        <div className="eq-body">
+                          <div className="eq-tabs">
+                            {[{id:'eq',label:'Ecualización'},{id:'comp',label:'Compresión'},{id:'reverb',label:'Reverb'}].map(tab=>(
+                              <button key={tab.id} type="button" className={`eq-tab${stemPanelTab===tab.id?' is-active':''}`} onClick={()=>setStemPanelTab(tab.id as 'eq'|'comp'|'reverb')}>{tab.label}</button>
+                            ))}
+                            <button type="button" className="eq-tab" disabled title="Próximamente" style={{opacity:.4,cursor:'not-allowed'}}>Envíos</button>
+                            <button type="button" className="eq-tab" disabled title="Próximamente" style={{opacity:.4,cursor:'not-allowed'}}>Ajustes</button>
+                          </div>
+                          <div className="eq-graph-wrap">
+                            {stemPanelTab==='eq' && (
+                              <>
+                                <div className="eq-graph">
+                                  <div className="eq-scale"><span>+12</span><span>+6</span><span>0</span><span>-6</span><span>-12</span></div>
+                                  <EQCurve color={selectedColor} bands={[
+                                      {id:'low',freqLabel:'80Hz',value:selectedStem.bassGain},
+                                      {id:'mid',freqLabel:'1kHz',value:selectedStem.midGain},
+                                      {id:'high',freqLabel:'8kHz',value:selectedStem.highGain},
+                                    ]}
+                                    onChange={(id,v)=>updateStemEQ(selectedStem.id,id==='low'?'bass':id==='mid'?'mid':'high',v)} />
+                                </div>
+                              </>
+                            )}
+                            {stemPanelTab==='comp' && (
+                              <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:'6px'}}>
+                                <span className="mono" style={{fontSize:'22px',fontWeight:700,color:selectedColor}}>{selectedStem.compressionRatio.toFixed(1)}:1</span>
+                                <span style={{fontSize:'12px',color:'var(--text-muted)'}}>Relación de compresión actual — ajusta con la perilla de abajo.</span>
+                              </div>
+                            )}
+                            {stemPanelTab==='reverb' && (
+                              <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:'6px'}}>
+                                <span className="mono" style={{fontSize:'22px',fontWeight:700,color:selectedColor}}>{Math.round(selectedStem.reverbWet01*100)}%</span>
+                                <span style={{fontSize:'12px',color:'var(--text-muted)'}}>Envío a reverb actual — ajusta con la perilla de abajo.</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="knob-row">
+                          <Knob label="Medios" size={44} value={selectedStem.midGain} min={-12} max={12} color={selectedColor} valueLabel={`${selectedStem.midGain>0?'+':''}${selectedStem.midGain.toFixed(1)}dB`} onChange={(v)=>updateStemEQ(selectedStem.id,'mid',v)} />
+                          <Knob label="Compresión" size={44} value={selectedStem.compressionRatio} min={1} max={8} color={selectedColor} valueLabel={`${selectedStem.compressionRatio.toFixed(1)}:1`} onChange={(v)=>updateStemCompression(selectedStem.id,v)} />
+                          <Knob label="Reverb" size={44} value={selectedStem.reverbWet01} min={0} max={1} color={selectedColor} valueLabel={`${Math.round(selectedStem.reverbWet01*100)}%`} onChange={(v)=>updateStemReverb(selectedStem.id,v)} />
+                          <PanKnob value={selectedStem.pan} onChange={(v)=>updateStemPan(selectedStem.id,Math.round(v))} label={selectedStem.pan===0?'C':selectedStem.pan>0?`R${selectedStem.pan}`:`L${Math.abs(selectedStem.pan)}`} />
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text-muted)',fontSize:'12px'}}>Sube pistas para ver su EQ</div>
+                    )}
+                  </div>
+                )}
+                <div className="master-panel" style={mixerView==='master'?{flex:'1 1 auto'}:undefined}>
+                  <div className="master-header">{Ico.eq}<span className="title">Master</span></div>
+                  <div className="master-body">
+                    <div className="master-stats">
+                      <div className="master-stat"><div className="stat-label">LUFS integrado</div><div className="stat-value large">{integratedLufs.toFixed(1)} <span className="unit">LUFS</span></div></div>
+                      <div className="master-stat"><div className="stat-label">Momentáneo</div><div className="stat-value small">{momentaryLufs.toFixed(1)} <span className="unit">LUFS</span></div></div>
+                      <div style={{flex:'1 1 auto'}} />
+                      <div className="master-note">{isPlaying?'En vivo':'Reproduce para medir'}</div>
+                    </div>
+                    <div className="meter">
+                      {[momentaryLufs,integratedLufs].map((val,col)=>{
+                        const litSegments = Math.round(Math.max(0,Math.min(22,((val+60)/60)*22)));
+                        return (
+                          <div className="meter-col" key={col}>
+                            {Array.from({length:22}).map((_,i)=>{
+                              const segFromTop = 22-i;
+                              const lit = segFromTop<=litSegments;
+                              const cls = !lit?'seg-off':segFromTop<=3?'seg-red':segFromTop<=7?'seg-yellow':'seg-green';
+                              return <span key={i} className={`seg ${cls}`} />;
+                            })}
+                          </div>
+                        );
+                      })}
+                      <div className="meter-scale"><span>0</span><span>-12</span><span>-24</span><span>-36</span><span>-48</span><span>-60</span></div>
+                    </div>
+                    {mixerView==='master' && <p style={{fontSize:'12px',color:'var(--text-muted)',margin:0}}>Cambia a "Mezcla" para ver y editar las pistas.</p>}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="row gap-2 center">
-            <button className="btn-primary btn" onClick={handleExportClick}>
-              {Ico.spark} <span className="spark-label">Exportar Mezcla con IA</span>
-              <span className="spark-label-short" style={{display:'none'}}>Exportar</span>
-            </button>
-            <button className="btn btn-ghost" onClick={onBack}>{Ico.back} Volver</button>
-          </div>
-        </header>
+            <AudioChatPanel mixer={mixerChatBridge} variant="v4" />
+          </div>{/* .main */}
+        </div>{/* .app */}
+        </div>{/* .mixer-v4 */}
+      </div>{/* .studio-shell-grid */}
 
-        {/* ── TOOLBAR: agregar pistas + Simple/Avanzado ── */}
-        <div className="row gap-3 center" style={{justifyContent:'space-between',flexWrap:'wrap',padding:'2px 0'}}>
-          <button className="btn btn-ghost" onClick={()=>setShowUploadModal(true)} style={{fontSize:'13px'}}>
-            {Ico.upload} + Agregar pistas
-          </button>
-          <div className="imx-mode-toggle">
-            <button type="button" className={mixerMode==='simple'?'active':''} onClick={()=>setMixerMode('simple')}>Simple</button>
-            <button type="button" className={mixerMode==='avanzado'?'active':''} onClick={()=>setMixerMode('avanzado')}>Avanzado</button>
-          </div>
-        </div>
-
-        {/* ── TIMELINE ── */}
-        <div className="card">
-          <div className="card-head">
-            <span className="section-label">Timeline</span>
-            <div className="row gap-2 center mono" style={{fontSize:'12px',color:'var(--text-muted)'}}>
-              <span>{fmt(currentTime)}</span>
-              <span>/</span>
-              <span>{fmt(duration)}</span>
-            </div>
-          </div>
-          <div style={{padding:'12px 20px 16px',position:'relative'}}>
-            <div style={{cursor:'pointer',borderRadius:'8px',overflow:'hidden',background:'rgba(8,4,16,0.55)',border:'1px solid rgba(217,70,239,0.1)'}} onClick={handleTimelineSeek}>
-              <canvas ref={timelineCanvasRef} width={1600} height={72} style={{width:'100%',height:'72px',display:'block'}}/>
-            </div>
-          </div>
-          <div style={{padding:'0 20px 16px',display:'flex',gap:'8px',alignItems:'center'}}>
-            <button onClick={handlePlayPause} style={{width:'36px',height:'36px',borderRadius:'50%',background:'var(--accent-grad)',border:'none',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'var(--shadow-glow)',flexShrink:0}}>
-              {isPlaying ? Ico.stop : Ico.play}
-            </button>
-            {isPlaying && <button onClick={handleStop} style={{width:'30px',height:'30px',borderRadius:'50%',background:'var(--panel-2)',border:'1px solid var(--border)',color:'var(--text-muted)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{Ico.stop}</button>}
-          </div>
-        </div>
-
+      {mixerMode==='avanzado' && (
+        <div className="studio-shell-grid" style={{maxWidth:'1480px',margin:'18px auto 0',padding:'0 32px 64px'}}>
+        <div className="studio" style={{maxWidth:'none',margin:0,padding:0}}>
         {/* ── PRESETS ── */}
         <div className="card">
           <div className="card-head">
@@ -1180,7 +1355,6 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           </div>
         </div>
 
-        {mixerMode==='avanzado' && (<>
         {/* ── IA EQ ── */}
         <div className="card">
           <div className="card-head">
@@ -1323,8 +1497,6 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
             </div>
           </div>
         </div>
-        </>)}
-
         {/* ── STEMS ── */}
         <div className="card">
           <div className="card-head stems-toolbar">
@@ -1483,10 +1655,9 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
             </div>
           );
         })()}
-
-      </div>{/* .studio */}
-        <AudioChatPanel mixer={mixerChatBridge} />
-      </div>{/* .studio-shell-grid */}
+        </div>
+      </div>
+      )}
 
       <style>{`
         .mbm-grid { display:grid; grid-template-columns:repeat(4,1fr); }

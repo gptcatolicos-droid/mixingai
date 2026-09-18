@@ -1,5 +1,44 @@
 import { useCallback, useEffect, useRef } from 'react';
 
+/** Small drag-to-adjust pan control matching the mixer-v4 reference's
+ * `.pan-knob`/`.pan-indicator` — same pointer-drag approach as Knob, just a
+ * plain rotated line instead of an SVG arc, and a text label instead of a
+ * dB readout. */
+export function PanKnob({ value, onChange, label }: { value: number; onChange: (v: number) => void; label: string }) {
+  const dragging = useRef(false);
+  const startY = useRef(0);
+  const startValue = useRef(value);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; });
+
+  const onPointerDown = useCallback((event: React.PointerEvent) => {
+    dragging.current = true;
+    startY.current = event.clientY;
+    startValue.current = value;
+    (event.target as Element).setPointerCapture(event.pointerId);
+  }, [value]);
+
+  useEffect(() => {
+    const onMove = (event: PointerEvent) => {
+      if (!dragging.current) return;
+      const delta = (startY.current - event.clientY) / 2; // 2px drag = 1 pan unit
+      const next = Math.max(-50, Math.min(50, Math.round(startValue.current + delta)));
+      onChangeRef.current(next);
+    };
+    const onUp = () => { dragging.current = false; };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
+  }, []);
+
+  return (
+    <div className="pan-knob" onPointerDown={onPointerDown} style={{ cursor: 'ns-resize', touchAction: 'none' }} title="Arrastra para cambiar el paneo">
+      <span className="pan-indicator" style={{ transform: `translateX(-50%) rotate(${(value / 50) * 45}deg)` }} />
+      <span className="pan-label">{label}</span>
+    </div>
+  );
+}
+
 /**
  * Rotary knob — drag vertically to change value, matching the mockup's dial
  * controls (Presencia/Compresión/Reverb/Panorama). Reused by the Mixer's
