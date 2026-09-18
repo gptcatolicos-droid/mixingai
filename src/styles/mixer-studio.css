@@ -642,6 +642,7 @@
 .stem-lock.on { background: var(--yellow); color: #1a1a1a; border-color: var(--yellow); }
 .stem.locked { opacity: .82; }
 .stem.locked .stem-ctrl { pointer-events: none; opacity: .55; }
+.stem.selected { box-shadow: inset 0 0 0 1px rgba(217,70,239,0.45), 0 0 0 1px rgba(217,70,239,0.16); }
 
 /* Stem wave column */
 .stem-wave {

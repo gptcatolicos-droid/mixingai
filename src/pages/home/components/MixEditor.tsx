@@ -7,6 +7,7 @@ import { drawFFTAnalyzer } from '@/utils/drawFFT';
 import { drawWaveform } from '@/utils/drawWaveform';
 import type { MixPreset } from './mixTypes';
 import { PRESETS } from './mixTypes';
+import { Knob, EQCurve } from './mixControls';
 import '@/styles/mixer-tokens.css';
 import '@/styles/mixer-studio.css';
 
@@ -40,6 +41,12 @@ interface Stem {
   instrument: string; icon: string; selected: boolean;
   stemPresetId: string | null;
   plugins: StemPlugins;
+  /** Live-readable mirror of the per-stem BiquadFilterNode gains, the
+   * DynamicsCompressorNode ratio and the reverb send — none of these were
+   * tracked as state before (only set write-only via presets), so the
+   * detail panel's EQ curve/knobs had nothing real to display or drag. */
+  bassGain: number; midGain: number; highGain: number;
+  compressionRatio: number; reverbWet01: number;
 }
 
 interface IAEQPreset { id: string; name: string; bands: number[]; }
@@ -304,6 +311,8 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
   const [activePreset, setActivePreset] = useState<MixPreset|undefined>(initialPreset);
   const [allFiles, setAllFiles] = useState<File[]>(uploadedFiles);
   const [openStemPresetId, setOpenStemPresetId] = useState<string|null>(null);
+  const [selectedStemId, setSelectedStemId] = useState<string|null>(null);
+  const [mixerMode, setMixerMode] = useState<'simple'|'avanzado'>('simple');
   const [showPaywall, setShowPaywall] = useState(false);
   const [iaEqPreset, setIaEqPreset] = useState<IAEQPreset>(IAEQ_PRESETS[0]);
   const [iaEqBands, setIaEqBands] = useState<number[]>([...IAEQ_PRESETS[0].bands]);
@@ -464,6 +473,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           reverbNode: stemReverbNode, reverbWet: reverbWetNode, reverbDry: reverbDryNode,
           delayNode: stemDelayNode, delayWet: delayWetNode, delayFeedback: delayFbNode,
           volume:0, pan:0, muted:false, locked:false,
+          bassGain:0, midGain:0, highGain:0, compressionRatio:4, reverbWet01:0,
           fftData: new Uint8Array(analyserNode.frequencyBinCount),
           waveformPeaks: generateWaveformPeaks(buffer, 400),
           instrument, icon, selected:false, stemPresetId:null,
@@ -472,6 +482,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         maxDur = Math.max(maxDur, buffer.duration);
       }
       setStems(stemsArr); setDuration(maxDur); startFFTAnimation();
+      setSelectedStemId(prev => prev ?? stemsArr[0]?.id ?? null);
       setLoadingProgress(100); setLoadingStep('¡Listo!');
       setTimeout(() => setIsLoading(false), 500);
     } catch(e) { console.error(e); setLoadingStep('Error al cargar archivos de audio. Verifica que sean .wav o .mp3'); setIsLoading(false); }
@@ -699,6 +710,32 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
    * proposal is applied. */
   const toggleStemLock=(id:string)=>{
     setStems(prev=>prev.map(s=>s.id===id?{...s,locked:!s.locked}:s));
+  };
+  const updateStemEQ=(id:string,band:'bass'|'mid'|'high',value:number)=>{
+    const ctx=audioContextRef.current; const v=Math.max(-12,Math.min(12,value));
+    setStems(prev=>prev.map(s=>{
+      if(s.id!==id||s.locked) return s;
+      const node = band==='bass'?s.eqLow:band==='mid'?s.eqMid:s.eqHigh;
+      if(ctx) node.gain.setTargetAtTime(v,ctx.currentTime,0.02);
+      return { ...s, [band==='bass'?'bassGain':band==='mid'?'midGain':'highGain']: v };
+    }));
+  };
+  const updateStemCompression=(id:string,ratio:number)=>{
+    const ctx=audioContextRef.current; const v=Math.max(1,Math.min(8,ratio));
+    setStems(prev=>prev.map(s=>{
+      if(s.id!==id||s.locked) return s;
+      if(ctx) s.compressorNode.ratio.setTargetAtTime(v,ctx.currentTime,0.02);
+      return { ...s, compressionRatio: v };
+    }));
+  };
+  const STEM_REVERB_WET_CAP=0.5;
+  const updateStemReverb=(id:string,wet01:number)=>{
+    const ctx=audioContextRef.current; const v=Math.max(0,Math.min(1,wet01));
+    setStems(prev=>prev.map(s=>{
+      if(s.id!==id||s.locked) return s;
+      if(ctx) s.reverbWet.gain.setTargetAtTime(v*STEM_REVERB_WET_CAP,ctx.currentTime,0.03);
+      return { ...s, reverbWet01: v };
+    }));
   };
   const adjustGlobalEQ=useCallback((band:'bass'|'mid'|'high',dir:'up'|'down')=>{
     const ctx=audioContextRef.current; if(!ctx) return;
@@ -1004,6 +1041,17 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           </div>
         </header>
 
+        {/* ── TOOLBAR: agregar pistas + Simple/Avanzado ── */}
+        <div className="row gap-3 center" style={{justifyContent:'space-between',flexWrap:'wrap',padding:'2px 0'}}>
+          <button className="btn btn-ghost" onClick={()=>setShowUploadModal(true)} style={{fontSize:'13px'}}>
+            {Ico.upload} + Agregar pistas
+          </button>
+          <div className="imx-mode-toggle">
+            <button type="button" className={mixerMode==='simple'?'active':''} onClick={()=>setMixerMode('simple')}>Simple</button>
+            <button type="button" className={mixerMode==='avanzado'?'active':''} onClick={()=>setMixerMode('avanzado')}>Avanzado</button>
+          </div>
+        </div>
+
         {/* ── TIMELINE ── */}
         <div className="card">
           <div className="card-head">
@@ -1069,19 +1117,12 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
 
             {/* EQ */}
             <div className="mbm-col">
-              <div className="section-label" style={{marginBottom:'16px'}}>EQ — Arrastra para ajustar</div>
-              {[{label:'Bass',val:bassGain,cb:(v:number)=>{setBassGain(v);bassFilterRef.current?.gain.setTargetAtTime(v,audioContextRef.current?.currentTime??0,0.01);}},
-                {label:'Mid', val:midGain, cb:(v:number)=>{setMidGain(v);midFilterRef.current?.gain.setTargetAtTime(v,audioContextRef.current?.currentTime??0,0.01);}},
-                {label:'High',val:highGain,cb:(v:number)=>{setHighGain(v);highFilterRef.current?.gain.setTargetAtTime(v,audioContextRef.current?.currentTime??0,0.01);}}
-              ].map(eq=>(
-                <div key={eq.label} style={{marginBottom:'16px'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:'8px'}}>
-                    <span style={{fontSize:'12px',color:'var(--text-secondary)'}}>{eq.label}</span>
-                    <span className="mono" style={{fontSize:'12px',color:'var(--accent)',fontWeight:500}}>{eq.val>0?'+':''}{eq.val.toFixed(1)} dB</span>
-                  </div>
-                  <HSlider value={eq.val} min={-12} max={12} onChange={eq.cb} color={presetColor}/>
-                </div>
-              ))}
+              <div className="section-label" style={{marginBottom:'16px'}}>EQ maestro</div>
+              <div style={{display:'flex',gap:'18px',justifyContent:'center'}}>
+                <Knob label="Graves" value={bassGain} min={-12} max={12} valueLabel={`${bassGain>0?'+':''}${bassGain.toFixed(1)}dB`} color={presetColor} onChange={(v)=>setGlobalEQBand('bass',v)} />
+                <Knob label="Medios" value={midGain} min={-12} max={12} valueLabel={`${midGain>0?'+':''}${midGain.toFixed(1)}dB`} color={presetColor} onChange={(v)=>setGlobalEQBand('mid',v)} />
+                <Knob label="Agudos" value={highGain} min={-12} max={12} valueLabel={`${highGain>0?'+':''}${highGain.toFixed(1)}dB`} color={presetColor} onChange={(v)=>setGlobalEQBand('high',v)} />
+              </div>
             </div>
 
             {/* Effects */}
@@ -1102,12 +1143,15 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
               ))}
             </div>
 
-            {/* Compression */}
+            {/* Compression — real average of each stem's own compressor ratio,
+                not a hardcoded "Medium/-18dB/4:1" label. */}
             <div className="mbm-col">
               <div className="section-label" style={{marginBottom:'16px'}}>Compresión</div>
-              <div style={{fontSize:'20px',fontWeight:600,color:'var(--text-primary)',marginBottom:'4px'}}>Medium</div>
-              <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'12px'}}>Thr: -18dB · 4:1</div>
-              <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'6px'}}>GR Meter</div>
+              <div style={{fontSize:'20px',fontWeight:600,color:'var(--text-primary)',marginBottom:'4px'}}>
+                {stems.length ? `${(stems.reduce((sum,s)=>sum+s.compressionRatio,0)/stems.length).toFixed(1)}:1` : '—'}
+              </div>
+              <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'12px'}}>Ratio promedio entre pistas</div>
+              <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'6px'}}>Nivel</div>
               <div style={{height:'6px',background:'var(--panel-2)',borderRadius:'3px',overflow:'hidden'}}>
                 <div style={{height:'100%',width:`${Math.min(100,Math.max(0,(momentaryLufs+60)/60*100))}%`,background:'linear-gradient(90deg,var(--green),var(--yellow),var(--red))',borderRadius:'3px',transition:'width 100ms'}}/>
               </div>
@@ -1136,6 +1180,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
           </div>
         </div>
 
+        {mixerMode==='avanzado' && (<>
         {/* ── IA EQ ── */}
         <div className="card">
           <div className="card-head">
@@ -1278,6 +1323,7 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
             </div>
           </div>
         </div>
+        </>)}
 
         {/* ── STEMS ── */}
         <div className="card">
@@ -1304,11 +1350,11 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
                 const showPresetMenu = openStemPresetId === stem.id;
 
                 return (
-                  <div key={stem.id} className={`stem${stem.muted?' muted':''}${stem.locked?' locked':''}`}>
+                  <div key={stem.id} className={`stem${stem.muted?' muted':''}${stem.locked?' locked':''}${selectedStemId===stem.id?' selected':''}`}>
                     {/* Color bar */}
                     <div className="stem-color" style={{background:color}}/>
                     {/* Meta */}
-                    <div className="stem-meta">
+                    <div className="stem-meta" onClick={()=>setSelectedStemId(stem.id)} style={{cursor:'pointer'}}>
                       <div className="stem-icon" style={{background:`${color}18`}}>
                         <span style={{fontSize:'18px'}}>{stem.icon}</span>
                       </div>
@@ -1392,6 +1438,51 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
             </div>
           </div>
         </div>
+
+        {/* ── SELECTED STEM DETAIL — EQ paramétrica real (3 bandas) + perillas ── */}
+        {(() => {
+          const selectedStem = stems.find(s => s.id === selectedStemId);
+          if (!selectedStem) return null;
+          const idx = stems.findIndex(s => s.id === selectedStem.id);
+          const color = TC[idx % TC.length];
+          return (
+            <div className="card">
+              <div className="card-head">
+                <span className="card-title">
+                  <span style={{fontSize:'16px'}}>{selectedStem.icon}</span>
+                  {selectedStem.name.replace(/\.[^/.]+$/,'')}
+                  {selectedStem.locked && <span className="pill" title="Pista bloqueada">🔒 Protegida</span>}
+                </span>
+                <span style={{fontSize:'11px',color:'var(--text-muted)'}}>EQ paramétrica</span>
+              </div>
+              <div className="card-body" style={{display:'grid',gridTemplateColumns:'1fr 260px',gap:'24px',alignItems:'center'}}>
+                <EQCurve
+                  color={color}
+                  bands={[
+                    {id:'low', freqLabel:'80Hz',  value:selectedStem.bassGain},
+                    {id:'mid', freqLabel:'1kHz',  value:selectedStem.midGain},
+                    {id:'high',freqLabel:'8kHz',  value:selectedStem.highGain},
+                  ]}
+                  onChange={(id,value)=>updateStemEQ(selectedStem.id, id==='low'?'bass':id==='mid'?'mid':'high', value)}
+                />
+                <div style={{display:'flex',gap:'16px',justifyContent:'center',flexWrap:'wrap'}}>
+                  <Knob label="Volumen" value={selectedStem.volume} min={-40} max={12} color={color}
+                    valueLabel={`${selectedStem.volume>0?'+':''}${selectedStem.volume.toFixed(1)}dB`}
+                    onChange={(v)=>updateStemVolume(selectedStem.id,v)} />
+                  <Knob label="Compresión" value={selectedStem.compressionRatio} min={1} max={8} color={color}
+                    valueLabel={`${selectedStem.compressionRatio.toFixed(1)}:1`}
+                    onChange={(v)=>updateStemCompression(selectedStem.id,v)} />
+                  <Knob label="Reverb" value={selectedStem.reverbWet01} min={0} max={1} color={color}
+                    valueLabel={`${Math.round(selectedStem.reverbWet01*100)}%`}
+                    onChange={(v)=>updateStemReverb(selectedStem.id,v)} />
+                  <Knob label="Panorama" value={selectedStem.pan} min={-50} max={50} color={color}
+                    valueLabel={selectedStem.pan===0?'C':selectedStem.pan>0?`R${selectedStem.pan}`:`L${Math.abs(selectedStem.pan)}`}
+                    onChange={(v)=>updateStemPan(selectedStem.id,Math.round(v))} />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       </div>{/* .studio */}
         <AudioChatPanel mixer={mixerChatBridge} />

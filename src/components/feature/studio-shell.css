@@ -40,6 +40,11 @@
   font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
 }
 
+/* ────── Simple/Avanzado toggle — shared across Mixer, Mejorar mezcla ────── */
+.imx-mode-toggle { display: inline-flex; gap: 4px; padding: 4px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+.imx-mode-toggle button { padding: 7px 14px; border: 0; border-radius: 7px; background: transparent; color: #a89db1; font-size: 11px; font-weight: 700; cursor: pointer; }
+.imx-mode-toggle button.active { background: linear-gradient(110deg,#EF4AA8 0%,#B557F3 72%,#8B4DE3 100%); color: #fff; }
+
 /* ────── Two-column shell (content + AudioChat rail) ────── */
 .studio-shell-grid {
   display: grid;

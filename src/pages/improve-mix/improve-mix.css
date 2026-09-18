@@ -2,9 +2,8 @@
    .master-header, .master-dropzone, .master-download, …) is shared with
    mastering.css so both tools look like the same product. */
 
-.imx-mode-toggle { display: inline-flex; gap: 4px; padding: 4px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
-.imx-mode-toggle button { padding: 7px 14px; border: 0; border-radius: 7px; background: transparent; color: #a89db1; font-size: 11px; font-weight: 700; cursor: pointer; }
-.imx-mode-toggle button.active { background: linear-gradient(110deg,#EF4AA8 0%,#B557F3 72%,#8B4DE3 100%); color: #fff; }
+/* .imx-mode-toggle now lives in studio-shell.css — shared with the Mixer's
+   Simple/Avanzado toggle too. */
 
 .imx-controls { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 18px 0; }
 .imx-control { padding: 18px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; background: #121018; }
