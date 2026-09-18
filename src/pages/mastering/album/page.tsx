@@ -9,6 +9,8 @@ import { createMaster } from '../masteringEngine';
 import type { LoudnessProfile } from '../masteringEngine';
 import { buildAlbumArchive } from './albumArchive';
 import { CompactWaveformComparison } from '../MasteringWaveforms';
+import StudioTabs from '../../../components/feature/StudioTabs';
+import AudioChatPanel from '../../../components/feature/AudioChatPanel';
 import '../mastering.css';
 import './album.css';
 
@@ -273,7 +275,12 @@ export default function AlbumMasteringPage() {
         <button className="master-exit" onClick={() => navigate('/mastering')}>Master individual</button>
       </header>
 
-      <div className="album-shell">
+      <div style={{width:'min(1180px,calc(100% - 36px))',margin:'0 auto',paddingTop:'6px'}}>
+        <StudioTabs active="album" />
+      </div>
+
+      <div className="studio-shell-grid" style={{width:'min(1180px,calc(100% - 36px))',margin:'0 auto'}}>
+      <div className="album-shell" style={{width:'auto',margin:0}}>
         <div className="album-heading">
           <span className="master-kicker">MODO ÁLBUM · UNLIMITED</span>
           <h1>Un álbum. Una identidad sonora.</h1>
@@ -356,7 +363,9 @@ export default function AlbumMasteringPage() {
 
         <input ref={inputRef} type="file" accept="audio/*,.wav,.wave,.aif,.aiff,.mp3,.flac,.m4a" multiple hidden onChange={(event) => { if (event.target.files) addFiles(event.target.files); event.target.value = ''; }} />
         {error && <div className="master-info album-error">{error}</div>}
-      </div>
+      </div>{/* .album-shell */}
+        <AudioChatPanel />
+      </div>{/* .studio-shell-grid */}
     </main>
   );
 }

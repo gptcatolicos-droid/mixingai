@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import UploadModal from '@/components/feature/UploadModal';
+import StudioTabs from '@/components/feature/StudioTabs';
+import AudioChatPanel from '@/components/feature/AudioChatPanel';
 import { drawFFTAnalyzer } from '@/utils/drawFFT';
 import { drawWaveform } from '@/utils/drawWaveform';
 import type { MixPreset } from './mixTypes';
@@ -927,7 +929,12 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
       {showPaywall && <PaywallModal onClose={()=>setShowPaywall(false)}/>}
       {showUploadModal && <UploadModal onClose={()=>setShowUploadModal(false)} onUpload={handleUploadMoreStems}/>}
 
-      <div className="studio">
+      <div style={{maxWidth:'1480px',margin:'0 auto',padding:'32px 32px 0'}}>
+        <StudioTabs active="mezclar" />
+      </div>
+
+      <div className="studio-shell-grid" style={{maxWidth:'1480px',margin:'0 auto',padding:'0 32px 64px'}}>
+      <div className="studio" style={{maxWidth:'none',margin:0,padding:0}}>
 
         {/* ── HEADER ── */}
         <header className="studio-header">
@@ -1335,6 +1342,8 @@ export default function MixEditor({ projectId, user, uploadedFiles, onBack, onCr
         </div>
 
       </div>{/* .studio */}
+        <AudioChatPanel />
+      </div>{/* .studio-shell-grid */}
 
       <style>{`
         .mbm-grid { display:grid; grid-template-columns:repeat(4,1fr); }

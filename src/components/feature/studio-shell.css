@@ -1,0 +1,123 @@
+/* MixingMusic — Shared studio shell: tab navigation + AudioChat panel.
+   Self-contained (literal colors matching --accent-grad in mixer-tokens.css)
+   so it renders consistently on the Mixer, Mastering and Album screens,
+   which don't all share the same base stylesheet. */
+
+/* ────── Tabs ────── */
+.studio-tabs-row {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  margin: 6px 0 18px;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.studio-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px;
+  border: 0; border-radius: 10px;
+  background: transparent;
+  color: rgba(245,242,250,0.55);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  white-space: nowrap; cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.studio-tab:hover:not(.disabled) { color: #F5F2FA; background: rgba(255,255,255,0.06); }
+.studio-tab.active {
+  background: linear-gradient(110deg, #EF4AA8 0%, #B557F3 72%, #8B4DE3 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(217,70,239,.34);
+}
+.studio-tab.disabled { opacity: .45; cursor: not-allowed; }
+.studio-tab-soon {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  color: rgba(245,242,250,0.6);
+  font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+}
+
+/* ────── Two-column shell (content + AudioChat rail) ────── */
+.studio-shell-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* ────── AudioChat panel ────── */
+.audio-chat-panel {
+  display: flex; flex-direction: column;
+  position: sticky; top: 20px;
+  height: calc(100vh - 40px); max-height: 900px;
+  background: linear-gradient(160deg, rgba(28,22,36,0.94), rgba(13,10,18,0.94));
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 20px;
+  box-shadow: 0 26px 70px rgba(0,0,0,0.34);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+  color: #F5F2FA;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+}
+.audio-chat-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.audio-chat-avatar {
+  width: 36px; height: 36px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; font-size: 16px; color: #fff;
+  background: linear-gradient(135deg, #EF4AA8, #8B4DE3);
+}
+.audio-chat-head-copy { min-width: 0; }
+.audio-chat-head strong { display: block; font-size: 13px; color: #F5F2FA; }
+.audio-chat-head span { display: block; margin-top: 2px; font-size: 11px; color: #9E94B0; }
+.audio-chat-close { margin-left: auto; padding: 4px; border: 0; background: transparent; color: #9E94B0; font-size: 15px; cursor: pointer; flex-shrink: 0; }
+.audio-chat-body { flex: 1; overflow-y: auto; padding: 18px; }
+.audio-chat-empty { margin: 0 0 16px; font-size: 12.5px; line-height: 1.6; color: #9E94B0; }
+.audio-chat-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+.audio-chat-chip {
+  padding: 7px 12px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #9E94B0; font-size: 11px; cursor: not-allowed;
+}
+.audio-chat-inputbar { display: flex; gap: 8px; padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.08); }
+.audio-chat-inputbar input {
+  flex: 1; padding: 10px 14px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.03);
+  color: #F5F2FA; font-family: inherit; font-size: 12.5px;
+}
+.audio-chat-inputbar input::placeholder { color: #6B6280; }
+.audio-chat-inputbar input:disabled, .audio-chat-inputbar button:disabled { opacity: .5; cursor: not-allowed; }
+.audio-chat-inputbar button {
+  width: 38px; height: 38px; flex-shrink: 0;
+  border: 0; border-radius: 10px;
+  background: linear-gradient(110deg, #EF4AA8 0%, #B557F3 72%, #8B4DE3 100%);
+  color: #fff; font-size: 14px; cursor: not-allowed;
+}
+.audio-chat-toggle {
+  display: none;
+  align-items: center; gap: 8px;
+  padding: 12px 18px;
+  border: 0; border-radius: 999px;
+  background: linear-gradient(110deg, #EF4AA8 0%, #B557F3 72%, #8B4DE3 100%);
+  color: #fff; font-family: inherit; font-size: 13px; font-weight: 700;
+  box-shadow: 0 10px 28px rgba(217,70,239,.40);
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .studio-shell-grid { grid-template-columns: 1fr; }
+  /* left side — the site's language switcher is fixed bottom-right (.site-locale-float) */
+  .audio-chat-toggle { display: inline-flex; position: fixed; left: 16px; bottom: 16px; z-index: 60; }
+  .audio-chat-panel {
+    position: fixed; inset: auto 0 0 0; z-index: 55;
+    height: min(78vh, 640px); max-height: none;
+    border-radius: 20px 20px 0 0;
+    transform: translateY(100%);
+    transition: transform 220ms ease;
+  }
+  .audio-chat-panel:not(.collapsed) { transform: translateY(0); }
+}

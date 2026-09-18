@@ -17,6 +17,8 @@ import { createMaster } from './masteringEngine';
 import type { LoudnessProfile, MasteringResult } from './masteringEngine';
 import { GeneratedMixWaveform, MasteringWaveformComparison } from './MasteringWaveforms';
 import { downloadBlob, downloadObjectUrl, saveBlobToDisk } from '../../utils/downloadFile';
+import StudioTabs from '../../components/feature/StudioTabs';
+import AudioChatPanel from '../../components/feature/AudioChatPanel';
 import './mastering.css';
 
 type Stage = 'upload' | 'analyzing' | 'configure' | 'processing' | 'compare' | 'complete';
@@ -552,7 +554,12 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
         <button className="master-exit" onClick={saveAndExit}>Guardar y salir</button>
       </header>
 
-      <div className="master-shell">
+      <div style={{width:'min(1120px,calc(100% - 36px))',margin:'0 auto',paddingTop:'6px'}}>
+        <StudioTabs active="mastering" />
+      </div>
+
+      <div className="studio-shell-grid" style={{width:'min(1180px,calc(100% - 36px))',margin:'0 auto'}}>
+      <div className="master-shell" style={{width:'auto',margin:0}}>
         <div className="master-progress" aria-label="Progreso del mastering">
           {['Cargar mezcla', 'Definir sonido', 'Comparar', 'Exportar'].map((step, index) => {
             const activeIndex = stage === 'upload' || stage === 'analyzing' ? 0 : stage === 'configure' || stage === 'processing' ? 1 : stage === 'compare' ? 2 : 3;
@@ -867,7 +874,9 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
             <button className="master-home-button" onClick={() => navigate('/')}>← Volver al home</button>
           </section>
         )}
-      </div>
+      </div>{/* .master-shell */}
+        <AudioChatPanel />
+      </div>{/* .studio-shell-grid */}
     </main>
   );
 }
