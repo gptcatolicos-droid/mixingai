@@ -1,0 +1,19 @@
+/* "Mejorar mezcla" — control panel. Everything else (.master-page,
+   .master-header, .master-dropzone, .master-download, …) is shared with
+   mastering.css so both tools look like the same product. */
+
+.imx-mode-toggle { display: inline-flex; gap: 4px; padding: 4px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+.imx-mode-toggle button { padding: 7px 14px; border: 0; border-radius: 7px; background: transparent; color: #a89db1; font-size: 11px; font-weight: 700; cursor: pointer; }
+.imx-mode-toggle button.active { background: linear-gradient(110deg,#EF4AA8 0%,#B557F3 72%,#8B4DE3 100%); color: #fff; }
+
+.imx-controls { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 18px 0; }
+.imx-control { padding: 18px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; background: #121018; }
+.imx-control-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.imx-control-head strong { font-size: 13px; color: #eee6f1; }
+.imx-control-head span { font: 700 12px 'DM Mono', monospace; color: #e08fd0; }
+.imx-control p { margin: 0 0 12px; color: #948b9e; font-size: 11px; line-height: 1.5; }
+.imx-control input[type="range"] { width: 100%; accent-color: #d957e8; }
+.imx-control-detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.06); color: #7d7586; font-size: 10px; line-height: 1.6; }
+
+.imx-safety-note { margin: 0 0 18px; padding: 12px 14px; border-radius: 10px; background: rgba(74,222,128,.045); border: 1px solid rgba(74,222,128,.14); color: #9fb8a8; font-size: 11px; line-height: 1.6; }
+.imx-safety-note strong { color: #bed8c8; }

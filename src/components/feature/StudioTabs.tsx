@@ -12,7 +12,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: 'mezclar', label: 'Mezclar', path: '/' },
-  { id: 'mejorar', label: 'Mejorar mezcla' },
+  { id: 'mejorar', label: 'Mejorar mezcla', path: '/mejorar-mezcla' },
   { id: 'mastering', label: 'Mastering', path: '/mastering' },
   { id: 'album', label: 'Álbum', path: '/mastering/album' },
 ];

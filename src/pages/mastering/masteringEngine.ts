@@ -54,7 +54,7 @@ const clamp = (value: number, minimum: number, maximum: number) => Math.max(mini
 const dbToGain = (db: number) => 10 ** (db / 20);
 const gainToDb = (gain: number) => gain > 0 ? 20 * Math.log10(gain) : -120;
 
-function connectStereoWidth(
+export function connectStereoWidth(
   context: OfflineAudioContext,
   input: AudioNode,
   output: AudioNode,
@@ -86,7 +86,7 @@ function connectStereoWidth(
   merger.connect(output);
 }
 
-function enforceSamplePeakCeiling(buffer: AudioBuffer, ceilingDbfs: number) {
+export function enforceSamplePeakCeiling(buffer: AudioBuffer, ceilingDbfs: number) {
   let peak = 0;
   let sumSquares = 0;
   let sampleCount = 0;
@@ -121,7 +121,7 @@ function enforceSamplePeakCeiling(buffer: AudioBuffer, ceilingDbfs: number) {
  * It only replaces a one-sample spike when both neighbours agree, preserving
  * musical transients and avoiding the clicks users can hear as static.
  */
-function repairIsolatedSampleSpikes(buffer: AudioBuffer) {
+export function repairIsolatedSampleSpikes(buffer: AudioBuffer) {
   for (let channelIndex = 0; channelIndex < buffer.numberOfChannels; channelIndex += 1) {
     const data = buffer.getChannelData(channelIndex);
     for (let sampleIndex = 1; sampleIndex < data.length - 1; sampleIndex += 1) {
@@ -143,7 +143,7 @@ function repairIsolatedSampleSpikes(buffer: AudioBuffer) {
  * short discontinuities in long OfflineAudioContext jobs; working directly on
  * PCM samples prevents those TV-static-like impulses.
  */
-function applyLinkedCompression(
+export function applyLinkedCompression(
   buffer: AudioBuffer,
   thresholdDb: number,
   ratio: number,
@@ -191,7 +191,7 @@ function applyTransparentLimiter(buffer: AudioBuffer, ceilingDbfs: number) {
   }
 }
 
-function applyGain(buffer: AudioBuffer, gainDb: number) {
+export function applyGain(buffer: AudioBuffer, gainDb: number) {
   const gain = dbToGain(gainDb);
   for (let channelIndex = 0; channelIndex < buffer.numberOfChannels; channelIndex += 1) {
     const data = buffer.getChannelData(channelIndex);

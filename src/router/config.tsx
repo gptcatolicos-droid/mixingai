@@ -24,6 +24,7 @@ const BlogArticlePage = lazy(() => import('../pages/blog/article/page'));
 const PaymentConfirmationPage = lazy(() => import('../pages/payment-confirmation/page'));
 const MasteringPage = lazy(() => import('../pages/mastering/page'));
 const AlbumMasteringPage = lazy(() => import('../pages/mastering/album/page'));
+const ImproveMixPage = lazy(() => import('../pages/improve-mix/page'));
 const MasteringCheckoutPage = lazy(() => import('../pages/mastering/checkout/page'));
 const CapabilitiesPage = lazy(() => import('../pages/capabilities/page'));
 const AudioConceptsPage = lazy(() => import('../pages/concepts/page'));
@@ -54,6 +55,7 @@ const appRoutes: RouteObject[] = [
   { path: '/admin/dashboard', element: <AdminPage /> },
   { path: '/payment-confirmation', element: <PaymentConfirmationPage /> },
   { path: '/mastering', element: <MasteringPage /> },
+  { path: '/mejorar-mezcla', element: <ImproveMixPage /> },
   { path: '/mastering/album', element: <AlbumMasteringPage /> },
   { path: '/checkout-v3', element: <MasteringCheckoutPage /> },
   { path: '/capacidades', element: <CapabilitiesPage /> },
