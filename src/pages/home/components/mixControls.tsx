@@ -75,7 +75,7 @@ export interface EQBandValue { id: 'low' | 'mid' | 'high'; freqLabel: string; va
  * the mockup's "EQ paramétrica" panel. Real ±12dB range, same as the actual
  * BiquadFilterNodes it drives — nothing here is decorative.
  */
-export function EQCurve({ bands, onChange, color = '#EF4AA8' }: { bands: EQBandValue[]; onChange: (id: EQBandValue['id'], value: number) => void; color?: string }) {
+export function EQCurve({ bands, onChange, color = '#EF4AA8', readOnly = false }: { bands: EQBandValue[]; onChange?: (id: EQBandValue['id'], value: number) => void; color?: string; readOnly?: boolean }) {
   const width = 640, height = 160, midY = height / 2;
   const dbToY = (db: number) => midY - (db / 12) * (midY - 14);
   const xFor = (index: number) => 40 + (index / (bands.length - 1)) * (width - 80);
@@ -84,20 +84,22 @@ export function EQCurve({ bands, onChange, color = '#EF4AA8' }: { bands: EQBandV
   const svgRef = useRef<SVGSVGElement>(null);
 
   const applyFromClientY = useCallback((clientY: number, id: EQBandValue['id']) => {
+    if (readOnly || !onChange) return;
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
     const scaledY = ((clientY - rect.top) / rect.height) * height;
     const db = Math.max(-12, Math.min(12, -((scaledY - midY) / (midY - 14)) * 12));
     onChange(id, Math.round(db * 10) / 10);
-  }, []);
+  }, [readOnly, onChange]);
 
   useEffect(() => {
+    if (readOnly) return;
     const onMove = (event: PointerEvent) => { if (dragging.current) applyFromClientY(event.clientY, dragging.current); };
     const onUp = () => { dragging.current = null; };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     return () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
-  }, [applyFromClientY]);
+  }, [applyFromClientY, readOnly]);
 
   const points = bands.map((band, index) => `${xFor(index)},${dbToY(band.value)}`).join(' ');
 
@@ -106,7 +108,7 @@ export function EQCurve({ bands, onChange, color = '#EF4AA8' }: { bands: EQBandV
       <line x1={40} y1={midY} x2={width - 40} y2={midY} stroke="rgba(255,255,255,0.08)" strokeDasharray="2 4" />
       <polyline points={points} fill="none" stroke={color} strokeWidth={2} opacity={0.9} />
       {bands.map((band, index) => (
-        <g key={band.id} onPointerDown={(e) => { dragging.current = band.id; (e.target as Element).setPointerCapture(e.pointerId); }} style={{ cursor: 'ns-resize' }}>
+        <g key={band.id} onPointerDown={readOnly ? undefined : (e) => { dragging.current = band.id; (e.target as Element).setPointerCapture(e.pointerId); }} style={{ cursor: readOnly ? 'default' : 'ns-resize' }}>
           <circle cx={xFor(index)} cy={dbToY(band.value)} r={9} fill={color} stroke="#fff" strokeWidth={1.5} />
           <text x={xFor(index)} y={height - 4} textAnchor="middle" fontSize={9} fill="var(--text-muted)">{band.freqLabel}</text>
           <text x={xFor(index)} y={dbToY(band.value) - 14} textAnchor="middle" fontSize={10} fontWeight={700} fill="var(--text-primary)">{band.value > 0 ? '+' : ''}{band.value.toFixed(1)}</text>

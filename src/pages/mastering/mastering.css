@@ -122,6 +122,16 @@
 .master-loudness > div { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; }
 .master-loudness button { padding:9px 4px; border:1px solid rgba(255,255,255,.08); border-radius:8px; background:rgba(255,255,255,.025); color:#82798d; font-size:9px; font-weight:700; cursor:pointer; }
 .master-loudness button.selected { border-color:rgba(205,103,244,.5); background:rgba(181,87,243,.12); color:#e2b9f3; }
+
+.master-intent { margin-top:21px; }
+.master-intent > strong { display:block; margin-bottom:10px; font-size:12px; }
+.master-intent-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.master-intent-grid button { display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:14px 12px; border:1px solid rgba(255,255,255,.08); border-radius:12px; background:rgba(255,255,255,.025); color:#82798d; cursor:pointer; text-align:left; }
+.master-intent-grid button i { font-style:normal; font-size:18px; }
+.master-intent-grid button strong { font-size:12px; color:#d5cbdc; }
+.master-intent-grid button span { font-size:9px; color:#7d7586; }
+.master-intent-grid button.selected { border-color:rgba(205,103,244,.5); background:rgba(181,87,243,.12); }
+.master-intent-grid button.selected strong { color:#e2b9f3; }
 .master-safe { margin:20px 0; padding:12px; display:flex; gap:9px; border-radius:10px; background:rgba(74,222,128,.045); }
 .master-safe i { color:#5ddb91; font-style:normal; }
 .master-safe span,.master-safe strong { display:block; }

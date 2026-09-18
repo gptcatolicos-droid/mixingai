@@ -19,6 +19,7 @@ import { GeneratedMixWaveform, MasteringWaveformComparison } from './MasteringWa
 import { downloadBlob, downloadObjectUrl, saveBlobToDisk } from '../../utils/downloadFile';
 import StudioTabs from '../../components/feature/StudioTabs';
 import AudioChatPanel from '../../components/feature/AudioChatPanel';
+import { Knob, EQCurve } from '../home/components/mixControls';
 import './mastering.css';
 
 type Stage = 'upload' | 'analyzing' | 'configure' | 'processing' | 'compare' | 'complete';
@@ -656,6 +657,17 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
               <div><strong>{status.title}</strong><span>{status.text}</span></div>
             </div>
 
+            {/* Cadena real de procesamiento (masteringEngine.ts): EQ tonal →
+                Compresión → Limitador → Salida — diagrama, no un selector. */}
+            <div className="master-chain" style={{ gridTemplateColumns: 'repeat(4,1fr)', margin: '0 0 16px' }}>
+              {['EQ tonal', 'Compresión', 'Limitador', 'Salida'].map((label) => (
+                <div key={label} className={selectedPreset.id !== 'neutro' ? 'done' : ''}>
+                  <i>{selectedPreset.id !== 'neutro' ? '✓' : '—'}</i>
+                  <span>{label}</span>
+                </div>
+              ))}
+            </div>
+
             <div className="master-metrics">
               <Metric label="Resolución" value={analysis.bitDepth ? `${analysis.bitDepth}-bit` : 'No detectada'} note={`${(analysis.sampleRate / 1000).toFixed(1)} kHz`} />
               <Metric label="Imagen estéreo" value={analysis.isDualMono ? "Dual-mono" : "Estéreo"} note={analysis.stereoCorrelation === null ? "Sin lectura de fase" : `Correlación ${analysis.stereoCorrelation.toFixed(2)}`} />
@@ -697,6 +709,30 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                     </button>
                   ))}
                 </div>
+
+                {selectedPreset.id !== 'neutro' && (() => {
+                  // Exactly the scaling masteringEngine.ts applies — not a
+                  // rough approximation — so this curve shows what the
+                  // preset + intensidad will really do.
+                  const scale = Math.max(0, Math.min(1, strength / 100));
+                  const bass = Math.max(-1.5, Math.min(1.8, selectedPreset.bass * 0.28 * scale));
+                  const mid = Math.max(-1.4, Math.min(1.5, selectedPreset.mid * 0.24 * scale));
+                  const high = Math.max(-1.2, Math.min(1.5, selectedPreset.high * 0.22 * scale));
+                  return (
+                    <div style={{ marginTop: '18px' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '.08em', color: '#a89db1', marginBottom: '4px' }}>EQ TONAL DE ESTE PRESET · {strength}% DE INTENSIDAD</div>
+                      <EQCurve
+                        readOnly
+                        color={selectedPreset.color}
+                        bands={[
+                          { id: 'low', freqLabel: '115Hz', value: bass },
+                          { id: 'mid', freqLabel: selectedPreset.id === 'acustico' ? '1.65kHz' : '1.2kHz', value: mid },
+                          { id: 'high', freqLabel: '7.2kHz', value: high },
+                        ]}
+                      />
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="master-controls-panel">
@@ -714,23 +750,27 @@ export default function MasteringPage({ onExit }: { onExit?: () => void }) {
                   </select>
                   <button onClick={saveConfiguration}>Guardar {isUnlimited ? '' : '· Unlimited'}</button>
                 </div>
-                <div className="master-control">
-                  <div><strong>Intensidad</strong><span>{strength}%</span></div>
-                  <input type="range" min="0" max="100" value={strength} disabled={selectedPreset.id === 'neutro'} onChange={(event) => setStrength(Number(event.target.value))} />
-                  <small>Sutil</small><small>Fuerte</small>
-                </div>
-                <div className="master-control">
-                  <div><strong>Amplitud estéreo</strong><span>{stereo}%</span></div>
-                  <input type="range" min="0" max="60" value={stereo} disabled={analysis.isDualMono || selectedPreset.id === 'neutro'} onChange={(event) => setStereo(Number(event.target.value))} />
-                  <small>Original</small><small>Amplia</small>
+                <div style={{ display: 'flex', gap: '28px', justifyContent: 'center', margin: '18px 0' }}>
+                  <Knob label="Intensidad" value={strength} min={0} max={100} color={selectedPreset.color}
+                    valueLabel={selectedPreset.id === 'neutro' ? 'N/A' : `${strength}%`}
+                    onChange={(v) => selectedPreset.id !== 'neutro' && setStrength(Math.round(v))} />
+                  <Knob label="Amplitud" value={stereo} min={0} max={60} color={selectedPreset.color}
+                    valueLabel={selectedPreset.id === 'neutro' || analysis.isDualMono ? 'N/A' : `${stereo}%`}
+                    onChange={(v) => selectedPreset.id !== 'neutro' && !analysis.isDualMono && setStereo(Math.round(v))} />
                 </div>
                 {selectedPreset.id === 'neutro' && <div className="master-safe"><i>✓</i><span><strong>Procesamiento neutro</strong>Solo ajustaremos ganancia y protegeremos picos. No se aplican EQ, compresión, amplitud, reverb, delay, saturación ni ruido.</span></div>}
-                <div className="master-loudness">
-                  <strong>Loudness</strong>
-                  <div>
-                    {(['streaming', 'balanced', 'competitive'] as const).map((option) => (
-                      <button className={loudness === option ? 'selected' : ''} key={option} onClick={() => setLoudness(option)}>
-                        {option === 'streaming' ? 'Streaming' : option === 'balanced' ? 'Dinámico' : 'Competitivo'}
+                <div className="master-intent">
+                  <strong>Intención de master</strong>
+                  <div className="master-intent-grid">
+                    {([
+                      { id: 'streaming' as const, icon: '🌿', label: 'Natural', sub: 'Cálido y musical' },
+                      { id: 'balanced' as const, icon: '⚖️', label: 'Equilibrado', sub: 'Claridad y punch' },
+                      { id: 'competitive' as const, icon: '⚡', label: 'Intenso', sub: 'Más nivel y energía' },
+                    ]).map((option) => (
+                      <button className={loudness === option.id ? 'selected' : ''} key={option.id} onClick={() => setLoudness(option.id)}>
+                        <i>{option.icon}</i>
+                        <strong>{option.label}</strong>
+                        <span>{option.sub}</span>
                       </button>
                     ))}
                   </div>
