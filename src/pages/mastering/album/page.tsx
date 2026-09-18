@@ -10,6 +10,7 @@ import type { LoudnessProfile } from '../masteringEngine';
 import { buildAlbumArchive } from './albumArchive';
 import { CompactWaveformComparison } from '../MasteringWaveforms';
 import AlbumCoherenceChart from './AlbumCoherenceChart';
+import { Knob, EQCurve } from '../../home/components/mixControls';
 import StudioTabs from '../../../components/feature/StudioTabs';
 import AudioChatPanel from '../../../components/feature/AudioChatPanel';
 import '../mastering.css';
@@ -379,10 +380,50 @@ export default function AlbumMasteringPage() {
                 <span className="master-kicker">SONIDO COMPARTIDO</span>
                 <h2>Configuración del álbum</h2>
                 <label>Preset<select value={selectedPreset.id} onChange={(event) => { const preset=PRESETS.find((item) => item.id === event.target.value) || PRESETS[0]; setSelectedPreset(preset); if(preset.id==='neutro') setStereo(0); }}>{PRESETS.map((preset) => <option value={preset.id} key={preset.id}>{preset.name}</option>)}</select></label>
-                <label>Intensidad <b>{selectedPreset.id==='neutro'?'No aplica':`${strength}%`}</b><input type="range" min="0" max="100" value={strength} disabled={selectedPreset.id==='neutro'} onChange={(event) => setStrength(Number(event.target.value))} /></label>
-                <label>Amplitud <b>{selectedPreset.id==='neutro'?'Original':`${stereo}%`}</b><input type="range" min="0" max="60" value={stereo} disabled={selectedPreset.id==='neutro'} onChange={(event) => setStereo(Number(event.target.value))} /></label>
+
+                {selectedPreset.id !== 'neutro' && (() => {
+                  const scale = Math.max(0, Math.min(1, strength / 100));
+                  const bass = Math.max(-1.5, Math.min(1.8, selectedPreset.bass * 0.28 * scale));
+                  const mid = Math.max(-1.4, Math.min(1.5, selectedPreset.mid * 0.24 * scale));
+                  const high = Math.max(-1.2, Math.min(1.5, selectedPreset.high * 0.22 * scale));
+                  return (
+                    <div style={{ margin: '4px 0 14px' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '.06em', color: '#a89db1', marginBottom: '4px' }}>EQ TONAL · {strength}% DE INTENSIDAD</div>
+                      <EQCurve readOnly color={selectedPreset.color} bands={[
+                        { id: 'low', freqLabel: '115Hz', value: bass },
+                        { id: 'mid', freqLabel: '1.2kHz', value: mid },
+                        { id: 'high', freqLabel: '7.2kHz', value: high },
+                      ]} />
+                    </div>
+                  );
+                })()}
+
+                <div style={{ display: 'flex', gap: '18px', justifyContent: 'center', margin: '14px 0' }}>
+                  <Knob label="Intensidad" value={strength} min={0} max={100} size={44} color={selectedPreset.color}
+                    valueLabel={selectedPreset.id==='neutro'?'N/A':`${strength}%`}
+                    onChange={(v) => selectedPreset.id!=='neutro' && setStrength(Math.round(v))} />
+                  <Knob label="Amplitud" value={stereo} min={0} max={60} size={44} color={selectedPreset.color}
+                    valueLabel={selectedPreset.id==='neutro'?'N/A':`${stereo}%`}
+                    onChange={(v) => selectedPreset.id!=='neutro' && setStereo(Math.round(v))} />
+                </div>
                 {selectedPreset.id==='neutro' && <p className="album-processing-label">Solo normalización transparente y protección de picos; sin EQ, compresión, efectos ni cambio estéreo.</p>}
-                <label>Loudness<select value={loudness} onChange={(event) => setLoudness(event.target.value as LoudnessProfile)}><option value="streaming">Streaming</option><option value="balanced">Balanceado</option><option value="competitive">Competitivo</option></select></label>
+
+                <div className="master-intent" style={{ marginTop: '10px' }}>
+                  <strong>Intención de master</strong>
+                  <div className="master-intent-grid" style={{ gridTemplateColumns: '1fr' }}>
+                    {([
+                      { id: 'streaming' as const, icon: '🌿', label: 'Natural', sub: 'Cálido y musical' },
+                      { id: 'balanced' as const, icon: '⚖️', label: 'Equilibrado', sub: 'Claridad y punch' },
+                      { id: 'competitive' as const, icon: '⚡', label: 'Intenso', sub: 'Más nivel y energía' },
+                    ]).map((option) => (
+                      <button className={loudness === option.id ? 'selected' : ''} key={option.id} onClick={() => setLoudness(option.id)}>
+                        <i>{option.icon}</i>
+                        <strong>{option.label}</strong>
+                        <span>{option.sub}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {stage === 'configure' && <button className="album-process" onClick={processAlbum} disabled={tracks.length < 2}>Masterizar {tracks.length} canciones</button>}
                 {stage === 'processing' && <div className="album-processing-label"><strong>Canción {currentTrack} de {tracks.length}</strong><span>Procesamos una a la vez para proteger la memoria.</span></div>}
                 {stage === 'results' && (
